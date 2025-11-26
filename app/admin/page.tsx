@@ -20,11 +20,11 @@ const genderOptions = [
 type Lang = "es" | "en";
 
 const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
-  available: { es: "disponible", en: "available" },
-  reserved: { es: "apartado", en: "reserved" },
-  paid: { es: "pagado", en: "paid" },
-  delivered: { es: "entregado", en: "delivered" },
-  cancelled: { es: "cancelado", en: "cancelled" },
+  available: { es: "Disponible", en: "Available" },
+  reserved: { es: "Apartado", en: "Reserved" },
+  paid: { es: "Pagado", en: "Paid" },
+  delivered: { es: "Entregado", en: "Delivered" },
+  cancelled: { es: "Cancelado", en: "Cancelled" },
 };
 
 export default function AdminPage() {
@@ -35,23 +35,26 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // filters
-  const [sizeFilter, setSizeFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
-    "all"
-  );
-  const [genderFilter, setGenderFilter] = useState<"all" | string>("all");
-  const [customerQuery, setCustomerQuery] = useState("");
 
-
-
-  // form state
-  const [modelName, setModelName] = useState("");
-  const [color, setColor] = useState("");
+  // Add form state
+  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+  const [colors, setColors] = useState<{ id: string; name_en: string }[]>([]);
+  const [modelSelect, setModelSelect] = useState<string>("other");
+  const [newModelName, setNewModelName] = useState("");
+  const [colorSelect, setColorSelect] = useState<string>("other");
+  const [newColorName, setNewColorName] = useState("");
   const [size, setSize] = useState("");
   const [gender, setGender] = useState("unisex");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
+    "all"
+  );
+  const [genderFilter, setGenderFilter] = useState<"all" | string>("all");
+  const [sizeFilter, setSizeFilter] = useState<string>("all");
+  const [customerQuery, setCustomerQuery] = useState("");
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -78,19 +81,56 @@ export default function AdminPage() {
     }
   }
 
+  async function loadLookups() {
+  if (!adminPassword) return;
+
+  const [modelsRes, colorsRes] = await Promise.all([
+    fetch(`/api/admin/models?password=${adminPassword}`).then((r) => r.json()),
+    fetch(`/api/admin/colors?password=${adminPassword}`).then((r) => r.json()),
+  ]);
+
+  setModels(modelsRes.models || []);
+  setColors(colorsRes.colors || []);
+}
+
+
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
     if (!adminPassword) return;
-
     setMessage(null);
+
+    const finalModel =
+      modelSelect === "other" ? newModelName.trim() : modelSelect.trim();
+    const finalColor =
+      colorSelect === "other" ? newColorName.trim() : colorSelect.trim();
+
+    if (!finalModel) {
+      setMessage(
+        t(
+          "Debes escribir un modelo nuevo o elegir uno existente.",
+          "You must enter a new model or choose an existing one."
+        )
+      );
+      return;
+    }
+
+    if (!finalColor) {
+      setMessage(
+        t(
+          "Debes escribir un color nuevo o elegir uno existente.",
+          "You must enter a new color or choose an existing one."
+        )
+      );
+      return;
+    }
 
     const res = await fetch("/api/admin/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         adminPassword,
-        model_name: modelName.trim(),
-        color: color.trim(),
+        model_name: finalModel,
+        color: finalColor, // stored in English in DB
         size: size.trim(),
         price_mxn: Number(price),
         gender,
@@ -107,12 +147,17 @@ export default function AdminPage() {
     setMessage(
       t("Inventario agregado correctamente ✅", "Inventory added successfully ✅")
     );
-    setModelName("");
-    setColor("");
+
+    // reset form
+    setModelSelect("other");
+    setNewModelName("");
+    setColorSelect("other");
+    setNewColorName("");
     setSize("");
     setPrice("");
     setQuantity("1");
     setGender("unisex");
+
     loadItems();
   }
 
@@ -136,11 +181,18 @@ export default function AdminPage() {
   useEffect(() => {
     if (adminPassword) {
       loadItems();
+      loadLookups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminPassword]);
 
-    const filteredItems = items.filter((item) => {
+  // derive options from DB inventory
+  const modelOptions = models.map((m) => m.name);
+  const colorOptions = colors.map((c) => c.name_en);
+
+  const sizeOptions = Array.from(new Set(items.map((i) => i.size))).sort();
+
+  const filteredItems = items.filter((item) => {
     const matchesStatus =
       statusFilter === "all" || item.status === statusFilter;
 
@@ -157,7 +209,6 @@ export default function AdminPage() {
 
     return matchesStatus && matchesGender && matchesCustomer && matchesSize;
   });
-
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900">
@@ -275,80 +326,125 @@ export default function AdminPage() {
             onSubmit={handleAdd}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <Field
-              label={t("Modelo", "Model")}
-              children={
-                <input
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  required
-                />
-              }
-            />
-            <Field
-              label={t("Color (inglés)", "Color (English)")}
-              children={
-                <input
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  required
-                />
-              }
-            />
-            <Field
-              label={t("Talla", "Size")}
-              children={
-                <input
-                  value={size}
-                  onChange={(e) => setSize(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  required
-                />
-              }
-            />
-            <Field
-              label={t("Para", "For")}
-              children={
+            {/* Model select + other */}
+            <Field label={t("Modelo", "Model")}>
+              <div className="space-y-1">
                 <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
+                  value={modelSelect}
+                  onChange={(e) => {
+                    setModelSelect(e.target.value);
+                    if (e.target.value !== "other") {
+                      setNewModelName("");
+                    }
+                  }}
                   className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
                 >
-                  {genderOptions.map((g) => (
-                    <option key={g.value} value={g.value}>
-                      {t(g.labelEs, g.labelEn)}
+                  <option value="other">
+                    {t("Otro (nuevo modelo)", "Other (new model)")}
+                  </option>
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
                 </select>
-              }
-            />
-            <Field
-              label={t("Precio MXN", "Price MXN")}
-              children={
-                <input
-                  type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  required
-                />
-              }
-            />
-            <Field
-              label={t("Cantidad", "Quantity")}
-              children={
-                <input
-                  type="number"
-                  min={1}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  required
-                />
-              }
-            />
+                {modelSelect === "other" && (
+                  <input
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                    placeholder={t(
+                      "Escribe el nombre del modelo",
+                      "Type the new model name"
+                    )}
+                  />
+                )}
+              </div>
+            </Field>
+
+            {/* Color select + other */}
+            <Field label={t("Color (inglés)", "Color (English)")}>
+              <div className="space-y-1">
+                <select
+                  value={colorSelect}
+                  onChange={(e) => {
+                    setColorSelect(e.target.value);
+                    if (e.target.value !== "other") {
+                      setNewColorName("");
+                    }
+                  }}
+                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                >
+                  <option value="other">
+                    {t("Otro (nuevo color)", "Other (new color)")}
+                  </option>
+                  {colorOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                {colorSelect === "other" && (
+                  <input
+                    value={newColorName}
+                    onChange={(e) => setNewColorName(e.target.value)}
+                    className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                    placeholder={t(
+                      "Escribe el color en inglés (ej. 'Black')",
+                      "Type the color in English (e.g. 'Black')"
+                    )}
+                  />
+                )}
+              </div>
+            </Field>
+
+            {/* Size */}
+            <Field label={t("Talla", "Size")}>
+              <input
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                required
+              />
+            </Field>
+
+            {/* Gender */}
+            <Field label={t("Para", "For")}>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+              >
+                {genderOptions.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {t(g.labelEs, g.labelEn)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {/* Price */}
+            <Field label={t("Precio MXN", "Price MXN")}>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                required
+              />
+            </Field>
+
+            {/* Quantity */}
+            <Field label={t("Cantidad", "Quantity")}>
+              <input
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                required
+              />
+            </Field>
 
             <div className="sm:col-span-2 lg:col-span-3 flex justify-end items-center">
               <button
@@ -366,146 +462,139 @@ export default function AdminPage() {
           )}
         </section>
 
-        {/* Inventory list */}
+        {/* Inventory list + filters */}
         <section className="bg-slate-950/80 border border-slate-800 rounded-2xl shadow-lg shadow-black/30 p-4 sm:p-5 space-y-4">
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h2 className="text-sm sm:text-base font-semibold text-slate-50">
-        {t("Inventario completo", "Full inventory")}
-      </h2>
-      <p className="text-[11px] text-slate-500">
-        {t(
-          `${items.length} pares en total`,
-          `${items.length} pairs total`
-        )}
-      </p>
-      {filteredItems.length !== items.length && (
-        <p className="text-[11px] text-emerald-300 mt-0.5">
-          {t(
-            `${filteredItems.length} resultados después de filtros`,
-            `${filteredItems.length} results after filters`
-          )}
-        </p>
-      )}
-    </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-slate-50">
+                {t("Inventario completo", "Full inventory")}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {t(
+                  `${items.length} pares en total`,
+                  `${items.length} pairs total`
+                )}
+              </p>
+              {filteredItems.length !== items.length && (
+                <p className="text-[11px] text-emerald-300 mt-0.5">
+                  {t(
+                    `${filteredItems.length} resultados después de filtros`,
+                    `${filteredItems.length} results after filters`
+                  )}
+                </p>
+              )}
+            </div>
 
-    {/* filters */}
-    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full sm:w-auto sm:min-w-[550px] text-[11px]">
-      {/* status filter */}
-      <div className="flex flex-col gap-1">
-        <span className="text-slate-300">
-          {t("Estatus", "Status")}
-        </span>
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            setStatusFilter(
-              e.target.value === "all"
-                ? "all"
-                : (e.target.value as InventoryStatus)
-            )
-          }
-          className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-        >
-          <option value="all">
-            {t("Todos", "All")}
-          </option>
-          {statusOptions.map((st) => (
-            <option key={st} value={st}>
-              {statusLabel[st][lang]}
-            </option>
-          ))}
-        </select>
-      </div>
+            {/* filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full sm:w-auto sm:min-w-[550px] text-[11px]">
+              {/* status filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-300">
+                  {t("Estatus", "Status")}
+                </span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(
+                      e.target.value === "all"
+                        ? "all"
+                        : (e.target.value as InventoryStatus)
+                    )
+                  }
+                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                >
+                  <option value="all">{t("Todos", "All")}</option>
+                  {statusOptions.map((st) => (
+                    <option key={st} value={st}>
+                      {statusLabel[st][lang]}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-      {/* gender filter */}
-      <div className="flex flex-col gap-1">
-        <span className="text-slate-300">
-          {t("Para", "For")}
-        </span>
-        <select
-          value={genderFilter}
-          onChange={(e) => setGenderFilter(e.target.value)}
-          className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-        >
-          <option value="all">
-            {t("Todos", "All")}
-          </option>
-          {genderOptions.map((g) => (
-            <option key={g.value} value={g.value}>
-              {t(g.labelEs, g.labelEn)}
-            </option>
-          ))}
-        </select>
-      </div>
+              {/* gender filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-300">
+                  {t("Para", "For")}
+                </span>
+                <select
+                  value={genderFilter}
+                  onChange={(e) => setGenderFilter(e.target.value)}
+                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                >
+                  <option value="all">{t("Todos", "All")}</option>
+                  {genderOptions.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {t(g.labelEs, g.labelEn)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-      {/* size filter */}
-<div className="flex flex-col gap-1">
-  <span className="text-slate-300">
-    {t("Talla", "Size")}
-  </span>
-  <select
-    value={sizeFilter}
-    onChange={(e) => setSizeFilter(e.target.value)}
-    className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-  >
-    <option value="all">{t("Todas", "All")}</option>
+              {/* size filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-300">
+                  {t("Talla", "Size")}
+                </span>
+                <select
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value)}
+                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                >
+                  <option value="all">{t("Todas", "All")}</option>
+                  {sizeOptions.map((sz) => (
+                    <option key={sz} value={sz}>
+                      {sz}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-    {/* dynamically load all sizes */}
-    {Array.from(new Set(items.map((i) => i.size))).map((size) => (
-      <option key={size} value={size}>
-        {size}
-      </option>
-    ))}
-  </select>
-</div>
-
-
-      {/* customer search */}
-      <div className="flex flex-col gap-1">
-        <span className="text-slate-300">
-          {t("Cliente / WhatsApp", "Customer / WhatsApp")}
-        </span>
-        <input
-          value={customerQuery}
-          onChange={(e) => setCustomerQuery(e.target.value)}
-          className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-          placeholder={
-            lang === "es" ? "Buscar nombre o +52..." : "Search name or +52..."
-          }
-        />
-      </div>
-    </div>
-  </div>
-
+              {/* customer search */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-300">
+                  {t("Cliente / WhatsApp", "Customer / WhatsApp")}
+                </span>
+                <input
+                  value={customerQuery}
+                  onChange={(e) => setCustomerQuery(e.target.value)}
+                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  placeholder={
+                    lang === "es"
+                      ? "Buscar nombre o +52..."
+                      : "Search name or +52..."
+                  }
+                />
+              </div>
+            </div>
+          </div>
 
           {items.length === 0 ? (
-  <p className="text-xs text-slate-400">
-    {t(
-      "No hay pares cargados todavía o la contraseña es incorrecta.",
-      "No pairs loaded yet, or password is incorrect."
-    )}
-  </p>
-) : filteredItems.length === 0 ? (
-  <p className="text-xs text-slate-400">
-    {t(
-      "No hay resultados con estos filtros.",
-      "No results with these filters."
-    )}
-  </p>
-) : (
-  <div className="space-y-3">
-    {filteredItems.map((item) => (
-      <InventoryCard
-        key={item.id}
-        item={item}
-        lang={lang}
-        onUpdate={updateItem}
-      />
-    ))}
-  </div>
-)}
-
+            <p className="text-xs text-slate-400">
+              {t(
+                "No hay pares cargados todavía o la contraseña es incorrecta.",
+                "No pairs loaded yet, or password is incorrect."
+              )}
+            </p>
+          ) : filteredItems.length === 0 ? (
+            <p className="text-xs text-slate-400">
+              {t(
+                "No hay resultados con estos filtros.",
+                "No results with these filters."
+              )}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {filteredItems.map((item) => (
+                <InventoryCard
+                  key={item.id}
+                  item={item}
+                  lang={lang}
+                  onUpdate={updateItem}
+                />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
@@ -540,18 +629,6 @@ function InventoryCard({
 }) {
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
-  const statusBadge =
-    item.status === "available"
-      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40"
-      : item.status === "reserved"
-      ? "bg-amber-500/15 text-amber-200 border border-amber-500/40"
-      : item.status === "paid"
-      ? "bg-sky-500/15 text-sky-200 border border-sky-500/40"
-      : item.status === "delivered"
-      ? "bg-slate-500/15 text-slate-200 border border-slate-400/40"
-      : "bg-rose-500/15 text-rose-200 border border-rose-500/40";
-
-  // 👇 Local editable state (no auto save)
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
   const [localGender, setLocalGender] = useState(item.gender);
   const [localCustomerName, setLocalCustomerName] = useState(
@@ -563,7 +640,6 @@ function InventoryCard({
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [saving, setSaving] = useState(false);
 
-  // If parent reloads items, sync the local state
   useEffect(() => {
     setLocalStatus(item.status);
     setLocalGender(item.gender);
@@ -592,6 +668,17 @@ function InventoryCard({
     });
     setSaving(false);
   }
+
+  const statusBadge =
+    item.status === "available"
+      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40"
+      : item.status === "reserved"
+      ? "bg-amber-500/15 text-amber-200 border border-amber-500/40"
+      : item.status === "paid"
+      ? "bg-sky-500/15 text-sky-200 border border-sky-500/40"
+      : item.status === "delivered"
+      ? "bg-slate-500/15 text-slate-200 border border-slate-400/40"
+      : "bg-rose-500/15 text-rose-200 border border-rose-500/40";
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3 sm:p-4 space-y-3">
@@ -627,19 +714,19 @@ function InventoryCard({
           <label className="text-[11px] font-medium text-slate-300">
             {t("Estatus", "Status")}
           </label>
-         <select
-  value={localStatus}
-  onChange={(e) =>
-    setLocalStatus(e.target.value as InventoryStatus)
-  }
-  className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
->
-  {statusOptions.map((st) => (
-    <option key={st} value={st}>
-      {statusLabel[st][lang]}
-    </option>
-  ))}
-</select>
+          <select
+            value={localStatus}
+            onChange={(e) =>
+              setLocalStatus(e.target.value as InventoryStatus)
+            }
+            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+          >
+            {statusOptions.map((st) => (
+              <option key={st} value={st}>
+                {statusLabel[st][lang]}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1">
@@ -712,4 +799,3 @@ function InventoryCard({
     </div>
   );
 }
-
