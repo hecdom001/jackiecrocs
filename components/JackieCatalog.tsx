@@ -193,7 +193,7 @@ export function JackieCatalog() {
             </div>
             <div>
               <h1 className="text-sm sm:text-base font-semibold text-slate-900">
-                Jackie Crocs
+                Jacky Crocs
               </h1>
               <p className="text-[11px] text-slate-500">
                 {t(
@@ -250,7 +250,7 @@ export function JackieCatalog() {
         <section className="space-y-3">
           <div>
             <h2 className="text-lg sm:text-2xl font-semibold text-slate-900 flex items-center gap-2">
-              {lang === "es" ? "Crocs disponibles 👟" : "Available Crocs 👟"}
+              {lang === "es" ? "Crocs disponibles" : "Available Crocs"}
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-xl">
               {lang === "es"

@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 const statusOptions: InventoryStatus[] = [
   "available",
   "reserved",
-  "paid",
+  "paid_complete",
+  "paid_partial",
   "delivered",
   "cancelled",
 ];
@@ -17,7 +18,8 @@ type Lang = "es" | "en";
 const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   available: { es: "Disponible", en: "Available" },
   reserved: { es: "Apartado", en: "Reserved" },
-  paid: { es: "Pagado", en: "Paid" },
+  paid_complete: { es: "Pagado Completo", en: "Fully Paid" },
+  paid_partial: { es: "Pagado Incompleto", en: "Partially Paid" },
   delivered: { es: "Entregado", en: "Delivered" },
   cancelled: { es: "Cancelado", en: "Cancelled" },
 };
@@ -262,7 +264,7 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-sm sm:text-base font-semibold text-slate-50">
-                Jackie Crocs Admin
+                Jacky Crocs Admin
               </h1>
               <p className="text-[11px] text-slate-400">
                 {t(
