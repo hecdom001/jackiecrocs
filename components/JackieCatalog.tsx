@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { track } from "@vercel/analytics";
 
 type Lang = "es" | "en";
 
@@ -502,20 +503,29 @@ export function JackieCatalog() {
                   }`}
             </p>
             <a
-              href={waLinkForSelected || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition ${
-                WHATSAPP_NUMBER
-                  ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                  : "bg-slate-300 text-slate-600 cursor-not-allowed"
-              }`}
-            >
-              <span className="text-base">📲</span>
-              {lang === "es"
-                ? "Pedir todos los seleccionados por WhatsApp"
-                : "Request all selected via WhatsApp"}
-            </a>
+            href={waLinkForSelected || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              // don’t track if something is wrong
+              if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+
+              track("whatsapp_click_multi", {
+                count: selectedItems.length,
+                lang,
+              });
+            }}
+            className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition ${
+              WHATSAPP_NUMBER
+                ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                : "bg-slate-300 text-slate-600 cursor-not-allowed"
+            }`}
+          >
+            <span className="text-base">📲</span>
+            {lang === "es"
+              ? "Pedir todos los seleccionados por WhatsApp"
+              : "Request all selected via WhatsApp"}
+          </a>
           </div>
         </div>
       )}
