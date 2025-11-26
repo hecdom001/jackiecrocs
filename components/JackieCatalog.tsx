@@ -10,14 +10,7 @@ type PublicItem = {
   model_name: string;
   color: string; // English (from colors.name_en)
   size: string;
-  gender: "men" | "women" | "unisex";
   price_mxn: number;
-};
-
-const genderLabel: Record<PublicItem["gender"], { es: string; en: string }> = {
-  men: { es: "Hombre", en: "Men" },
-  women: { es: "Mujer", en: "Women" },
-  unisex: { es: "Unisex", en: "Unisex" },
 };
 
 function translateColor(colorEn: string, lang: Lang) {
@@ -68,7 +61,6 @@ function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   Modelo: ${item.model_name || "Crocs"}
   Color: ${colorEs} (${item.color})
   Talla: ${item.size}
-  Para: ${genderLabel[item.gender].es}
   Precio: $${item.price_mxn.toFixed(0)} MXN`;
   });
 
@@ -77,7 +69,6 @@ function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   Model: ${item.model_name || "Crocs"}
   Color: ${item.color}
   Size: ${item.size}
-  For: ${genderLabel[item.gender].en}
   Price: $${item.price_mxn.toFixed(0)} MXN`;
   });
 
@@ -111,10 +102,6 @@ export function JackieCatalog() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const [genderFilter, setGenderFilter] = useState<
-    "all" | PublicItem["gender"]
-  >("all");
   const [sizeFilter, setSizeFilter] = useState<string>("all");
 
   // multi-select
@@ -132,7 +119,6 @@ export function JackieCatalog() {
         `
         id,
         size,
-        gender,
         price_mxn,
         status,
         models ( name ),
@@ -153,7 +139,6 @@ export function JackieCatalog() {
       data?.map((row: any) => ({
         id: row.id,
         size: row.size,
-        gender: row.gender,
         price_mxn: Number(row.price_mxn),
         model_name: row.models?.name ?? "",
         color: row.colors?.name_en ?? "",
@@ -177,9 +162,8 @@ export function JackieCatalog() {
   const allSizes = Array.from(new Set(items.map((i) => i.size))).sort();
 
   const filtered = items.filter((item) => {
-    const byGender = genderFilter === "all" || item.gender === genderFilter;
     const bySize = sizeFilter === "all" || item.size === sizeFilter;
-    return byGender && bySize;
+    return  bySize;
   });
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
@@ -324,31 +308,6 @@ export function JackieCatalog() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-            {/* gender filter */}
-            <div className="flex flex-col gap-1">
-              <span className="text-slate-800">
-                {lang === "es" ? "Para:" : "For:"}
-              </span>
-              <select
-                value={genderFilter}
-                onChange={(e) =>
-                  setGenderFilter(
-                    e.target.value === "all"
-                      ? "all"
-                      : (e.target.value as PublicItem["gender"])
-                  )
-                }
-                className="border border-emerald-100 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-300"
-              >
-                <option value="all">
-                  {lang === "es" ? "Todos" : "All"}
-                </option>
-                <option value="women">{genderLabel.women[lang]}</option>
-                <option value="men">{genderLabel.men[lang]}</option>
-                <option value="unisex">{genderLabel.unisex[lang]}</option>
-              </select>
-            </div>
-
             {/* size filter */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-800">
@@ -437,7 +396,6 @@ export function JackieCatalog() {
                           <span className="font-medium text-slate-800">
                             {item.size}
                           </span>{" "}
-                          · {genderLabel[item.gender][lang]}
                         </p>
                       </div>
                       <div className="text-right">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import type { InventoryItem, InventoryStatus } from "@/types/inventory";
+import { supabase } from "@/lib/supabaseClient";
 
 const statusOptions: InventoryStatus[] = [
   "available",
@@ -9,12 +10,6 @@ const statusOptions: InventoryStatus[] = [
   "paid",
   "delivered",
   "cancelled",
-];
-
-const genderOptions = [
-  { value: "unisex", labelEs: "Unisex", labelEn: "Unisex" },
-  { value: "men", labelEs: "Hombre", labelEn: "Men" },
-  { value: "women", labelEs: "Mujer", labelEn: "Women" },
 ];
 
 type Lang = "es" | "en";
@@ -27,6 +22,11 @@ const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   cancelled: { es: "Cancelado", en: "Cancelled" },
 };
 
+type SizeOption = {
+  id: string;
+  label: string;
+};
+
 export default function AdminPage() {
   const [lang, setLang] = useState<Lang>("es");
   const [adminPassword, setAdminPassword] = useState("");
@@ -35,25 +35,28 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-
-  // Add form state
+  // Lookups / form state
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [colors, setColors] = useState<{ id: string; name_en: string }[]>([]);
-  const [modelSelect, setModelSelect] = useState<string>("other");
+  const [modelSelect, setModelSelect] = useState<string>("");
   const [newModelName, setNewModelName] = useState("");
-  const [colorSelect, setColorSelect] = useState<string>("other");
+  const [colorSelect, setColorSelect] = useState<string>("");
   const [newColorName, setNewColorName] = useState("");
   const [size, setSize] = useState("");
-  const [gender, setGender] = useState("unisex");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
+
+  // Sizes lookup
+  const [sizes, setSizes] = useState<SizeOption[]>([]);
+  const [sizesLoading, setSizesLoading] = useState(true);
+  const [sizesError, setSizesError] = useState<string | null>(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
     "all"
   );
-  const [genderFilter, setGenderFilter] = useState<"all" | string>("all");
   const [sizeFilter, setSizeFilter] = useState<string>("all");
+  const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
@@ -82,17 +85,45 @@ export default function AdminPage() {
   }
 
   async function loadLookups() {
-  if (!adminPassword) return;
+    if (!adminPassword) return;
 
-  const [modelsRes, colorsRes] = await Promise.all([
-    fetch(`/api/admin/models?password=${adminPassword}`).then((r) => r.json()),
-    fetch(`/api/admin/colors?password=${adminPassword}`).then((r) => r.json()),
-  ]);
+    const [modelsRes, colorsRes] = await Promise.all([
+      fetch(`/api/admin/models?password=${adminPassword}`).then((r) =>
+        r.json()
+      ),
+      fetch(`/api/admin/colors?password=${adminPassword}`).then((r) =>
+        r.json()
+      ),
+    ]);
 
-  setModels(modelsRes.models || []);
-  setColors(colorsRes.colors || []);
-}
+    setModels(modelsRes.models || []);
+    setColors(colorsRes.colors || []);
+  }
 
+  // Load sizes from Supabase (no password needed, read-only)
+  useEffect(() => {
+    async function loadSizes() {
+      setSizesLoading(true);
+      setSizesError(null);
+
+      const { data, error } = await supabase
+        .from("sizes")
+        .select("id, label")
+        .order("sort_order", { ascending: true });
+
+      if (error) {
+        console.error("Error loading sizes:", error);
+        setSizesError("Error loading sizes");
+        setSizesLoading(false);
+        return;
+      }
+
+      setSizes(data ?? []);
+      setSizesLoading(false);
+    }
+
+    loadSizes();
+  }, []);
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
@@ -124,6 +155,13 @@ export default function AdminPage() {
       return;
     }
 
+    if (!size) {
+      setMessage(
+        t("Debes seleccionar una talla.", "You must select a size.")
+      );
+      return;
+    }
+
     const res = await fetch("/api/admin/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,9 +169,8 @@ export default function AdminPage() {
         adminPassword,
         model_name: finalModel,
         color: finalColor, // stored in English in DB
-        size: size.trim(),
+        size: size.trim(), // label from dropdown, e.g. "M5-W7"
         price_mxn: Number(price),
-        gender,
         quantity: Number(quantity),
       }),
     });
@@ -156,7 +193,6 @@ export default function AdminPage() {
     setSize("");
     setPrice("");
     setQuantity("1");
-    setGender("unisex");
 
     loadItems();
   }
@@ -186,29 +222,34 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminPassword]);
 
-  // derive options from DB inventory
+  // derive options from DB inventory + lookups
   const modelOptions = models.map((m) => m.name);
   const colorOptions = colors.map((c) => c.name_en);
-
   const sizeOptions = Array.from(new Set(items.map((i) => i.size))).sort();
 
+  const colorFilterOptions = Array.from(
+  new Set(items.map((i) => i.color))
+)
+  .filter(Boolean)
+  .sort((a, b) => a.localeCompare(b));
+
   const filteredItems = items.filter((item) => {
-    const matchesStatus =
-      statusFilter === "all" || item.status === statusFilter;
+  const matchesStatus =
+    statusFilter === "all" || item.status === statusFilter;
 
-    const matchesGender =
-      genderFilter === "all" || item.gender === genderFilter;
+  const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
 
-    const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
+  const matchesColor =
+    colorFilter === "all" || item.color === colorFilter;
 
-    const query = customerQuery.trim().toLowerCase();
-    const matchesCustomer =
-      !query ||
-      (item.customer_name || "").toLowerCase().includes(query) ||
-      (item.customer_whatsapp || "").toLowerCase().includes(query);
+  const query = customerQuery.trim().toLowerCase();
+  const matchesCustomer =
+    !query ||
+    (item.customer_name || "").toLowerCase().includes(query) ||
+    (item.customer_whatsapp || "").toLowerCase().includes(query);
 
-    return matchesStatus && matchesGender && matchesCustomer && matchesSize;
-  });
+  return matchesStatus && matchesCustomer && matchesSize && matchesColor;
+});
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900">
@@ -268,7 +309,7 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Access + refresh */}
         <section className="bg-slate-900/80 border border-slate-700 rounded-2xl shadow-lg shadow-black/30 p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items=end sm:justify-between">
             <div className="w-full sm:max-w-md">
               <label className="block text-xs font-medium text-slate-200 mb-1">
                 {t("Contraseña admin", "Admin password")}
@@ -326,41 +367,51 @@ export default function AdminPage() {
             onSubmit={handleAdd}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
-            {/* Model select + other */}
-            <Field label={t("Modelo", "Model")}>
-              <div className="space-y-1">
-                <select
-                  value={modelSelect}
-                  onChange={(e) => {
-                    setModelSelect(e.target.value);
-                    if (e.target.value !== "other") {
-                      setNewModelName("");
-                    }
-                  }}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                >
-                  <option value="other">
-                    {t("Otro (nuevo modelo)", "Other (new model)")}
+           {/* Model select + other */}
+          <Field label={t("Modelo", "Model")}>
+            <div className="space-y-1">
+              <select
+                value={modelSelect}
+                onChange={(e) => {
+                  setModelSelect(e.target.value);
+                  if (e.target.value !== "other") {
+                    setNewModelName("");
+                  }
+                }}
+                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                required
+              >
+                {/* Placeholder */}
+                <option value="" disabled>
+                  {t("Selecciona un modelo", "Select a model")}
+                </option>
+
+                <option value="other">
+                  {t("Otro (nuevo modelo)", "Other (new model)")}
+                </option>
+
+                {modelOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
                   </option>
-                  {modelOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-                {modelSelect === "other" && (
-                  <input
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                    placeholder={t(
-                      "Escribe el nombre del modelo",
-                      "Type the new model name"
-                    )}
-                  />
-                )}
-              </div>
-            </Field>
+                ))}
+              </select>
+
+              {modelSelect === "other" && (
+                <input
+                  value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  placeholder={t(
+                    "Escribe el nombre del modelo",
+                    "Type the new model name"
+                  )}
+                  required
+                />
+              )}
+            </div>
+          </Field>
+
 
             {/* Color select + other */}
             <Field label={t("Color (inglés)", "Color (English)")}>
@@ -374,16 +425,24 @@ export default function AdminPage() {
                     }
                   }}
                   className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  required
                 >
+                  {/* Placeholder */}
+                  <option value="" disabled>
+                    {t("Selecciona un color", "Select a color")}
+                  </option>
+
                   <option value="other">
                     {t("Otro (nuevo color)", "Other (new color)")}
                   </option>
+
                   {colorOptions.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
                   ))}
                 </select>
+
                 {colorSelect === "other" && (
                   <input
                     value={newColorName}
@@ -393,34 +452,39 @@ export default function AdminPage() {
                       "Escribe el color en inglés (ej. 'Black')",
                       "Type the color in English (e.g. 'Black')"
                     )}
+                    required
                   />
                 )}
               </div>
             </Field>
 
-            {/* Size */}
+            {/* Size (dropdown from DB) */}
             <Field label={t("Talla", "Size")}>
-              <input
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                required
-              />
-            </Field>
-
-            {/* Gender */}
-            <Field label={t("Para", "For")}>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-              >
-                {genderOptions.map((g) => (
-                  <option key={g.value} value={g.value}>
-                    {t(g.labelEs, g.labelEn)}
+              {sizesLoading ? (
+                <div className="text-[11px] text-slate-400">
+                  {t("Cargando tallas…", "Loading sizes…")}
+                </div>
+              ) : sizesError ? (
+                <div className="text-[11px] text-red-400">
+                  {sizesError}
+                </div>
+              ) : (
+                <select
+                  value={size}
+                  onChange={(e) => setSize(e.target.value)}
+                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  required
+                >
+                  <option value="" disabled>
+                    {t("Selecciona una talla", "Select a size")}
                   </option>
-                ))}
-              </select>
+                  {sizes.map((s) => (
+                    <option key={s.id} value={s.label}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
 
             {/* Price */}
@@ -512,25 +576,6 @@ export default function AdminPage() {
                 </select>
               </div>
 
-              {/* gender filter */}
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-300">
-                  {t("Para", "For")}
-                </span>
-                <select
-                  value={genderFilter}
-                  onChange={(e) => setGenderFilter(e.target.value)}
-                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                >
-                  <option value="all">{t("Todos", "All")}</option>
-                  {genderOptions.map((g) => (
-                    <option key={g.value} value={g.value}>
-                      {t(g.labelEs, g.labelEn)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* size filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-slate-300">
@@ -543,6 +588,25 @@ export default function AdminPage() {
                 >
                   <option value="all">{t("Todas", "All")}</option>
                   {sizeOptions.map((sz) => (
+                    <option key={sz} value={sz}>
+                      {sz}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+               {/* color filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-300">
+                  {t("Color", "Color")}
+                </span>
+                <select
+                  value={colorFilter}
+                  onChange={(e) => setColorFilter(e.target.value)}
+                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                >
+                  <option value="all">{t("Todas", "All")}</option>
+                  {colorOptions.map((sz) => (
                     <option key={sz} value={sz}>
                       {sz}
                     </option>
@@ -630,7 +694,6 @@ function InventoryCard({
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localGender, setLocalGender] = useState(item.gender);
   const [localCustomerName, setLocalCustomerName] = useState(
     item.customer_name || ""
   );
@@ -642,7 +705,6 @@ function InventoryCard({
 
   useEffect(() => {
     setLocalStatus(item.status);
-    setLocalGender(item.gender);
     setLocalCustomerName(item.customer_name || "");
     setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
@@ -650,7 +712,6 @@ function InventoryCard({
 
   const hasChanges =
     localStatus !== item.status ||
-    localGender !== item.gender ||
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
     localNotes !== (item.notes || "");
@@ -661,7 +722,6 @@ function InventoryCard({
     await onUpdate({
       id: item.id,
       status: localStatus,
-      gender: localGender as any,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -724,23 +784,6 @@ function InventoryCard({
             {statusOptions.map((st) => (
               <option key={st} value={st}>
                 {statusLabel[st][lang]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-300">
-            {t("Para", "For")}
-          </label>
-          <select
-            value={localGender}
-            onChange={(e) => setLocalGender(e.target.value)}
-            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-          >
-            {genderOptions.map((g) => (
-              <option key={g.value} value={g.value}>
-                {t(g.labelEs, g.labelEn)}
               </option>
             ))}
           </select>

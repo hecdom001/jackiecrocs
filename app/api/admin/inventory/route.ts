@@ -36,7 +36,6 @@ export async function GET(req: NextRequest) {
       model_id,
       color_id,
       size,
-      gender,
       price_mxn,
       status,
       customer_name,
@@ -67,7 +66,6 @@ export async function GET(req: NextRequest) {
       model_name: row.models?.name as string,
       color: row.colors?.name_en as string,
       size: row.size as string,
-      gender: row.gender as "men" | "women" | "unisex",
       price_mxn: Number(row.price_mxn),
       status: row.status as any,
       customer_name: row.customer_name as string | null,
@@ -82,7 +80,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/inventory
- * Body: { adminPassword, model_name, color, size, price_mxn, gender, quantity }
+ * Body: { adminPassword, model_name, color, size, price_mxn, quantity }
  * - Ensures model exists in `models`
  * - Ensures color exists in `colors`
  * - Inserts N inventory_items rows with those IDs
@@ -96,7 +94,6 @@ export async function POST(req: NextRequest) {
     color,
     size,
     price_mxn,
-    gender,
     quantity,
   } = body;
 
@@ -107,7 +104,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!model_name || !color || !size || !price_mxn || !gender) {
+  if (!model_name || !color || !size || !price_mxn) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -191,7 +188,6 @@ export async function POST(req: NextRequest) {
     model_id,
     color_id,
     size: String(size).trim(),
-    gender: String(gender),
     price_mxn: Number(price_mxn),
     status: "available",
   }));
@@ -214,7 +210,7 @@ export async function POST(req: NextRequest) {
 /**
  * PATCH /api/admin/inventory
  * Body: { adminPassword, id, ...fieldsToUpdate }
- * Only used for status / gender / customer data / notes
+ * Only used for status / customer data / notes
  */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
@@ -237,7 +233,6 @@ export async function PATCH(req: NextRequest) {
   // Only allow certain fields to be updated from the admin UI
   const allowedFields = [
     "status",
-    "gender",
     "customer_name",
     "customer_whatsapp",
     "notes",
