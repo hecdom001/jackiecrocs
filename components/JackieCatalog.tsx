@@ -52,6 +52,42 @@ function colorEmoji(colorEn: string) {
 // Public WhatsApp number (set in .env + Vercel)
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
 
+// === NEW: photos for the gallery (replace URLs with your real images) ===
+const CROCS_PHOTOS: { src: string; labelEs: string; labelEn: string }[] = [
+  {
+    src: "/images/crocs-negro-mesa.jpg",
+    labelEs: "Crocs negros reales",
+    labelEn: "Real black Crocs",
+  },
+  {
+    src: "/images/crocs-blanco-piso.jpg",
+    labelEs: "Crocs blancos reales",
+    labelEn: "Real white Crocs",
+  },
+  {
+    src: "/images/crocs-beige-stack.jpg",
+    labelEs: "Crocs beige apilados",
+    labelEn: "Beige Crocs stack",
+  },
+];
+
+// === NEW: entrega locations (no times) ===
+const DELIVERY_SPOTS = [
+  "Pinos Presa",
+  "Villafloresta",
+  "Otay",
+  "20 de Noviembre",
+  "Macro Burger King",
+];
+
+// === NEW: Mexican bank info (fill with your real data) ===
+const MEX_BANK_INFO = {
+  bankName: "BBVA", // cambia a tu banco
+  accountName: "Jackeline Nombre Apellido", // titular
+  clabe: "TU_CLABE_AQUI",
+  accountNumber: "TU_NUMERO_DE_CUENTA",
+};
+
 // Build WhatsApp message for one or many items
 function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   if (!items.length) return "";
@@ -191,7 +227,7 @@ export function JackieCatalog() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-sky-50 text-slate-900 pb-20">
+    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-sky-50 text-slate-900 pb-24">
       {/* top bar */}
       <header className="sticky top-0 z-10 border-b border-emerald-100 bg-white/90 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
@@ -254,20 +290,20 @@ export function JackieCatalog() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* TITLE SECTION */}
-        <section className="space-y-3">
+        {/* TITLE + BADGES */}
+        <section className="space-y-4">
           <div>
-            <h2 className="text-lg sm:text-2xl font-semibold text-slate-900 flex items-center gap-2">
-              {lang === "es" ? "Crocs disponibles" : "Available Crocs"}
+            <h2 className="text-xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
+              {lang === "es" ? "Crocs disponibles 🐊✨" : "Available Crocs 🐊✨"}
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-xl">
+            <p className="mt-1 text-sm sm:text-base text-slate-600 max-w-xl">
               {lang === "es"
-                ? 'Consulta tallas y colores disponibles. Para comprar, toca "Pedir por WhatsApp" en el par que te interese.'
-                : 'Check available sizes and colors. To order, tap "Request via WhatsApp" on the pair you like.'}
+                ? "Toca un par, elígelo y pídenos por WhatsApp 💬"
+                : "Tap a pair, select it, and request via WhatsApp 💬"}
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs text-slate-700">
+          <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs text-slate-700 items-center">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
               <span>📍</span>
               {lang === "es" ? "Entrega en Tijuana" : "Pickup in Tijuana"}
@@ -286,17 +322,77 @@ export function JackieCatalog() {
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
               <span>🇺🇸</span>
-              {lang === "es"
-                ? "Tallas Americanas"
-                : "American sizes"}
+              {lang === "es" ? "Tallas Americanas" : "American sizes"}
             </span>
           </div>
 
           {lastUpdated && (
             <p className="text-[11px] text-slate-500">
-              {t("Última actualización", "Last updated")}: {formattedLastUpdated}
+              {t("Última actualización", "Last updated")}:{" "}
+              {formattedLastUpdated}
             </p>
           )}
+        </section>
+
+        {/* NEW: REAL PHOTOS */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
+              {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
+              <span>📸</span>
+            </h3>
+            <p className="text-[11px] text-slate-500">
+              {lang === "es"
+                ? "Tomadas por nosotros, sin filtros."
+                : "Taken by us, no filters."}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {CROCS_PHOTOS.map((photo) => (
+              <figure
+                key={photo.src}
+                className="overflow-hidden rounded-xl bg-slate-100 shadow-sm"
+              >
+                <a
+                  href={photo.src}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.src}
+                    alt={lang === "es" ? photo.labelEs : photo.labelEn}
+                    className="h-24 sm:h-60 w-full object-cover hover:scale-105 transition-transform"
+                  />
+                </a>
+              </figure>
+            ))}
+          </div>
+        </section>
+
+        {/* NEW: DELIVERY LOCATIONS (no times) */}
+        <section className="space-y-2">
+          <h3 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
+            {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
+            <span>🚚📦</span>
+          </h3>
+          <p className="text-[11px] text-slate-500">
+            {lang === "es"
+              ? "Coordinamos el horario exacto por WhatsApp."
+              : "Exact time will be coordinated on WhatsApp."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {DELIVERY_SPOTS.map((spot) => (
+              <span
+                key={spot}
+                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] border border-emerald-100 shadow-sm"
+              >
+                <span>📍</span>
+                <span>{spot}</span>
+              </span>
+            ))}
+          </div>
         </section>
 
         {/* FILTER BAR */}
@@ -310,8 +406,8 @@ export function JackieCatalog() {
             </div>
             <p className="text-[11px] text-slate-500">
               {lang === "es"
-                ? "⚠️ El inventario se mueve rápido — confirma siempre por WhatsApp."
-                : "⚠️ Stock moves fast — always confirm via WhatsApp."}
+                ? "🔥 Se están vendiendo rápido — confirma por WhatsApp."
+                : "🔥 Selling fast — confirm on WhatsApp."}
             </p>
           </div>
 
@@ -324,7 +420,7 @@ export function JackieCatalog() {
               <select
                 value={sizeFilter}
                 onChange={(e) => setSizeFilter(e.target.value)}
-                className="border border-emerald-100 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
               >
                 <option value="all">
                   {lang === "es" ? "Todas" : "All"}
@@ -345,7 +441,7 @@ export function JackieCatalog() {
               <select
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
-                className="border border-emerald-100 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
               >
                 <option value="all">
                   {lang === "es" ? "Todos" : "All"}
@@ -403,7 +499,7 @@ export function JackieCatalog() {
                 return (
                   <article
                     key={item.id}
-                    className="rounded-2xl border border-emerald-100 bg-white p-3 sm:p-4 flex flex-col gap-3 shadow-sm hover:border-emerald-200 transition"
+                    className="rounded-3xl bg-white p-4 flex flex-col gap-3 shadow-md hover:shadow-lg transition-transform hover:-translate-y-0.5"
                   >
                     {/* Title + price */}
                     <div className="flex justify-between items-start gap-2">
@@ -426,7 +522,7 @@ export function JackieCatalog() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-base sm:text-lg font-semibold text-emerald-700">
+                        <p className="text-lg sm:text-xl font-bold text-emerald-600">
                           ${item.price_mxn.toFixed(0)} MXN
                         </p>
                       </div>
@@ -469,11 +565,11 @@ export function JackieCatalog() {
                           </span>
                           {isSelected
                             ? lang === "es"
-                              ? "Seleccionado"
-                              : "Selected"
+                              ? "Añadido ✅"
+                              : "Added ✅"
                             : lang === "es"
-                            ? "Agregar al pedido"
-                            : "Add to request"}
+                            ? "Lo quiero 💖"
+                            : "I want this 💖"}
                         </button>
                       </div>
                     </div>
@@ -503,29 +599,28 @@ export function JackieCatalog() {
                   }`}
             </p>
             <a
-            href={waLinkForSelected || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              // don’t track if something is wrong
-              if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+              href={waLinkForSelected || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (!WHATSAPP_NUMBER || !selectedItems.length) return;
 
-              track("whatsapp_click_multi", {
-                count: selectedItems.length,
-                lang,
-              });
-            }}
-            className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition ${
-              WHATSAPP_NUMBER
-                ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                : "bg-slate-300 text-slate-600 cursor-not-allowed"
-            }`}
-          >
-            <span className="text-base">📲</span>
-            {lang === "es"
-              ? "Pedir todos los seleccionados por WhatsApp"
-              : "Request all selected via WhatsApp"}
-          </a>
+                track("whatsapp_click_multi", {
+                  count: selectedItems.length,
+                  lang,
+                });
+              }}
+              className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-bold transition ${
+                WHATSAPP_NUMBER
+                  ? "bg-gradient-to-r from-emerald-500 to-emerald-400 text-white shadow-lg hover:from-emerald-400 hover:to-emerald-300"
+                  : "bg-slate-300 text-slate-600 cursor-not-allowed"
+              }`}
+            >
+              <span className="text-base">📲</span>
+              {lang === "es"
+                ? "Pedir todos los seleccionados por WhatsApp"
+                : "Request all selected via WhatsApp"}
+            </a>
           </div>
         </div>
       )}
