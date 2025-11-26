@@ -102,7 +102,9 @@ export function JackieCatalog() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   const [sizeFilter, setSizeFilter] = useState<string>("all");
+  const [colorFilter, setColorFilter] = useState<string>("all");
 
   // multi-select
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -161,9 +163,14 @@ export function JackieCatalog() {
 
   const allSizes = Array.from(new Set(items.map((i) => i.size))).sort();
 
+  const allColors = Array.from(new Set(items.map((i) => i.color)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
   const filtered = items.filter((item) => {
     const bySize = sizeFilter === "all" || item.size === sizeFilter;
-    return  bySize;
+    const byColor = colorFilter === "all" || item.color === colorFilter;
+    return bySize && byColor;
   });
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
@@ -276,7 +283,7 @@ export function JackieCatalog() {
                 ? "Respuestas 9am–7pm"
                 : "Replies 9am–7pm"}
             </span>
-             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
               <span>🇺🇸</span>
               {lang === "es"
                 ? "Tallas Americanas"
@@ -329,6 +336,27 @@ export function JackieCatalog() {
               </select>
             </div>
 
+            {/* color filter */}
+            <div className="flex flex-col gap-1">
+              <span className="text-slate-800">
+                {lang === "es" ? "Color:" : "Color:"}
+              </span>
+              <select
+                value={colorFilter}
+                onChange={(e) => setColorFilter(e.target.value)}
+                className="border border-emerald-100 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+              >
+                <option value="all">
+                  {lang === "es" ? "Todos" : "All"}
+                </option>
+                {allColors.map((color) => (
+                  <option key={color} value={color}>
+                    {translateColor(color, lang)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* count + refresh (mobile) */}
             <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px]">
               <span className="text-slate-500">
@@ -371,8 +399,6 @@ export function JackieCatalog() {
                 const colorText = translateColor(item.color, lang);
                 const emoji = colorEmoji(item.color);
 
-                const waLinkSingle = buildWhatsAppLink([item], lang);
-
                 return (
                   <article
                     key={item.id}
@@ -395,7 +421,7 @@ export function JackieCatalog() {
                           {lang === "es" ? "Talla:" : "Size:"}{" "}
                           <span className="font-medium text-slate-800">
                             {item.size}
-                          </span>{" "}
+                          </span>
                         </p>
                       </div>
                       <div className="text-right">
@@ -425,7 +451,7 @@ export function JackieCatalog() {
                       </p>
                     </div>
 
-                    {/* selection toggle + per-card WA */}
+                    {/* selection toggle */}
                     <div className="mt-1 flex flex-col gap-2">
                       <div className="flex justify-end">
                         <button
