@@ -188,9 +188,9 @@ export default function AdminPage() {
     );
 
     // reset form
-    setModelSelect("other");
+    setModelSelect("");
     setNewModelName("");
-    setColorSelect("other");
+    setColorSelect("");
     setNewColorName("");
     setSize("");
     setPrice("");
@@ -229,44 +229,42 @@ export default function AdminPage() {
   const colorOptions = colors.map((c) => c.name_en);
   const sizeOptions = Array.from(new Set(items.map((i) => i.size))).sort();
 
-  const colorFilterOptions = Array.from(
-  new Set(items.map((i) => i.color))
-)
-  .filter(Boolean)
-  .sort((a, b) => a.localeCompare(b));
+  const colorFilterOptions = Array.from(new Set(items.map((i) => i.color)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
   const filteredItems = items.filter((item) => {
-  const matchesStatus =
-    statusFilter === "all" || item.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" || item.status === statusFilter;
 
-  const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
+    const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
 
-  const matchesColor =
-    colorFilter === "all" || item.color === colorFilter;
+    const matchesColor =
+      colorFilter === "all" || item.color === colorFilter;
 
-  const query = customerQuery.trim().toLowerCase();
-  const matchesCustomer =
-    !query ||
-    (item.customer_name || "").toLowerCase().includes(query) ||
-    (item.customer_whatsapp || "").toLowerCase().includes(query);
+    const query = customerQuery.trim().toLowerCase();
+    const matchesCustomer =
+      !query ||
+      (item.customer_name || "").toLowerCase().includes(query) ||
+      (item.customer_whatsapp || "").toLowerCase().includes(query);
 
-  return matchesStatus && matchesCustomer && matchesSize && matchesColor;
-});
+    return matchesStatus && matchesCustomer && matchesSize && matchesColor;
+  });
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900">
+    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-slate-50">
       {/* sticky top bar */}
-      <div className="sticky top-0 z-20 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur">
+      <div className="sticky top-0 z-20 border-b border-emerald-100 bg-white/90 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center text-lg">
+            <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center text-lg text-white shadow-sm">
               🐊
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-semibold text-slate-50">
+              <h1 className="text-sm sm:text-base font-semibold text-slate-900">
                 Jacky Crocs Admin
               </h1>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {t(
                   "Panel interno para manejar inventario.",
                   "Internal panel to manage inventory."
@@ -276,17 +274,17 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-[11px] text-slate-400">
+            <span className="hidden sm:inline text-[11px] text-slate-500">
               {t("Idioma", "Language")}
             </span>
-            <div className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 p-0.5 text-[11px]">
+            <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 p-0.5 text-[11px] shadow-sm">
               <button
                 type="button"
                 onClick={() => setLang("es")}
                 className={`px-2.5 py-1 rounded-full ${
                   lang === "es"
-                    ? "bg-emerald-500 text-slate-950"
-                    : "text-slate-300 hover:text-white"
+                    ? "bg-emerald-500 text-white shadow"
+                    : "text-slate-700 hover:text-slate-900"
                 }`}
               >
                 ES
@@ -296,8 +294,8 @@ export default function AdminPage() {
                 onClick={() => setLang("en")}
                 className={`px-2.5 py-1 rounded-full ${
                   lang === "en"
-                    ? "bg-emerald-500 text-slate-950"
-                    : "text-slate-300 hover:text-white"
+                    ? "bg-emerald-500 text-white shadow"
+                    : "text-slate-700 hover:text-slate-900"
                 }`}
               >
                 EN
@@ -310,21 +308,21 @@ export default function AdminPage() {
       {/* main content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Access + refresh */}
-        <section className="bg-slate-900/80 border border-slate-700 rounded-2xl shadow-lg shadow-black/30 p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items=end sm:justify-between">
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="w-full sm:max-w-md">
-              <label className="block text-xs font-medium text-slate-200 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 {t("Contraseña admin", "Admin password")}
               </label>
               <input
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                className="w-full border border-slate-600/80 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 placeholder="••••••••"
               />
               {authError && (
-                <p className="mt-1 text-[11px] text-red-400">{authError}</p>
+                <p className="mt-1 text-[11px] text-red-500">{authError}</p>
               )}
               {!authError && (
                 <p className="mt-1 text-[11px] text-slate-500">
@@ -340,7 +338,7 @@ export default function AdminPage() {
               type="button"
               onClick={loadItems}
               disabled={!adminPassword || loading}
-              className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-slate-950 text-xs font-semibold px-5 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition"
+              className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-5 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
               {loading
                 ? t("Actualizando…", "Refreshing…")
@@ -350,10 +348,10 @@ export default function AdminPage() {
         </section>
 
         {/* Add inventory */}
-        <section className="bg-slate-950/80 border border-slate-800 rounded-2xl shadow-lg shadow-black/30 p-4 sm:p-5 space-y-4">
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm sm:text-base font-semibold text-slate-50">
+              <h2 className="text-sm sm:text-base font-semibold text-slate-900">
                 {t("Agregar nuevos pares", "Add new pairs")}
               </h2>
               <p className="text-[11px] text-slate-500">
@@ -369,51 +367,50 @@ export default function AdminPage() {
             onSubmit={handleAdd}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
-           {/* Model select + other */}
-          <Field label={t("Modelo", "Model")}>
-            <div className="space-y-1">
-              <select
-                value={modelSelect}
-                onChange={(e) => {
-                  setModelSelect(e.target.value);
-                  if (e.target.value !== "other") {
-                    setNewModelName("");
-                  }
-                }}
-                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                required
-              >
-                {/* Placeholder */}
-                <option value="" disabled>
-                  {t("Selecciona un modelo", "Select a model")}
-                </option>
-
-                <option value="other">
-                  {t("Otro (nuevo modelo)", "Other (new model)")}
-                </option>
-
-                {modelOptions.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-
-              {modelSelect === "other" && (
-                <input
-                  value={newModelName}
-                  onChange={(e) => setNewModelName(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
-                  placeholder={t(
-                    "Escribe el nombre del modelo",
-                    "Type the new model name"
-                  )}
+            {/* Model select + other */}
+            <Field label={t("Modelo", "Model")}>
+              <div className="space-y-1">
+                <select
+                  value={modelSelect}
+                  onChange={(e) => {
+                    setModelSelect(e.target.value);
+                    if (e.target.value !== "other") {
+                      setNewModelName("");
+                    }
+                  }}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   required
-                />
-              )}
-            </div>
-          </Field>
+                >
+                  {/* Placeholder */}
+                  <option value="" disabled>
+                    {t("Selecciona un modelo", "Select a model")}
+                  </option>
 
+                  <option value="other">
+                    {t("Otro (nuevo modelo)", "Other (new model)")}
+                  </option>
+
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+
+                {modelSelect === "other" && (
+                  <input
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    placeholder={t(
+                      "Escribe el nombre del modelo",
+                      "Type the new model name"
+                    )}
+                    required
+                  />
+                )}
+              </div>
+            </Field>
 
             {/* Color select + other */}
             <Field label={t("Color (inglés)", "Color (English)")}>
@@ -426,7 +423,7 @@ export default function AdminPage() {
                       setNewColorName("");
                     }
                   }}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   required
                 >
                   {/* Placeholder */}
@@ -449,7 +446,7 @@ export default function AdminPage() {
                   <input
                     value={newColorName}
                     onChange={(e) => setNewColorName(e.target.value)}
-                    className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                    className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                     placeholder={t(
                       "Escribe el color en inglés (ej. 'Black')",
                       "Type the color in English (e.g. 'Black')"
@@ -463,18 +460,18 @@ export default function AdminPage() {
             {/* Size (dropdown from DB) */}
             <Field label={t("Talla", "Size")}>
               {sizesLoading ? (
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] text-slate-500">
                   {t("Cargando tallas…", "Loading sizes…")}
                 </div>
               ) : sizesError ? (
-                <div className="text-[11px] text-red-400">
+                <div className="text-[11px] text-red-500">
                   {sizesError}
                 </div>
               ) : (
                 <select
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
-                  className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   required
                 >
                   <option value="" disabled>
@@ -495,7 +492,7 @@ export default function AdminPage() {
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 required
               />
             </Field>
@@ -507,7 +504,7 @@ export default function AdminPage() {
                 min={1}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full border border-slate-700 bg-slate-900/80 rounded-lg px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 required
               />
             </Field>
@@ -516,7 +513,7 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={!adminPassword}
-                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
               >
                 {t("Agregar pares", "Add pairs")}
               </button>
@@ -524,15 +521,15 @@ export default function AdminPage() {
           </form>
 
           {message && (
-            <p className="text-[11px] text-emerald-300 text-right">{message}</p>
+            <p className="text-[11px] text-emerald-600 text-right">{message}</p>
           )}
         </section>
 
         {/* Inventory list + filters */}
-        <section className="bg-slate-950/80 border border-slate-800 rounded-2xl shadow-lg shadow-black/30 p-4 sm:p-5 space-y-4">
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm sm:text-base font-semibold text-slate-50">
+              <h2 className="text-sm sm:text-base font-semibold text-slate-900">
                 {t("Inventario completo", "Full inventory")}
               </h2>
               <p className="text-[11px] text-slate-500">
@@ -542,7 +539,7 @@ export default function AdminPage() {
                 )}
               </p>
               {filteredItems.length !== items.length && (
-                <p className="text-[11px] text-emerald-300 mt-0.5">
+                <p className="text-[11px] text-emerald-600 mt-0.5">
                   {t(
                     `${filteredItems.length} resultados después de filtros`,
                     `${filteredItems.length} results after filters`
@@ -555,7 +552,7 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full sm:w-auto sm:min-w-[550px] text-[11px]">
               {/* status filter */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-300">
+                <span className="text-slate-700">
                   {t("Estatus", "Status")}
                 </span>
                 <select
@@ -567,7 +564,7 @@ export default function AdminPage() {
                         : (e.target.value as InventoryStatus)
                     )
                   }
-                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 >
                   <option value="all">{t("Todos", "All")}</option>
                   {statusOptions.map((st) => (
@@ -580,13 +577,13 @@ export default function AdminPage() {
 
               {/* size filter */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-300">
+                <span className="text-slate-700">
                   {t("Talla", "Size")}
                 </span>
                 <select
                   value={sizeFilter}
                   onChange={(e) => setSizeFilter(e.target.value)}
-                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 >
                   <option value="all">{t("Todas", "All")}</option>
                   {sizeOptions.map((sz) => (
@@ -597,20 +594,20 @@ export default function AdminPage() {
                 </select>
               </div>
 
-               {/* color filter */}
+              {/* color filter */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-300">
+                <span className="text-slate-700">
                   {t("Color", "Color")}
                 </span>
                 <select
                   value={colorFilter}
                   onChange={(e) => setColorFilter(e.target.value)}
-                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 >
-                  <option value="all">{t("Todas", "All")}</option>
-                  {colorOptions.map((sz) => (
-                    <option key={sz} value={sz}>
-                      {sz}
+                  <option value="all">{t("Todos", "All")}</option>
+                  {colorFilterOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
                     </option>
                   ))}
                 </select>
@@ -618,13 +615,13 @@ export default function AdminPage() {
 
               {/* customer search */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-300">
+                <span className="text-slate-700">
                   {t("Cliente / WhatsApp", "Customer / WhatsApp")}
                 </span>
                 <input
                   value={customerQuery}
                   onChange={(e) => setCustomerQuery(e.target.value)}
-                  className="border border-slate-700 bg-slate-900/80 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   placeholder={
                     lang === "es"
                       ? "Buscar nombre o +52..."
@@ -636,14 +633,14 @@ export default function AdminPage() {
           </div>
 
           {items.length === 0 ? (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               {t(
                 "No hay pares cargados todavía o la contraseña es incorrecta.",
                 "No pairs loaded yet, or password is incorrect."
               )}
             </p>
           ) : filteredItems.length === 0 ? (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               {t(
                 "No hay resultados con estos filtros.",
                 "No results with these filters."
@@ -676,7 +673,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label className="block text-[11px] font-medium text-slate-300">
+      <label className="block text-[11px] font-medium text-slate-700">
         {label}
       </label>
       {children}
@@ -733,22 +730,22 @@ function InventoryCard({
 
   const statusBadge =
     item.status === "available"
-      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40"
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
       : item.status === "reserved"
-      ? "bg-amber-500/15 text-amber-200 border border-amber-500/40"
+      ? "bg-amber-50 text-amber-700 border border-amber-200"
       : item.status === "paid_complete"
-      ? "bg-sky-500/15 text-sky-200 border border-sky-500/40"
+      ? "bg-sky-50 text-sky-700 border border-sky-200"
       : item.status === "paid_partial"
-      ? "bg-sky-500/15 text-sky-200 border border-sky-500/40"
+      ? "bg-sky-50 text-sky-700 border border-sky-200"
       : item.status === "delivered"
-      ? "bg-slate-500/15 text-slate-200 border border-slate-400/40"
-      : "bg-rose-500/15 text-rose-200 border border-rose-500/40";
+      ? "bg-slate-50 text-slate-700 border border-slate-200"
+      : "bg-rose-50 text-rose-700 border border-rose-200";
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3 sm:p-4 space-y-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="space-y-0.5">
-          <p className="text-sm font-semibold text-slate-50">
+          <p className="text-sm font-semibold text-slate-900">
             {item.model_name} · {item.color} · {item.size}
           </p>
           <p className="text-[11px] text-slate-500">
@@ -757,10 +754,10 @@ function InventoryCard({
         </div>
         <div className="flex items-center gap-3 justify-between sm:justify-end">
           <div className="text-right">
-            <p className="text-sm font-semibold text-slate-50">
+            <p className="text-sm font-semibold text-slate-900">
               ${item.price_mxn.toFixed(0)} MXN
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               {t("Estado", "Status")} ·{" "}
               {statusLabel[item.status][lang].toLowerCase()}
             </p>
@@ -775,7 +772,7 @@ function InventoryCard({
 
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-300">
+          <label className="text-[11px] font-medium text-slate-700">
             {t("Estatus", "Status")}
           </label>
           <select
@@ -783,7 +780,7 @@ function InventoryCard({
             onChange={(e) =>
               setLocalStatus(e.target.value as InventoryStatus)
             }
-            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
           >
             {statusOptions.map((st) => (
               <option key={st} value={st}>
@@ -794,37 +791,37 @@ function InventoryCard({
         </div>
 
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-300">
+          <label className="text-[11px] font-medium text-slate-700">
             {t("Cliente (opcional)", "Customer (optional)")}
           </label>
           <input
             value={localCustomerName}
             onChange={(e) => setLocalCustomerName(e.target.value)}
-            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
             placeholder={t("Nombre", "Name")}
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-300">
+          <label className="text-[11px] font-medium text-slate-700">
             WhatsApp
           </label>
           <input
             value={localWhatsapp}
             onChange={(e) => setLocalWhatsapp(e.target.value)}
-            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80"
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
             placeholder="+52..."
           />
         </div>
 
         <div className="sm:col-span-2 space-y-1">
-          <label className="text-[11px] font-medium text-slate-300">
+          <label className="text-[11px] font-medium text-slate-700">
             {t("Notas (entrega, etc.)", "Notes (meetup, etc.)")}
           </label>
           <textarea
             value={localNotes}
             onChange={(e) => setLocalNotes(e.target.value)}
-            className="w-full border border-slate-700 bg-slate-950/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/80 min-h-[48px]"
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[48px]"
           />
         </div>
       </div>
@@ -834,7 +831,7 @@ function InventoryCard({
           type="button"
           onClick={handleSave}
           disabled={!hasChanges || saving}
-          className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
         >
           {saving
             ? t("Guardando…", "Saving…")
