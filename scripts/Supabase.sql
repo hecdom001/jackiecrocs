@@ -63,7 +63,13 @@ create table inventory_items (
   -- reserved = held but not sold
   -- sold = completed sale
   status text not null
-    check (status in ('available', 'reserved', 'sold'))
+    check (status in (
+      'available',
+      'reserved',
+      'paid_complete',
+      'paid_partial',
+      'delivered',
+      'cancelled'))
     default 'available',
 
   -- Admin-only fields
