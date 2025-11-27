@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { track } from "@vercel/analytics";
 
@@ -32,7 +32,6 @@ function translateColor(colorEn: string, lang: Lang) {
   }
 }
 
-// emoji next to color
 function colorEmoji(colorEn: string) {
   const key = colorEn.trim().toLowerCase();
   switch (key) {
@@ -49,29 +48,23 @@ function colorEmoji(colorEn: string) {
   }
 }
 
-// Public WhatsApp number (set in .env + Vercel)
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
+// keep in case you reuse later
+function imageForColor(colorEn: string | null | undefined): string {
+  const key = (colorEn || "").trim().toLowerCase();
+  if (key === "black") return "/images/crocs-black.jpg";
+  if (key === "white") return "/images/crocs-white.jpg";
+  if (key === "beige") return "/images/crocs-beige.jpg";
+  return "/images/crocs-black.jpg";
+}
 
-// === NEW: photos for the gallery (replace URLs with your real images) ===
-const CROCS_PHOTOS: { src: string; labelEs: string; labelEn: string }[] = [
-  {
-    src: "/images/crocs-negro-mesa.jpg",
-    labelEs: "Crocs negros reales",
-    labelEn: "Real black Crocs",
-  },
-  {
-    src: "/images/crocs-blanco-piso.jpg",
-    labelEs: "Crocs blancos reales",
-    labelEn: "Real white Crocs",
-  },
-  {
-    src: "/images/crocs-beige-stack.jpg",
-    labelEs: "Crocs beige apilados",
-    labelEn: "Beige Crocs stack",
-  },
+const CROCS_PHOTOS: { src: string; label: string }[] = [
+  { src: "/images/crocs-black.jpg", label: "Crocs negros" },
+  { src: "/images/crocs-white.jpg", label: "Crocs blancos" },
+  { src: "/images/crocs-beige.jpg", label: "Crocs beige" },
 ];
 
-// === NEW: entrega locations (no times) ===
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
+
 const DELIVERY_SPOTS = [
   "Pinos Presa",
   "Villafloresta",
@@ -80,15 +73,16 @@ const DELIVERY_SPOTS = [
   "Macro Burger King",
 ];
 
-// === NEW: Mexican bank info (fill with your real data) ===
 const MEX_BANK_INFO = {
-  bankName: "BBVA", // cambia a tu banco
-  accountName: "Jackeline Nombre Apellido", // titular
-  clabe: "TU_CLABE_AQUI",
-  accountNumber: "TU_NUMERO_DE_CUENTA",
-};
+  bankName: "Santander",
+  accountName: "Jackeline Monge",
+  accountNumber: "014020260401072579",
+  Concepto: "Tu nombre",
+} as const;
 
-// Build WhatsApp message for one or many items
+const INITIAL_VISIBLE = 10;
+const AUTO_REFRESH_MS = 60_000;
+
 function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   if (!items.length) return "";
 
@@ -124,7 +118,6 @@ ${linesEn.join("\n\n")}
 Are they still available?`;
 }
 
-// Build WhatsApp link from items (1 or many)
 function buildWhatsAppLink(items: PublicItem[], lang: Lang) {
   if (!WHATSAPP_NUMBER || !items.length) return "#";
   const message = buildWhatsAppMessage(items, lang);
@@ -143,12 +136,12 @@ export function JackieCatalog() {
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
-  // multi-select
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
-  async function loadInventory() {
+  const loadInventory = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
 
@@ -184,19 +177,27 @@ export function JackieCatalog() {
       })) ?? [];
 
     setItems(mapped);
-
-    // clean up selected if items disappeared
     setSelectedIds((prev) =>
       prev.filter((id) => mapped.some((i) => i.id === id))
     );
-
     setLastUpdated(new Date());
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     loadInventory();
-  }, []);
+  }, [loadInventory]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadInventory();
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadInventory]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [sizeFilter, colorFilter, items.length]);
 
   const allSizes = Array.from(new Set(items.map((i) => i.size))).sort();
 
@@ -209,6 +210,8 @@ export function JackieCatalog() {
     const byColor = colorFilter === "all" || item.color === colorFilter;
     return bySize && byColor;
   });
+
+  const limited = filtered.slice(0, visibleCount);
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
   const waLinkForSelected = buildWhatsAppLink(selectedItems, lang);
@@ -227,47 +230,40 @@ export function JackieCatalog() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-sky-50 text-slate-900 pb-24">
-      {/* top bar */}
-      <header className="sticky top-0 z-10 border-b border-emerald-100 bg-white/90 backdrop-blur">
+    <main className="min-h-screen bg-slate-50 text-slate-900 pb-24">
+      {/* TOP BAR */}
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-full bg-emerald-400 flex items-center justify-center text-lg shadow-sm">
+            <div className="h-9 w-9 rounded-full bg-emerald-500 flex items-center justify-center text-lg text-white">
               🐊
             </div>
-            <div>
-              <h1 className="text-sm sm:text-base font-semibold text-slate-900">
-                Jacky Crocs
-              </h1>
+            <div className="leading-tight">
+              <p className="text-sm font-semibold">Jacky Crocs</p>
               <p className="text-[11px] text-slate-500">
-                {t(
-                  "Sólo consulta de inventario · Pedido por WhatsApp",
-                  "Inventory view only · Order via WhatsApp"
-                )}
+                {t("Crocs originales · Tijuana", "Original Crocs · Tijuana")}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Refresh button */}
             <button
               type="button"
               onClick={loadInventory}
-              className="hidden sm:inline-flex items-center rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition"
+              className="hidden sm:inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
             >
               {loading
                 ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar", "Refresh")}
+                : t("Actualizar inventario", "Refresh stock")}
             </button>
 
-            {/* Language toggle */}
-            <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 p-0.5 text-[11px] shadow-sm">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setLang("es")}
                 className={`px-2.5 py-1 rounded-full ${
                   lang === "es"
-                    ? "bg-emerald-500 text-white shadow"
+                    ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -278,7 +274,7 @@ export function JackieCatalog() {
                 onClick={() => setLang("en")}
                 className={`px-2.5 py-1 rounded-full ${
                   lang === "en"
-                    ? "bg-emerald-500 text-white shadow"
+                    ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -289,138 +285,141 @@ export function JackieCatalog() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* TITLE + BADGES */}
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
-              {lang === "es" ? "Crocs disponibles 🐊✨" : "Available Crocs 🐊✨"}
-            </h2>
-            <p className="mt-1 text-sm sm:text-base text-slate-600 max-w-xl">
-              {lang === "es"
-                ? "Toca un par, elígelo y pídenos por WhatsApp 💬"
-                : "Tap a pair, select it, and request via WhatsApp 💬"}
-            </p>
-          </div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
+        {/* HERO */}
+        <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-5">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-center">
+            <div className="space-y-3">
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-800 border border-slate-200">
+                <span>🛒</span>
+                {lang === "es" ? "Catálogo para WhatsApp" : "WhatsApp catalog"}
+              </span>
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+                  {lang === "es"
+                    ? "Crocs disponibles 🐊✨"
+                    : "Available Crocs 🐊✨"}
+                </h1>
+                <p className="text-sm text-slate-600 max-w-md">
+                  {lang === "es"
+                    ? "Toca un par, elige tu talla y pídenos por WhatsApp."
+                    : "Tap a pair, pick your size and order via WhatsApp."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
+                  <span>📍</span>
+                  {lang === "es" ? "Entrega en Tijuana" : "Pickup in Tijuana"}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
+                  <span>💵</span>
+                  {lang === "es"
+                    ? "Pago en efectivo o transferencia"
+                    : "Cash or transfer"}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
+                  <span>⏰</span>
+                  {lang === "es" ? "Respuestas 9am–7pm" : "Replies 9am–7pm"}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
+                  <span>🇺🇸</span>
+                  {lang === "es" ? "Tallas americanas" : "US sizing"}
+                </span>
+              </div>
+              {lastUpdated && (
+                <p className="text-[11px] text-slate-500">
+                  {t("Última actualización", "Last updated")}:{" "}
+                  {formattedLastUpdated}
+                </p>
+              )}
+            </div>
 
-          <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs text-slate-700 items-center">
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
-              <span>📍</span>
-              {lang === "es" ? "Entrega en Tijuana" : "Pickup in Tijuana"}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
-              <span>💵</span>
-              {lang === "es"
-                ? "Pago en efectivo o transferencia"
-                : "Cash or bank transfer"}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
-              <span>⏰</span>
-              {lang === "es"
-                ? "Respuestas 9am–7pm"
-                : "Replies 9am–7pm"}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-100">
-              <span>🇺🇸</span>
-              {lang === "es" ? "Tallas Americanas" : "American sizes"}
-            </span>
-          </div>
+            {/* highlight card */}
+            <div className="justify-self-end w-full max-w-xs">
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-3">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
+                  🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
+                </span>
 
-          {lastUpdated && (
-            <p className="text-[11px] text-slate-500">
-              {t("Última actualización", "Last updated")}:{" "}
-              {formattedLastUpdated}
-            </p>
-          )}
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                    {lang === "es"
+                      ? "Precio por par desde"
+                      : "Price per pair from"}
+                  </p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    $600 MXN
+                  </p>
+                </div>
+
+                <p className="text-[11px] text-slate-600">
+                  {lang === "es"
+                    ? "Originales, tallas americanas. Entrega en Tijuana y pago en efectivo o transferencia."
+                    : "Original pairs, US sizing. Pickup in Tijuana, pay in cash or bank transfer."}
+                </p>
+
+                <p className="text-[10px] text-slate-500">
+                  {lang === "es"
+                    ? "Agrega los pares que te gustan al carrito y envíanos tu mensaje por WhatsApp."
+                    : "Add the pairs you like to the cart and send us your order on WhatsApp."}
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* NEW: REAL PHOTOS */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-              {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
-              <span>📸</span>
-            </h3>
+        {/* PHOTO STRIP */}
+        <section className="rounded-2xl bg-white border border-slate-100 p-4 space-y-2">
+          <div className="flex items-center justify-between text-[12px] sm:text-sm">
+            <p className="font-medium">
+              {lang === "es"
+                ? "Fotos reales del producto"
+                : "Real product photos"}
+            </p>
             <p className="text-[11px] text-slate-500">
               {lang === "es"
                 ? "Tomadas por nosotros, sin filtros."
                 : "Taken by us, no filters."}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {CROCS_PHOTOS.map((photo) => (
-              <figure
+              <div
                 key={photo.src}
-                className="overflow-hidden rounded-xl bg-slate-100 shadow-sm"
+                className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
               >
-                <a
-                  href={photo.src}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photo.src}
-                    alt={lang === "es" ? photo.labelEs : photo.labelEn}
-                    className="h-24 sm:h-60 w-full object-cover hover:scale-105 transition-transform"
-                  />
-                </a>
-              </figure>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.src}
+                  alt={photo.label}
+                  className="h-60 w-full object-cover"
+                />
+              </div>
             ))}
           </div>
         </section>
 
-        {/* NEW: DELIVERY LOCATIONS (no times) */}
-        <section className="space-y-2">
-          <h3 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-            {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
-            <span>🚚📦</span>
-          </h3>
-          <p className="text-[11px] text-slate-500">
-            {lang === "es"
-              ? "Coordinamos el horario exacto por WhatsApp."
-              : "Exact time will be coordinated on WhatsApp."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {DELIVERY_SPOTS.map((spot) => (
-              <span
-                key={spot}
-                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] border border-emerald-100 shadow-sm"
-              >
-                <span>📍</span>
-                <span>{spot}</span>
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* FILTER BAR */}
-        <section className="bg-white/95 border border-emerald-100 rounded-2xl p-3 sm:p-4 space-y-3 shadow-sm">
+        {/* FILTERS */}
+        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🔎</span>
-              <p className="text-sm font-semibold text-slate-900">
-                {lang === "es" ? "Filtrar inventario" : "Filter inventory"}
-              </p>
-            </div>
+            <p className="text-sm font-medium text-slate-900">
+              {lang === "es" ? "Filtrar inventario" : "Filter inventory"}
+            </p>
             <p className="text-[11px] text-slate-500">
               {lang === "es"
-                ? "🔥 Se están vendiendo rápido — confirma por WhatsApp."
-                : "🔥 Selling fast — confirm on WhatsApp."}
+                ? "Se están vendiendo rápido — confirma por WhatsApp."
+                : "Stock moves quickly — always confirm on WhatsApp."}
             </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-            {/* size filter */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
             <div className="flex flex-col gap-1">
-              <span className="text-slate-800">
-                {lang === "es" ? "Talla:" : "Size:"}
+              <span className="text-slate-700">
+                {lang === "es" ? "Talla" : "Size"}
               </span>
               <select
                 value={sizeFilter}
                 onChange={(e) => setSizeFilter(e.target.value)}
-                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">
                   {lang === "es" ? "Todas" : "All"}
@@ -433,15 +432,14 @@ export function JackieCatalog() {
               </select>
             </div>
 
-            {/* color filter */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-800">
-                {lang === "es" ? "Color:" : "Color:"}
+              <span className="text-slate-700">
+                {lang === "es" ? "Color" : "Color"}
               </span>
               <select
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
-                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">
                   {lang === "es" ? "Todos" : "All"}
@@ -454,148 +452,240 @@ export function JackieCatalog() {
               </select>
             </div>
 
-            {/* count + refresh (mobile) */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px]">
-              <span className="text-slate-500">
-                {lang === "es"
-                  ? `${filtered.length} pares disponibles`
-                  : `${filtered.length} pairs available`}
+            <div className="flex flex-col justify-between gap-1">
+              <span className="text-slate-700">
+                {lang === "es" ? "Resultado" : "Result"}
               </span>
-              <button
-                type="button"
-                onClick={loadInventory}
-                className="inline-flex sm:hidden items-center rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition"
-              >
-                {loading
-                  ? t("Actualizando…", "Refreshing…")
-                  : t("Actualizar", "Refresh")}
-              </button>
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="text-slate-600">
+                  {lang === "es"
+                    ? `${filtered.length} pares disponibles`
+                    : `${filtered.length} pairs available`}
+                </span>
+                <button
+                  type="button"
+                  onClick={loadInventory}
+                  className="inline-flex sm:hidden items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                >
+                  {loading
+                    ? t("Actualizando…", "Refreshing…")
+                    : t("Actualizar", "Refresh")}
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* GRID + PRODUCT CARDS */}
-        <section>
-          {loading ? (
-            <p className="text-xs text-slate-600">
-              {t("Cargando inventario…", "Loading inventory…")}
-            </p>
-          ) : errorMsg ? (
-            <p className="text-xs text-red-500">{errorMsg}</p>
-          ) : filtered.length === 0 ? (
-            <p className="text-xs text-slate-600">
-              {t(
-                "Por ahora no hay pares con estos filtros.",
-                "No pairs match these filters right now."
-              )}
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {filtered.map((item) => {
-                const isSelected = selectedIds.includes(item.id);
-                const colorText = translateColor(item.color, lang);
-                const emoji = colorEmoji(item.color);
+        {/* MAIN CONTENT */}
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+          {/* LEFT: products */}
+          <div>
+            {loading ? (
+              <p className="text-xs text-slate-600">
+                {t("Cargando inventario…", "Loading inventory…")}
+              </p>
+            ) : errorMsg ? (
+              <p className="text-xs text-red-500">{errorMsg}</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-xs text-slate-600">
+                {t(
+                  "Por ahora no hay pares con estos filtros.",
+                  "No pairs match these filters right now."
+                )}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {limited.map((item) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  const colorText = translateColor(item.color, lang);
+                  const emoji = colorEmoji(item.color);
 
-                return (
-                  <article
-                    key={item.id}
-                    className="rounded-3xl bg-white p-4 flex flex-col gap-3 shadow-md hover:shadow-lg transition-transform hover:-translate-y-0.5"
-                  >
-                    {/* Title + price */}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="space-y-1">
-                        <h3 className="text-sm sm:text-base font-semibold text-slate-900">
-                          {(item.model_name || "Classic") + " Crocs"}
-                        </h3>
-                        <p className="text-[11px] text-slate-600">
-                          {lang === "es" ? "Color:" : "Color:"}{" "}
-                          <span className="font-medium text-slate-800">
-                            {colorText}
-                          </span>{" "}
-                          <span className="align-middle">{emoji}</span>
-                        </p>
-                        <p className="text-[11px] text-slate-600">
-                          {lang === "es" ? "Talla:" : "Size:"}{" "}
-                          <span className="font-medium text-slate-800">
-                            {item.size}
+                  return (
+                    <article
+                      key={item.id}
+                      className="rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-3.5 sm:p-4 flex flex-col gap-3"
+                    >
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="space-y-1">
+                          <h3 className="text-sm sm:text-base font-medium text-slate-900">
+                            {(item.model_name || "Classic") + " Crocs"}
+                          </h3>
+                          <span className="inline-block text-[10px] text-emerald-600 font-medium">
+                            ✅{" "}
+                            {lang === "es"
+                              ? "Disponible hoy"
+                              : "Available today"}
                           </span>
+                          <p className="text-[11px] text-slate-600">
+                            {emoji} {colorText} ·{" "}
+                            {lang === "es" ? "Talla" : "Size"} {item.size}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg sm:text-xl font-semibold text-emerald-600">
+                            ${item.price_mxn.toFixed(0)} MXN
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            {lang === "es"
+                              ? "Precio por par"
+                              : "Price per pair"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 text-[11px] text-slate-600">
+                        <p>📍 {t("Entrega en Tijuana", "Pickup in Tijuana")}</p>
+                        <p>
+                          💵{" "}
+                          {t(
+                            "Pago en efectivo o transferencia",
+                            "Pay in cash or bank transfer"
+                          )}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg sm:text-xl font-bold text-emerald-600">
-                          ${item.price_mxn.toFixed(0)} MXN
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* info lines */}
-                    <div className="space-y-1 text-[11px] text-slate-600">
-                      <p className="flex items-center gap-1">
-                        <span>📍</span>
-                        <span>
-                          {lang === "es"
-                            ? "Entrega en Tijuana"
-                            : "Pickup in Tijuana"}
-                        </span>
-                      </p>
-                      <p className="flex items-center gap-1">
-                        <span>💵</span>
-                        <span>
-                          {lang === "es"
-                            ? "Pago en efectivo o transferencia"
-                            : "Cash or bank transfer"}
-                        </span>
-                      </p>
-                    </div>
-
-                    {/* selection toggle */}
-                    <div className="mt-1 flex flex-col gap-2">
-                      <div className="flex justify-end">
+                      {/* SINGLE CTA BUTTON */}
+                      <div className="mt-1">
                         <button
                           type="button"
                           onClick={() => handleToggleSelect(item.id)}
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold border transition ${
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
                             isSelected
                               ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
-                              : "bg-white text-slate-700 border-emerald-200 hover:border-emerald-400 hover:text-emerald-700"
+                              : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
                           }`}
                         >
-                          <span className="text-base">
-                            {isSelected ? "✅" : "➕"}
+                          <span>{isSelected ? "✅" : "➕"}</span>
+                          <span>
+                            {isSelected
+                              ? lang === "es"
+                                ? "En carrito"
+                                : "In cart"
+                              : lang === "es"
+                              ? "Lo quiero 🤍"
+                              : "Add to cart"}
                           </span>
-                          {isSelected
-                            ? lang === "es"
-                              ? "Añadido ✅"
-                              : "Added ✅"
-                            : lang === "es"
-                            ? "Lo quiero 💖"
-                            : "I want this 💖"}
                         </button>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                })}
+
+                {/* Show more button */}
+                {filtered.length > limited.length && (
+                  <div className="col-span-full mt-2 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleCount((prev) => prev + INITIAL_VISIBLE)
+                      }
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                    >
+                      {lang === "es"
+                        ? "Mostrar más pares"
+                        : "Show more pairs"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT SIDEBAR */}
+          <aside className="space-y-4">
+            {/* Entregas */}
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
+                <span>🚚</span>
+                {lang === "es" ? "Entregas" : "Deliveries"}
+              </h3>
+              <p className="text-[11px] text-slate-600">
+                {lang === "es"
+                  ? "Elige el punto que te quede mejor. El horario exacto se confirma por WhatsApp."
+                  : "Pick the spot that works best. Exact time is agreed via WhatsApp."}
+              </p>
+              <ul className="space-y-1 text-[12px] text-slate-800">
+                {DELIVERY_SPOTS.map((spot) => (
+                  <li key={spot} className="flex items-center gap-2">
+                    <span>📍</span>
+                    <span>{spot}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
+
+            {/* Bank info */}
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
+                <span>💳🇲🇽</span>
+                {lang === "es"
+                  ? "Pago por transferencia"
+                  : "Pay by bank transfer"}
+              </h3>
+              <p className="text-[11px] text-slate-600">
+                {lang === "es"
+                  ? "Después de transferir, envía captura por WhatsApp para confirmar tu pedido."
+                  : "After you transfer, send a screenshot on WhatsApp to confirm your order."}
+              </p>
+              <div className="space-y-1 text-[11px] sm:text-xs text-slate-800">
+                <p>
+                  <span className="font-medium">
+                    {lang === "es" ? "Banco: " : "Bank: "}
+                  </span>
+                  {MEX_BANK_INFO.bankName}
+                </p>
+                <p>
+                  <span className="font-medium">
+                    {lang === "es" ? "Titular: " : "Account name: "}
+                  </span>
+                  {MEX_BANK_INFO.accountName}
+                </p>
+                <p className="break-all">
+                  <span className="font-medium">
+                    {lang === "es" ? "Cuenta: " : "Account: "}
+                  </span>
+                  {MEX_BANK_INFO.accountNumber}
+                </p>
+                <p className="break-all">
+                  <span className="font-medium">Concepto: </span>
+                  {MEX_BANK_INFO.Concepto}
+                </p>
+              </div>
+            </div>
+
+            {/* Questions */}
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
+                <span>❓</span>
+                {lang === "es"
+                  ? "¿Dudas sobre tallas o colores?"
+                  : "Questions about sizes or colors?"}
+              </h3>
+              <p className="text-[11px] text-slate-600">
+                {lang === "es"
+                  ? "Mándanos mensaje por WhatsApp y te ayudamos a elegir talla y color. Respuestas de 9am a 7pm."
+                  : "Send us a WhatsApp message and we’ll help you pick size and color. Replies from 9am to 7pm."}
+              </p>
+            </div>
+          </aside>
         </section>
       </div>
 
-      {/* Sticky WhatsApp bar for MULTIPLE selected items */}
+      {/* STICKY CART BAR */}
       {selectedItems.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-20 border-t border-emerald-100 bg-white/95 backdrop-blur shadow-[0_-4px_12px_rgba(15,23,42,0.08)]">
+        <div className="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_30px_rgba(15,23,42,0.12)]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-[11px] text-slate-700">
               {lang === "es"
-                ? `${selectedItems.length} ${
+                ? `✅ ${selectedItems.length} ${
                     selectedItems.length === 1
-                      ? "par seleccionado"
-                      : "pares seleccionados"
+                      ? "par listo para enviar"
+                      : "pares listos para enviar"
                   }`
-                : `${selectedItems.length} ${
+                : `✅ ${selectedItems.length} ${
                     selectedItems.length === 1
-                      ? "pair selected"
-                      : "pairs selected"
+                      ? "pair ready to send"
+                      : "pairs ready to send"
                   }`}
             </p>
             <a
@@ -604,22 +694,21 @@ export function JackieCatalog() {
               rel="noopener noreferrer"
               onClick={() => {
                 if (!WHATSAPP_NUMBER || !selectedItems.length) return;
-
                 track("whatsapp_click_multi", {
                   count: selectedItems.length,
                   lang,
                 });
               }}
-              className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-bold transition ${
+              className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
                 WHATSAPP_NUMBER
-                  ? "bg-gradient-to-r from-emerald-500 to-emerald-400 text-white shadow-lg hover:from-emerald-400 hover:to-emerald-300"
-                  : "bg-slate-300 text-slate-600 cursor-not-allowed"
+                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
             >
               <span className="text-base">📲</span>
               {lang === "es"
-                ? "Pedir todos los seleccionados por WhatsApp"
-                : "Request all selected via WhatsApp"}
+                ? "Enviar carrito por WhatsApp"
+                : "Send cart via WhatsApp"}
             </a>
           </div>
         </div>
