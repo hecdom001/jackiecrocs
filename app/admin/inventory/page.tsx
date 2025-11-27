@@ -13,7 +13,8 @@ type SizeOption = {
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_DESKTOP = 25;
+const PAGE_SIZE_MOBILE = 4;
 
 const statusOptions: InventoryStatus[] = [
   "available",
@@ -46,7 +47,6 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
     case "beige":
       return "Beige";
     default:
-      // fallback: show the raw DB value
       return colorEn;
   }
 }
@@ -59,7 +59,6 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   switch (key) {
     case "classic":
       return "Clásico";
-    // if you add more models later, map them here
     default:
       return modelEn;
   }
@@ -72,6 +71,21 @@ export default function AdminInventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  const [showAddMobile, setShowAddMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      if (typeof window === "undefined") return;
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
@@ -86,7 +100,6 @@ export default function AdminInventoryPage() {
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
-  // ---- Helpers to handle 401 (session expired) ----
   function handleMaybeUnauthorized(res: Response): boolean {
     if (res.status === 401) {
       router.push("/admin/login?redirect=/admin/inventory");
@@ -112,7 +125,7 @@ export default function AdminInventoryPage() {
         return;
       }
       setItems(data.items || []);
-      setPage(1); // reset page when data changes
+      setPage(1);
     } catch (err) {
       console.error(err);
       setErrorMsg(
@@ -139,7 +152,6 @@ export default function AdminInventoryPage() {
     loadItems();
   }
 
-  // Initial load
   useEffect(() => {
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,7 +162,7 @@ export default function AdminInventoryPage() {
     setPage(1);
   }, [statusFilter, sizeFilter, colorFilter, customerQuery]);
 
-  // Derive filter options
+  // Filter options
   const sizeOptions = Array.from(new Set(items.map((i) => i.size))).sort();
 
   const colorFilterOptions = Array.from(new Set(items.map((i) => i.color)))
@@ -175,7 +187,7 @@ export default function AdminInventoryPage() {
     return matchesStatus && matchesCustomer && matchesSize && matchesColor;
   });
 
-  // Status counts for the CURRENT filtered set
+  // Status counts
   const countsByStatus: Record<InventoryStatus, number> = {
     available: filteredItems.filter((i) => i.status === "available").length,
     reserved: filteredItems.filter((i) => i.status === "reserved").length,
@@ -199,13 +211,15 @@ export default function AdminInventoryPage() {
     setCustomerQuery("");
   }
 
-  // Pagination calculations
+  // Pagination
+  const effectivePageSize = isMobile ? PAGE_SIZE_MOBILE : PAGE_SIZE_DESKTOP;
+
   const totalFiltered = filteredItems.length;
   const totalPages =
-    totalFiltered === 0 ? 1 : Math.ceil(totalFiltered / PAGE_SIZE);
+    totalFiltered === 0 ? 1 : Math.ceil(totalFiltered / effectivePageSize);
   const currentPage = Math.min(page, totalPages);
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const endIndex = startIndex + PAGE_SIZE;
+  const startIndex = (currentPage - 1) * effectivePageSize;
+  const endIndex = startIndex + effectivePageSize;
   const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
   const showingFrom = totalFiltered === 0 ? 0 : startIndex + 1;
@@ -272,16 +286,51 @@ export default function AdminInventoryPage() {
         )}
       </section>
 
-      <AddInventorySection
-        t={t}
-        lang={lang}
-        onAdded={loadItems}
-        onUnauthorized={() =>
-          router.push("/admin/login?redirect=/admin/inventory")
-        }
-      />
+      {/* Add inventory – collapsible on mobile, always visible on desktop */}
+      <section className="space-y-3">
+        {/* Mobile toggle card */}
+        <div className="sm:hidden">
+          <button
+            type="button"
+            onClick={() => setShowAddMobile((prev) => !prev)}
+            className="w-full flex items-center justify-between rounded-xl border border-slate-300 bg-white px-3 py-2 text-left shadow-sm active:bg-slate-50"
+          >
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-slate-900">
+                {t("Agregar nuevos pares", "Add new pairs")}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {showAddMobile
+                  ? t("Toca para ocultar el formulario", "Tap to hide form")
+                  : t("Toca para ver el formulario", "Tap to show form")}
+              </span>
+            </div>
+            <span
+              className={`ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-[11px] text-slate-600 transition-transform ${
+                showAddMobile ? "rotate-90" : ""
+              }`}
+            >
+              ▶
+            </span>
+          </button>
+        </div>
 
-      {/* Filters + table */}
+        {/* Form:
+            - Always visible on desktop (sm:block)
+            - On mobile only if showAddMobile === true */}
+        <div className={isMobile ? (showAddMobile ? "block" : "hidden") : "block"}>
+          <AddInventorySection
+            t={t}
+            lang={lang}
+            onAdded={loadItems}
+            onUnauthorized={() =>
+              router.push("/admin/login?redirect=/admin/inventory")
+            }
+          />
+        </div>
+      </section>
+
+      {/* Filters + table / mobile cards */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
         {/* Filter bar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -403,7 +452,7 @@ export default function AdminInventoryPage() {
           </div>
         </div>
 
-        {/* Status chips row (for filtered results) */}
+        {/* Status chips row */}
         <div className="flex flex-wrap gap-2 text-[11px]">
           <StatusChip
             label={t("Disponibles", "Available")}
@@ -437,7 +486,7 @@ export default function AdminInventoryPage() {
           />
         </div>
 
-        {/* Table view + pagination */}
+        {/* Table / cards + pagination */}
         {items.length === 0 ? (
           <p className="text-xs text-slate-500">
             {t(
@@ -454,7 +503,20 @@ export default function AdminInventoryPage() {
           </p>
         ) : (
           <>
-            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[70vh]">
+            {/* Mobile: card layout */}
+            <div className="space-y-3 sm:hidden">
+              {paginatedItems.map((item) => (
+                <InventoryCardMobile
+                  key={item.id}
+                  item={item}
+                  lang={lang}
+                  onUpdate={updateItem}
+                />
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table layout */}
+            <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden sm:max-h-[70vh]">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[11px]">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
@@ -506,45 +568,79 @@ export default function AdminInventoryPage() {
             </div>
 
             {/* Pagination controls */}
-            {totalFiltered > PAGE_SIZE && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[11px] text-slate-600 mt-3">
-                <p>
-                  {t(
-                    `Mostrando ${showingFrom}–${showingTo} de ${totalFiltered} pares`,
-                    `Showing ${showingFrom}–${showingTo} of ${totalFiltered} pairs`
-                  )}
-                </p>
-                <div className="inline-flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((p) => Math.max(1, p - 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
-                  >
-                    {t("Anterior", "Previous")}
-                  </button>
+            {totalFiltered > effectivePageSize && (
+              <>
+                {/* Mobile pagination */}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 mt-3 sm:hidden">
                   <span>
-                    {t(
-                      `Página ${currentPage} de ${totalPages}`,
-                      `Page ${currentPage} of ${totalPages}`
-                    )}
+                    {showingFrom}–{showingTo} / {totalFiltered}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((p) =>
-                        Math.min(totalPages, p + 1)
-                      )
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
-                  >
-                    {t("Siguiente", "Next")}
-                  </button>
+                  <div className="inline-flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {t("Anterior", "Prev")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(totalPages, p + 1)
+                        )
+                      }
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {t("Siguiente", "Next")}
+                    </button>
+                  </div>
                 </div>
-              </div>
+
+                {/* Desktop pagination */}
+                <div className="hidden sm:flex sm:items-center sm:justify-between gap-2 text-[11px] text-slate-600 mt-3">
+                  <p>
+                    {t(
+                      `Mostrando ${showingFrom}–${showingTo} de ${totalFiltered} pares`,
+                      `Showing ${showingFrom}–${showingTo} of ${totalFiltered} pairs`
+                    )}
+                  </p>
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
+                    >
+                      {t("Anterior", "Previous")}
+                    </button>
+                    <span>
+                      {t(
+                        `Página ${currentPage} de ${totalPages}`,
+                        `Page ${currentPage} of ${totalPages}`
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(totalPages, p + 1)
+                        )
+                      }
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
+                    >
+                      {t("Siguiente", "Next")}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </>
         )}
@@ -552,6 +648,8 @@ export default function AdminInventoryPage() {
     </div>
   );
 }
+
+/* ---------- AddInventorySection ---------- */
 
 function AddInventorySection({
   t,
@@ -655,9 +753,9 @@ function AddInventorySection({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model_name: modelName.trim(), // ✅ English from DB
-          color: color.trim(),          // ✅ English from DB
-          size: size.trim(),            // e.g. "M5-W7"
+          model_name: modelName.trim(), // English from DB
+          color: color.trim(),          // English from DB
+          size: size.trim(),
           price_mxn: Number(price),
           quantity: Number(quantity) || 1,
         }),
@@ -688,7 +786,6 @@ function AddInventorySection({
         )
       );
 
-      // Reset some fields, keep model/color as convenience
       setSize("");
       setQuantity("1");
       onAdded();
@@ -859,6 +956,7 @@ function AddInventorySection({
   );
 }
 
+/* ---------- Small helpers ---------- */
 
 function StatusChip({
   label,
@@ -1020,5 +1118,166 @@ function InventoryRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+/* ---------- Mobile card component ---------- */
+
+function InventoryCardMobile({
+  item,
+  lang,
+  onUpdate,
+}: {
+  item: InventoryItem;
+  lang: Lang;
+  onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
+}) {
+  const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
+  const [localCustomerName, setLocalCustomerName] = useState(
+    item.customer_name || ""
+  );
+  const [localWhatsapp, setLocalWhatsapp] = useState(
+    item.customer_whatsapp || ""
+  );
+  const [localNotes, setLocalNotes] = useState(item.notes || "");
+  const [saving, setSaving] = useState(false);
+
+  const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  useEffect(() => {
+    setLocalStatus(item.status);
+    setLocalCustomerName(item.customer_name || "");
+    setLocalWhatsapp(item.customer_whatsapp || "");
+    setLocalNotes(item.notes || "");
+  }, [item]);
+
+  const hasChanges =
+    localStatus !== item.status ||
+    localCustomerName !== (item.customer_name || "") ||
+    localWhatsapp !== (item.customer_whatsapp || "") ||
+    localNotes !== (item.notes || "");
+
+  async function handleSave() {
+    if (!hasChanges) return;
+    setSaving(true);
+    await onUpdate({
+      id: item.id,
+      status: localStatus,
+      customer_name: localCustomerName || null,
+      customer_whatsapp: localWhatsapp || null,
+      notes: localNotes || null,
+    });
+    setSaving(false);
+  }
+
+  const statusBadgeClass =
+    localStatus === "available"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : localStatus === "reserved"
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : localStatus === "paid_complete"
+      ? "bg-sky-50 text-sky-700 border-sky-200"
+      : localStatus === "paid_partial"
+      ? "bg-sky-50 text-sky-700 border-sky-200"
+      : "bg-rose-50 text-rose-700 border-rose-200";
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3 shadow-sm">
+      {/* Top row: basic info */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            {translateModelLabel(item.model_name, lang)} ·{" "}
+            {translateColorLabel(item.color, lang)} · {item.size}
+          </p>
+          <p className="text-[11px] text-slate-500 font-mono">
+            ID: {item.id.slice(0, 8)}…
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-slate-900">
+            ${item.price_mxn.toFixed(0)} MXN
+          </p>
+          <span
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold mt-1 ${statusBadgeClass}`}
+          >
+            {statusLabel[localStatus][lang]}
+          </span>
+        </div>
+      </div>
+
+      {/* Editable fields stacked */}
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-slate-700">
+            {t("Estatus", "Status")}
+          </label>
+          <select
+            value={localStatus}
+            onChange={(e) =>
+              setLocalStatus(e.target.value as InventoryStatus)
+            }
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+          >
+            {statusOptions.map((st) => (
+              <option key={st} value={st}>
+                {statusLabel[st][lang]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-slate-700">
+            {t("Cliente", "Customer")}
+          </label>
+          <input
+            value={localCustomerName}
+            onChange={(e) => setLocalCustomerName(e.target.value)}
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            placeholder={t("Nombre", "Name")}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-slate-700">
+            WhatsApp
+          </label>
+          <input
+            value={localWhatsapp}
+            onChange={(e) => setLocalWhatsapp(e.target.value)}
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            placeholder="+52..."
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-slate-700">
+            {t("Notas", "Notes")}
+          </label>
+          <textarea
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[48px]"
+          />
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!hasChanges || saving}
+          className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+        >
+          {saving
+            ? t("Guardando…", "Saving…")
+            : hasChanges
+            ? t("Guardar cambios", "Save changes")
+            : t("Sin cambios", "No changes")}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -69,7 +69,7 @@ export function LoginForm() {
             value={password}
             autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             placeholder="••••••••"
           />
         </div>
@@ -83,7 +83,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={!password || submitting}
-          className="w-full inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+          className="w-full inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-2.5 text-base font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
         >
           {submitting ? "Entrando…" : "Entrar al panel"}
         </button>
