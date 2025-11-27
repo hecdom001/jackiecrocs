@@ -83,7 +83,8 @@ const MEX_BANK_INFO = {
 } as const;
 
 // how many products to show at first / each "show more"
-const INITIAL_VISIBLE = 6;
+const MOBILE_INITIAL_VISIBLE = 4;
+const DESKTOP_INITIAL_VISIBLE = 10;
 
 // ---------- WhatsApp helpers ----------
 
@@ -156,7 +157,11 @@ export function JackieCatalog() {
   const [colorFilter, setColorFilter] = useState<string>("all");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE);
+
+  // pageSize = how many per "page" (mobile vs desktop)
+  const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
+  const [visibleCount, setVisibleCount] =
+    useState<number>(MOBILE_INITIAL_VISIBLE);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -209,6 +214,29 @@ export function JackieCatalog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // detect mobile vs desktop for pagination (client-only)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const computePageSize = () =>
+      window.innerWidth >= 1024
+        ? DESKTOP_INITIAL_VISIBLE
+        : MOBILE_INITIAL_VISIBLE;
+
+    const initial = computePageSize();
+    setPageSize(initial);
+    setVisibleCount(initial);
+
+    const handleResize = () => {
+      const next = computePageSize();
+      setPageSize(next);
+      setVisibleCount(next);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // auto-refresh every 60s
   useEffect(() => {
     const id = setInterval(() => {
@@ -221,8 +249,8 @@ export function JackieCatalog() {
 
   // reset visible items when filters or inventory change
   useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE);
-  }, [sizeFilter, colorFilter, items.length]);
+    setVisibleCount(pageSize);
+  }, [sizeFilter, colorFilter, items.length, pageSize]);
 
   const allSizes = Array.from(new Set(items.map((i) => i.size))).sort();
 
@@ -255,6 +283,8 @@ export function JackieCatalog() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
+
+  const showingCount = Math.min(visibleCount, filtered.length);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-24">
@@ -396,54 +426,54 @@ export function JackieCatalog() {
         </section>
 
         {/* PHOTO STRIP */}
-      <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
-        <div className="flex items-center justify-between text-[12px] sm:text-sm">
-          <p className="font-medium">
-            {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
-          </p>
-          <p className="text-[11px] text-slate-500">
-            {lang === "es"
-              ? "Tomadas por nosotros, sin filtros."
-              : "Taken by us, no filters."}
-          </p>
-        </div>
+        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between text-[12px] sm:text-sm">
+            <p className="font-medium">
+              {lang === "es"
+                ? "Fotos reales del producto"
+                : "Real product photos"}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {lang === "es"
+                ? "Tomadas por nosotros, sin filtros."
+                : "Taken by us, no filters."}
+            </p>
+          </div>
 
-        {/* MOBILE: horizontal scroll, no big empty space */}
-        <div className="flex md:hidden gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
-          {CROCS_PHOTOS.map((photo) => (
-            <div
-              key={photo.src}
-              className="snap-start min-w-[58%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo.src}
-                alt={photo.label}
-                className="h-44 w-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
+          {/* MOBILE: horizontal scroll, no big empty space */}
+          <div className="flex md:hidden gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+            {CROCS_PHOTOS.map((photo) => (
+              <div
+                key={photo.src}
+                className="snap-start min-w-[58%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.src}
+                  alt={photo.label}
+                  className="h-40 sm:h-60 w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
 
-        {/* DESKTOP: keep 3-column grid */}
-        <div className="hidden md:grid md:grid-cols-3 gap-3">
-          {CROCS_PHOTOS.map((photo) => (
-            <div
-              key={photo.src}
-              className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo.src}
-                alt={photo.label}
-                className="h-60 w-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-
+          {/* DESKTOP: keep 3-column grid */}
+          <div className="hidden md:grid md:grid-cols-3 gap-3">
+            {CROCS_PHOTOS.map((photo) => (
+              <div
+                key={photo.src}
+                className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.src}
+                  alt={photo.label}
+                  className="h-60 w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* FILTERS */}
         <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
@@ -617,13 +647,24 @@ export function JackieCatalog() {
                   );
                 })}
 
+                {/* count hint */}
+                {filtered.length > 0 && (
+                  <div className="col-span-full mt-1 text-center">
+                    <p className="text-[10px] text-slate-500">
+                      {lang === "es"
+                        ? `Mostrando ${showingCount} de ${filtered.length} pares`
+                        : `Showing ${showingCount} of ${filtered.length} pairs`}
+                    </p>
+                  </div>
+                )}
+
                 {/* Show more button */}
                 {filtered.length > limited.length && (
                   <div className="col-span-full mt-2 flex justify-center">
                     <button
                       type="button"
                       onClick={() =>
-                        setVisibleCount((prev) => prev + INITIAL_VISIBLE)
+                        setVisibleCount((prev) => prev + pageSize)
                       }
                       className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
                     >
