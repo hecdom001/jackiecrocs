@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-function checkPassword(password: string | null) {
-  return password === ADMIN_PASSWORD;
+// Simple helper: check for admin_session cookie
+function requireAdmin(req: NextRequest) {
+  const session = req.cookies.get("admin_session")?.value;
+  return !!session;
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const password = searchParams.get("password");
-
-  if (!checkPassword(password)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+   if (!requireAdmin(req)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
   const { data, error } = await supabase
     .from("colors")
     .select("id,name_en")

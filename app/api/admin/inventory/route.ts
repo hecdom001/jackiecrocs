@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient"; // <- same client you already use
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-// Small helper to check admin password
-function checkPassword(password: string | null) {
-  if (!ADMIN_PASSWORD) {
-    console.warn("ADMIN_PASSWORD is not set in env");
-    return false;
-  }
-  return password === ADMIN_PASSWORD;
+// Simple helper: check for admin_session cookie
+function requireAdmin(req: NextRequest) {
+  const session = req.cookies.get("admin_session")?.value;
+  return !!session;
 }
 
 /**
- * GET /api/admin/inventory?password=...
+ * GET /api/admin/inventory
  * Returns: { items: InventoryItemDTO[] }
  */
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const password = searchParams.get("password");
-
-  if (!checkPassword(password)) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+  if (!requireAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Join inventory_items with models + colors
@@ -80,29 +69,18 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/inventory
- * Body: { adminPassword, model_name, color, size, price_mxn, quantity }
+ * Body: { model_name, color, size, price_mxn, quantity }
  * - Ensures model exists in `models`
  * - Ensures color exists in `colors`
  * - Inserts N inventory_items rows with those IDs
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-
-  const {
-    adminPassword,
-    model_name,
-    color,
-    size,
-    price_mxn,
-    quantity,
-  } = body;
-
-  if (!checkPassword(adminPassword)) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+  if (!requireAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const body = await req.json();
+  const { model_name, color, size, price_mxn, quantity } = body;
 
   if (!model_name || !color || !size || !price_mxn) {
     return NextResponse.json(
@@ -209,19 +187,16 @@ export async function POST(req: NextRequest) {
 
 /**
  * PATCH /api/admin/inventory
- * Body: { adminPassword, id, ...fieldsToUpdate }
+ * Body: { id, ...fieldsToUpdate }
  * Only used for status / customer data / notes
  */
 export async function PATCH(req: NextRequest) {
-  const body = await req.json();
-  const { adminPassword, id, ...rest } = body;
-
-  if (!checkPassword(adminPassword)) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+  if (!requireAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const body = await req.json();
+  const { id, ...rest } = body;
 
   if (!id) {
     return NextResponse.json(
