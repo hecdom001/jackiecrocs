@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { track } from "@vercel/analytics";
 
@@ -48,7 +48,7 @@ function colorEmoji(colorEn: string) {
   }
 }
 
-// keep in case you reuse later
+// keep handy if you want per-color hero later
 function imageForColor(colorEn: string | null | undefined): string {
   const key = (colorEn || "").trim().toLowerCase();
   if (key === "black") return "/images/crocs-black.jpg";
@@ -57,6 +57,7 @@ function imageForColor(colorEn: string | null | undefined): string {
   return "/images/crocs-black.jpg";
 }
 
+// static gallery row
 const CROCS_PHOTOS: { src: string; label: string }[] = [
   { src: "/images/crocs-black.jpg", label: "Crocs negros" },
   { src: "/images/crocs-white.jpg", label: "Crocs blancos" },
@@ -65,6 +66,7 @@ const CROCS_PHOTOS: { src: string; label: string }[] = [
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
 
+// delivery chips & sidebar content
 const DELIVERY_SPOTS = [
   "Pinos Presa",
   "Villafloresta",
@@ -80,8 +82,10 @@ const MEX_BANK_INFO = {
   Concepto: "Tu nombre",
 } as const;
 
-const INITIAL_VISIBLE = 10;
-const AUTO_REFRESH_MS = 60_000;
+// how many products to show at first / each "show more"
+const INITIAL_VISIBLE = 6;
+
+// ---------- WhatsApp helpers ----------
 
 function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   if (!items.length) return "";
@@ -126,6 +130,21 @@ function buildWhatsAppLink(items: PublicItem[], lang: Lang) {
   )}`;
 }
 
+function buildWhatsAppSupportLink(lang: Lang) {
+  if (!WHATSAPP_NUMBER) return "#";
+
+  const message =
+    lang === "es"
+      ? "Hola 👋 Tengo dudas sobre tallas o colores de los Crocs."
+      : "Hi 👋 I have questions about Crocs sizes or colors.";
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    message
+  )}`;
+}
+
+// ---------- Component ----------
+
 export function JackieCatalog() {
   const [lang, setLang] = useState<Lang>("es");
   const [items, setItems] = useState<PublicItem[]>([]);
@@ -141,7 +160,7 @@ export function JackieCatalog() {
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
-  const loadInventory = useCallback(async () => {
+  async function loadInventory() {
     setLoading(true);
     setErrorMsg(null);
 
@@ -182,19 +201,25 @@ export function JackieCatalog() {
     );
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }
 
+  // initial load
   useEffect(() => {
     loadInventory();
-  }, [loadInventory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // auto-refresh every 60s
   useEffect(() => {
     const id = setInterval(() => {
       loadInventory();
-    }, AUTO_REFRESH_MS);
-    return () => clearInterval(id);
-  }, [loadInventory]);
+    }, 60_000);
 
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // reset visible items when filters or inventory change
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
   }, [sizeFilter, colorFilter, items.length]);
@@ -211,10 +236,12 @@ export function JackieCatalog() {
     return bySize && byColor;
   });
 
+  // only show up to visibleCount on screen
   const limited = filtered.slice(0, visibleCount);
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
   const waLinkForSelected = buildWhatsAppLink(selectedItems, lang);
+  const supportWaLink = buildWhatsAppSupportLink(lang);
 
   const formattedLastUpdated =
     lastUpdated &&
@@ -292,7 +319,7 @@ export function JackieCatalog() {
             <div className="space-y-3">
               <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-800 border border-slate-200">
                 <span>🛒</span>
-                {lang === "es" ? "Catálogo para WhatsApp" : "WhatsApp catalog"}
+                {lang === "es" ? "Catálogo" : "Catalog"}
               </span>
               <div className="space-y-1">
                 <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
@@ -335,7 +362,7 @@ export function JackieCatalog() {
             </div>
 
             {/* highlight card */}
-            <div className="justify-self-end w-full max-w-xs">
+            <div className="w-full max-w-[320px] mx-auto md:max-w-xs md:mx-0 md:justify-self-end">
               <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-3">
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
                   🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
@@ -361,7 +388,7 @@ export function JackieCatalog() {
                 <p className="text-[10px] text-slate-500">
                   {lang === "es"
                     ? "Agrega los pares que te gustan al carrito y envíanos tu mensaje por WhatsApp."
-                    : "Add the pairs you like to the cart and send us your order on WhatsApp."}
+                    : "Add the pairs you like to the cart and send your order on WhatsApp."}
                 </p>
               </div>
             </div>
@@ -369,35 +396,54 @@ export function JackieCatalog() {
         </section>
 
         {/* PHOTO STRIP */}
-        <section className="rounded-2xl bg-white border border-slate-100 p-4 space-y-2">
-          <div className="flex items-center justify-between text-[12px] sm:text-sm">
-            <p className="font-medium">
-              {lang === "es"
-                ? "Fotos reales del producto"
-                : "Real product photos"}
-            </p>
-            <p className="text-[11px] text-slate-500">
-              {lang === "es"
-                ? "Tomadas por nosotros, sin filtros."
-                : "Taken by us, no filters."}
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {CROCS_PHOTOS.map((photo) => (
-              <div
-                key={photo.src}
-                className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.src}
-                  alt={photo.label}
-                  className="h-60 w-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        </section>
+      <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
+        <div className="flex items-center justify-between text-[12px] sm:text-sm">
+          <p className="font-medium">
+            {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
+          </p>
+          <p className="text-[11px] text-slate-500">
+            {lang === "es"
+              ? "Tomadas por nosotros, sin filtros."
+              : "Taken by us, no filters."}
+          </p>
+        </div>
+
+        {/* MOBILE: horizontal scroll, no big empty space */}
+        <div className="flex md:hidden gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+          {CROCS_PHOTOS.map((photo) => (
+            <div
+              key={photo.src}
+              className="snap-start min-w-[58%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.src}
+                alt={photo.label}
+                className="h-44 w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* DESKTOP: keep 3-column grid */}
+        <div className="hidden md:grid md:grid-cols-3 gap-3">
+          {CROCS_PHOTOS.map((photo) => (
+            <div
+              key={photo.src}
+              className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.src}
+                alt={photo.label}
+                className="h-60 w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+
 
         {/* FILTERS */}
         <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
@@ -476,7 +522,7 @@ export function JackieCatalog() {
           </div>
         </section>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT: product grid + sidebar */}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           {/* LEFT: products */}
           <div>
@@ -544,26 +590,26 @@ export function JackieCatalog() {
                         </p>
                       </div>
 
-                      {/* SINGLE CTA BUTTON */}
-                      <div className="mt-1">
+                      {/* single CTA – toggle select */}
+                      <div className="mt-1 flex">
                         <button
                           type="button"
                           onClick={() => handleToggleSelect(item.id)}
-                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.75 text-[11px] font-medium border transition ${
                             isSelected
                               ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
                               : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
                           }`}
                         >
-                          <span>{isSelected ? "✅" : "➕"}</span>
+                          <span>{isSelected ? "✅" : "🤍"}</span>
                           <span>
                             {isSelected
                               ? lang === "es"
                                 ? "En carrito"
                                 : "In cart"
                               : lang === "es"
-                              ? "Lo quiero 🤍"
-                              : "Add to cart"}
+                              ? "Lo quiero"
+                              : "I want it"}
                           </span>
                         </button>
                       </div>
@@ -654,18 +700,40 @@ export function JackieCatalog() {
             </div>
 
             {/* Questions */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-3 sm:p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
                 <span>❓</span>
                 {lang === "es"
                   ? "¿Dudas sobre tallas o colores?"
                   : "Questions about sizes or colors?"}
               </h3>
-              <p className="text-[11px] text-slate-600">
+              <p className="text-[10px] sm:text-[11px] text-slate-600">
                 {lang === "es"
                   ? "Mándanos mensaje por WhatsApp y te ayudamos a elegir talla y color. Respuestas de 9am a 7pm."
                   : "Send us a WhatsApp message and we’ll help you pick size and color. Replies from 9am to 7pm."}
               </p>
+
+              <a
+                href={supportWaLink || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  if (!WHATSAPP_NUMBER) return;
+                  track("whatsapp_click_support", { lang });
+                }}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.75 text-[11px] font-medium border transition ${
+                  WHATSAPP_NUMBER
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                }`}
+              >
+                <span>📲</span>
+                <span>
+                  {lang === "es"
+                    ? "Preguntar por WhatsApp"
+                    : "Ask on WhatsApp"}
+                </span>
+              </a>
             </div>
           </aside>
         </section>
