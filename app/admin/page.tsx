@@ -362,53 +362,65 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          {Object.keys(colorSizeMap).length === 0 ? (
-            <p className="text-[11px] text-slate-500">
-              {t("Sin datos todavía.", "No data yet.")}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {Object.entries(colorSizeMap).map(([colorKey, sizes]) => (
-                <div
-                  key={colorKey}
-                  className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-1.5"
-                >
-                  <div className="text-[11px] font-semibold text-slate-900">
+          {Object.entries(colorSizeMap).map(([colorKey, sizes]) => {
+            const colorTotals = Object.values(sizes).reduce(
+              (acc, s) => {
+                acc.total += s.total;
+                acc.available += s.available;
+                acc.reserved += s.reserved;
+                return acc;
+              },
+              { total: 0, available: 0, reserved: 0 }
+            );
+
+            return (
+              <div
+                key={colorKey}
+                className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-2"
+              >
+                {/* Color header + totals as badges */}
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-900">
                     {translateColorLabel(
                       colorKey === "no_color" ? null : colorKey,
                       lang
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {Object.entries(sizes)
-                      .sort(([a], [b]) => compareSizeKey(a, b))
-                      .map(([sizeKey, stats]) => (
-                        <div
-                          key={sizeKey}
-                          className="flex items-center justify-between text-[10px]"
-                        >
-                          <span className="text-slate-700">
-                            {sizeKey === "no_size"
-                              ? t("Sin talla", "No size")
-                              : sizeKey}
+                    )} -  {t("Total", "Total")}: {colorTotals.total} -  {t("Disp.", "Avail.")}: {colorTotals.available} -  {t("Apart.", "Resv.")}: {colorTotals.reserved}
+                  </span>
+                </div>
+
+                {/* Divider between header and size rows */}
+                <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                  {Object.entries(sizes)
+                    .sort(([a], [b]) => compareSizeKey(a, b))
+                    .map(([sizeKey, stats]) => (
+                      <div
+                        key={sizeKey}
+                        className="flex items-start justify-between gap-2 text-[10px]"
+                      >
+                        <span className="text-slate-700">
+                          {sizeKey === "no_size"
+                            ? t("Sin talla", "No size")
+                            : sizeKey}
+                        </span>
+
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            {t("Total", "Total")}: {stats.total}
                           </span>
-                          <span className="text-slate-600">
-                            {stats.total} ·{" "}
-                            <span className="text-emerald-700">
-                              {stats.available}
-                            </span>{" "}
-                            /{" "}
-                            <span className="text-amber-700">
-                              {stats.reserved}
-                            </span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            {t("Disp.", "Avail.")}: {stats.available}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            {t("Apart.", "Resv.")}: {stats.reserved}
                           </span>
                         </div>
-                      ))}
-                  </div>
+                      </div>
+                    ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            );
+          })}
+
         </div>
       </section>
 
@@ -581,61 +593,90 @@ export default function AdminDashboardPage() {
             </p>
           ) : (
             <div className="space-y-4">
-              {Object.entries(colorSizeMap).map(([colorKey, sizes]) => (
-                <div key={colorKey}>
-                  <h4 className="text-[11px] font-semibold text-slate-700 mb-1.5">
-                    {translateColorLabel(
-                      colorKey === "no_color" ? null : colorKey,
-                      lang
-                    )}
-                  </h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px] border-collapse min-w-[260px]">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-1.5 pr-3 font-semibold text-slate-600">
-                            {t("Talla", "Size")}
-                          </th>
-                          <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
-                            {t("Total", "Total")}
-                          </th>
-                          <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
-                            {t("Disponibles", "Available")}
-                          </th>
-                          <th className="text-right py-1.5 pl-3 font-semibold text-slate-600">
-                            {t("Apartados", "Reserved")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(sizes)
-                          .sort(([a], [b]) => compareSizeKey(a, b))
-                          .map(([sizeKey, stats]) => (
-                            <tr
-                              key={sizeKey}
-                              className="border-b border-slate-100 last:border-0"
-                            >
-                              <td className="py-1.5 pr-3 text-slate-800">
-                                {sizeKey === "no_size"
-                                  ? t("Sin talla", "No size")
-                                  : sizeKey}
-                              </td>
-                              <td className="py-1.5 px-3 text-right text-slate-800">
-                                {stats.total}
-                              </td>
-                              <td className="py-1.5 px-3 text-right text-emerald-700">
-                                {stats.available}
-                              </td>
-                              <td className="py-1.5 pl-3 text-right text-amber-700">
-                                {stats.reserved}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
+              {Object.entries(colorSizeMap).map(([colorKey, sizes]) => {
+  const colorTotals = Object.values(sizes).reduce(
+    (acc, s) => {
+      acc.total += s.total;
+      acc.available += s.available;
+      acc.reserved += s.reserved;
+      return acc;
+    },
+    { total: 0, available: 0, reserved: 0 }
+  );
+
+  return (
+    <div key={colorKey}>
+      <h4 className="text-[11px] font-semibold text-slate-700 mb-1.5">
+        {translateColorLabel(
+          colorKey === "no_color" ? null : colorKey,
+          lang
+        )}
+      </h4>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] border-collapse min-w-[260px]">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-1.5 pr-3 font-semibold text-slate-600">
+                {t("Talla", "Size")}
+              </th>
+              <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
+                {t("Total", "Total")}
+              </th>
+              <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
+                {t("Disponibles", "Available")}
+              </th>
+              <th className="text-right py-1.5 pl-3 font-semibold text-slate-600">
+                {t("Apartados", "Reserved")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+                {Object.entries(sizes)
+                  .sort(([a], [b]) => compareSizeKey(a, b))
+                  .map(([sizeKey, stats]) => (
+                    <tr
+                      key={sizeKey}
+                      className="border-b border-slate-100 last:border-0"
+                    >
+                      <td className="py-1.5 pr-3 text-slate-800">
+                        {sizeKey === "no_size"
+                          ? t("Sin talla", "No size")
+                          : sizeKey}
+                      </td>
+                      <td className="py-1.5 px-3 text-right text-slate-800">
+                        {stats.total}
+                      </td>
+                      <td className="py-1.5 px-3 text-right text-emerald-700">
+                        {stats.available}
+                      </td>
+                      <td className="py-1.5 pl-3 text-right text-amber-700">
+                        {stats.reserved}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200 bg-slate-50">
+                  <td className="py-1.5 pr-3 font-semibold text-slate-900">
+                    {t("Total", "Total")}
+                  </td>
+                  <td className="py-1.5 px-3 text-right font-semibold text-slate-900">
+                    {colorTotals.total}
+                  </td>
+                  <td className="py-1.5 px-3 text-right font-semibold text-emerald-800">
+                    {colorTotals.available}
+                  </td>
+                  <td className="py-1.5 pl-3 text-right font-semibold text-amber-800">
+                    {colorTotals.reserved}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      );
+    })}
+
             </div>
           )}
         </div>
