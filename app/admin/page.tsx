@@ -33,6 +33,30 @@ function translateColorLabel(
   }
 }
 
+// Helper to sort size labels (M5-W7, 8M-10W, etc.)
+function compareSizeKey(a: string, b: string) {
+  // Always push "no_size" to the end
+  if (a === "no_size" && b === "no_size") return 0;
+  if (a === "no_size") return 1;
+  if (b === "no_size") return -1;
+
+  // Try to extract the first number in each size string (e.g. "M5-W7" -> 5, "8M-10W" -> 8)
+  const numA = (() => {
+    const m = a.match(/(\d+(\.\d+)?)/);
+    return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
+  })();
+
+  const numB = (() => {
+    const m = b.match(/(\d+(\.\d+)?)/);
+    return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
+  })();
+
+  if (numA !== numB) return numA - numB;
+
+  // Fallback: alphabetical if same number (e.g. "M5-W7" vs "M5-W8")
+  return a.localeCompare(b);
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("es");
@@ -92,7 +116,7 @@ export default function AdminDashboardPage() {
     .filter((i) => i.status === "paid_complete")
     .reduce((sum, i) => sum + i.price_mxn, 0);
 
-  // --- Breakdown by color ---
+  // --- Breakdown by color (global) ---
   type ColorStats = {
     total: number;
     available: number;
@@ -114,6 +138,36 @@ export default function AdminDashboardPage() {
     a[0].localeCompare(b[0])
   );
 
+  // --- Breakdown: sizes per color ---
+  type SizeStats = {
+    total: number;
+    available: number;
+    reserved: number;
+  };
+
+  type ColorSizeStats = Record<
+    string, // color key
+    Record<string, SizeStats> // size label -> stats
+  >;
+
+  const colorSizeMap = items.reduce<ColorSizeStats>((acc, item) => {
+    const colorKey = item.color || "no_color";
+    const sizeKey = item.size || "no_size";
+
+    if (!acc[colorKey]) {
+      acc[colorKey] = {};
+    }
+    if (!acc[colorKey][sizeKey]) {
+      acc[colorKey][sizeKey] = { total: 0, available: 0, reserved: 0 };
+    }
+
+    acc[colorKey][sizeKey].total += 1;
+    if (item.status === "available") acc[colorKey][sizeKey].available += 1;
+    if (item.status === "reserved") acc[colorKey][sizeKey].reserved += 1;
+
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header section (language + refresh) */}
@@ -125,8 +179,8 @@ export default function AdminDashboardPage() {
             </h2>
             <p className="text-[11px] text-slate-500">
               {t(
-                "Resumen rápido de todos los estatus y colores.",
-                "Quick overview of all statuses and colors."
+                "Resumen rápido de todos los estatus, colores y tallas.",
+                "Quick overview of all statuses, colors and sizes."
               )}
             </p>
           </div>
@@ -184,9 +238,8 @@ export default function AdminDashboardPage() {
       </section>
 
       {/* ---------- MOBILE LAYOUT ---------- */}
-      {/* Compact stats + revenue + color summary */}
       <section className="space-y-3 sm:hidden">
-        {/* Stats: 2 columns on mobile to avoid super tall stack */}
+        {/* Stats: 2 columns on mobile */}
         <div className="grid grid-cols-2 gap-2">
           <StatCard
             label={t("Pares totales", "Total pairs")}
@@ -293,10 +346,74 @@ export default function AdminDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* 📏 Sizes per color (mobile) */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <span>📏</span>
+              {t("Tallas por color", "Sizes by color")}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {t(
+                "Tallas disponibles dentro de cada color.",
+                "Sizes available within each color."
+              )}
+            </p>
+          </div>
+
+          {Object.keys(colorSizeMap).length === 0 ? (
+            <p className="text-[11px] text-slate-500">
+              {t("Sin datos todavía.", "No data yet.")}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {Object.entries(colorSizeMap).map(([colorKey, sizes]) => (
+                <div
+                  key={colorKey}
+                  className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-1.5"
+                >
+                  <div className="text-[11px] font-semibold text-slate-900">
+                    {translateColorLabel(
+                      colorKey === "no_color" ? null : colorKey,
+                      lang
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {Object.entries(sizes)
+                      .sort(([a], [b]) => compareSizeKey(a, b))
+                      .map(([sizeKey, stats]) => (
+                        <div
+                          key={sizeKey}
+                          className="flex items-center justify-between text-[10px]"
+                        >
+                          <span className="text-slate-700">
+                            {sizeKey === "no_size"
+                              ? t("Sin talla", "No size")
+                              : sizeKey}
+                          </span>
+                          <span className="text-slate-600">
+                            {stats.total} ·{" "}
+                            <span className="text-emerald-700">
+                              {stats.available}
+                            </span>{" "}
+                            /{" "}
+                            <span className="text-amber-700">
+                              {stats.reserved}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ---------- DESKTOP / TABLET LAYOUT ---------- */}
-      {/* STATS GRID: ALL STATUS COUNTS (without delivered) */}
+      {/* STATS GRID */}
       <section className="hidden sm:grid sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label={t("Pares totales", "Total pairs")}
@@ -336,7 +453,7 @@ export default function AdminDashboardPage() {
         />
       </section>
 
-      {/* REVENUE + STATUS DETAIL (desktop / tablet) */}
+      {/* REVENUE + COLOR SUMMARY (desktop / tablet) */}
       <section className="hidden sm:grid sm:gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {/* Revenue card */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-3">
@@ -437,6 +554,88 @@ export default function AdminDashboardPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 📏 SIZE-BY-COLOR SUMMARY (desktop / tablet) */}
+      <section className="hidden sm:block">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <span>📏</span>
+              {t("Tallas por color", "Sizes by color")}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              {t(
+                "Distribución de tallas dentro de cada color.",
+                "Size distribution within each color."
+              )}
+            </p>
+          </div>
+
+          {Object.keys(colorSizeMap).length === 0 ? (
+            <p className="text-[11px] text-slate-500">
+              {t("Sin datos todavía.", "No data yet.")}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(colorSizeMap).map(([colorKey, sizes]) => (
+                <div key={colorKey}>
+                  <h4 className="text-[11px] font-semibold text-slate-700 mb-1.5">
+                    {translateColorLabel(
+                      colorKey === "no_color" ? null : colorKey,
+                      lang
+                    )}
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] border-collapse min-w-[260px]">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 pr-3 font-semibold text-slate-600">
+                            {t("Talla", "Size")}
+                          </th>
+                          <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
+                            {t("Total", "Total")}
+                          </th>
+                          <th className="text-right py-1.5 px-3 font-semibold text-slate-600">
+                            {t("Disponibles", "Available")}
+                          </th>
+                          <th className="text-right py-1.5 pl-3 font-semibold text-slate-600">
+                            {t("Apartados", "Reserved")}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(sizes)
+                          .sort(([a], [b]) => compareSizeKey(a, b))
+                          .map(([sizeKey, stats]) => (
+                            <tr
+                              key={sizeKey}
+                              className="border-b border-slate-100 last:border-0"
+                            >
+                              <td className="py-1.5 pr-3 text-slate-800">
+                                {sizeKey === "no_size"
+                                  ? t("Sin talla", "No size")
+                                  : sizeKey}
+                              </td>
+                              <td className="py-1.5 px-3 text-right text-slate-800">
+                                {stats.total}
+                              </td>
+                              <td className="py-1.5 px-3 text-right text-emerald-700">
+                                {stats.available}
+                              </td>
+                              <td className="py-1.5 pl-3 text-right text-amber-700">
+                                {stats.reserved}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
