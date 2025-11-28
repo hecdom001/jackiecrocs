@@ -3,8 +3,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
-
-type Lang = "es" | "en";
+import { useAdminLang } from "../adminLangContext";  // 👈 add this
 
 type SizeOption = {
   id: string;
@@ -12,9 +11,11 @@ type SizeOption = {
 };
 
 export default function AdminNewPage() {
-  const [lang, setLang] = useState<Lang>("es");
+  const { lang, t } = useAdminLang(); // 👈 shared lang + t
   const [adminPassword, setAdminPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  // ... rest of your state
+
 
   // Lookups / form state
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -31,8 +32,6 @@ export default function AdminNewPage() {
   const [sizes, setSizes] = useState<SizeOption[]>([]);
   const [sizesLoading, setSizesLoading] = useState(true);
   const [sizesError, setSizesError] = useState<string | null>(null);
-
-  const t = (es: string, en: string) => (lang === "es" ? es : en);
 
   async function loadLookups() {
     if (!adminPassword) return;
@@ -177,36 +176,6 @@ export default function AdminNewPage() {
                 "Only you and Jackie should have this password."
               )}
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 justify-end">
-            <span className="hidden sm:inline text-[11px] text-slate-500">
-              {t("Idioma", "Language")}
-            </span>
-            <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 p-0.5 text-[11px] shadow-sm">
-              <button
-                type="button"
-                onClick={() => setLang("es")}
-                className={`px-2.5 py-1 rounded-full ${
-                  lang === "es"
-                    ? "bg-emerald-500 text-white shadow"
-                    : "text-slate-700 hover:text-slate-900"
-                }`}
-              >
-                ES
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang("en")}
-                className={`px-2.5 py-1 rounded-full ${
-                  lang === "en"
-                    ? "bg-emerald-500 text-white shadow"
-                    : "text-slate-700 hover:text-slate-900"
-                }`}
-              >
-                EN
-              </button>
-            </div>
           </div>
         </div>
       </section>

@@ -4,17 +4,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { InventoryItem, InventoryStatus } from "@/types/inventory";
-import { supabase } from "@/lib/supabaseClient";
-
-type SizeOption = {
-  id: string;
-  label: string;
-};
+import { useAdminLang, type Lang } from "../adminLangContext";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE_DESKTOP = 25;
-const PAGE_SIZE_MOBILE = 4;
+const PAGE_SIZE_MOBILE = 6;
 
 const statusOptions: InventoryStatus[] = [
   "available",
@@ -23,8 +18,6 @@ const statusOptions: InventoryStatus[] = [
   "paid_partial",
   "cancelled",
 ];
-
-type Lang = "es" | "en";
 
 const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   available: { es: "Disponible", en: "Available" },
@@ -37,7 +30,6 @@ const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
 function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
   if (!colorEn) return "";
   if (lang === "en") return colorEn;
-
   const key = colorEn.trim().toLowerCase();
   switch (key) {
     case "black":
@@ -54,7 +46,6 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
 function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   if (!modelEn) return "";
   if (lang === "en") return modelEn;
-
   const key = modelEn.trim().toLowerCase();
   switch (key) {
     case "classic":
@@ -66,22 +57,22 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
 
 export default function AdminInventoryPage() {
   const router = useRouter();
+  const { lang, t } = useAdminLang(); // shared lang + t
 
-  const [lang, setLang] = useState<Lang>("es");
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // mobile detection
+  // mobile detection + fast mode
   const [isMobile, setIsMobile] = useState(false);
-  const [showAddMobile, setShowAddMobile] = useState(false);
+  const [mobileFastMode, setMobileFastMode] =
+    useState<"normal" | "fast">("fast");
 
   useEffect(() => {
     const checkIsMobile = () => {
       if (typeof window === "undefined") return;
       setIsMobile(window.innerWidth < 640);
     };
-
     checkIsMobile();
     window.addEventListener("resize", checkIsMobile);
     return () => window.removeEventListener("resize", checkIsMobile);
@@ -95,10 +86,11 @@ export default function AdminInventoryPage() {
   const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
 
+  // Filters panel (mobile)
+  const [showFilters, setShowFilters] = useState(false);
+
   // Pagination
   const [page, setPage] = useState(1);
-
-  const t = (es: string, en: string) => (lang === "es" ? es : en);
 
   function handleMaybeUnauthorized(res: Response): boolean {
     if (res.status === 401) {
@@ -114,7 +106,6 @@ export default function AdminInventoryPage() {
     try {
       const res = await fetch("/api/admin/inventory");
       if (handleMaybeUnauthorized(res)) return;
-
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(
@@ -172,12 +163,9 @@ export default function AdminInventoryPage() {
   const filteredItems = items.filter((item) => {
     const matchesStatus =
       statusFilter === "all" || item.status === statusFilter;
-
     const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
-
     const matchesColor =
       colorFilter === "all" || item.color === colorFilter;
-
     const query = customerQuery.trim().toLowerCase();
     const matchesCustomer =
       !query ||
@@ -213,7 +201,6 @@ export default function AdminInventoryPage() {
 
   // Pagination
   const effectivePageSize = isMobile ? PAGE_SIZE_MOBILE : PAGE_SIZE_DESKTOP;
-
   const totalFiltered = filteredItems.length;
   const totalPages =
     totalFiltered === 0 ? 1 : Math.ceil(totalFiltered / effectivePageSize);
@@ -221,64 +208,81 @@ export default function AdminInventoryPage() {
   const startIndex = (currentPage - 1) * effectivePageSize;
   const endIndex = startIndex + effectivePageSize;
   const paginatedItems = filteredItems.slice(startIndex, endIndex);
-
   const showingFrom = totalFiltered === 0 ? 0 : startIndex + 1;
   const showingTo = Math.min(endIndex, totalFiltered);
 
   return (
-    <div className="space-y-6">
-      {/* Header + language + refresh */}
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-3">
+    <div className="space-y-4">
+      {/* HEADER */}
+      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: title + subtitle */}
           <div>
-            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
-              {t("Inventario detallado", "Detailed inventory")}
-            </h2>
-            <p className="text-[11px] text-slate-500">
+            <h1 className="text-base font-semibold text-slate-900">
+              {t("Inventario", "Inventory")}
+            </h1>
+            <p className="text-xs text-slate-500">
               {t(
-                "Busca y actualiza pares rápidamente en una vista de tabla.",
-                "Search and update pairs quickly in a table view."
+                "Gestiona pares desde el teléfono.",
+                "Manage pairs from your phone."
               )}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
-            <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 p-0.5 text-[11px] shadow-sm self-start">
-              <button
-                type="button"
-                onClick={() => setLang("es")}
-                className={`px-2.5 py-1 rounded-full ${
-                  lang === "es"
-                    ? "bg-emerald-500 text-white shadow"
-                    : "text-slate-700 hover:text-slate-900"
-                }`}
-              >
-                ES
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang("en")}
-                className={`px-2.5 py-1 rounded-full ${
-                  lang === "en"
-                    ? "bg-emerald-500 text-white shadow"
-                    : "text-slate-700 hover:text-slate-900"
-                }`}
-              >
-                EN
-              </button>
-            </div>
-
+          {/* Right (desktop): refresh button */}
+          <div className="hidden sm:flex">
             <button
               type="button"
               onClick={loadItems}
               disabled={loading}
-              className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-5 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
+              className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
               {loading
                 ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar inventario", "Refresh inventory")}
+                : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
+        </div>
+
+        {/* Mobile: refresh + normal/fast in one bar */}
+        <div className="sm:hidden flex gap-2 text-[11px]">
+          {/* Normal */}
+          <button
+            type="button"
+            onClick={() => setMobileFastMode("normal")}
+            className={`flex-1 rounded-full px-3 py-2.5 font-semibold ${
+              mobileFastMode === "normal"
+                ? "bg-white shadow text-slate-900 border border-slate-300"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {t("Normal", "Normal")}
+          </button>
+
+          {/* Rápido */}
+          <button
+            type="button"
+            onClick={() => setMobileFastMode("fast")}
+            className={`flex-1 rounded-full px-3 py-2.5 font-semibold ${
+              mobileFastMode === "fast"
+                ? "bg-white shadow text-slate-900 border border-slate-300"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {t("Rápido", "Fast")}
+          </button>
+
+          {/* Refresh */}
+          <button
+            type="button"
+            onClick={loadItems}
+            disabled={loading}
+            className="flex-1 inline-flex justify-center items-center rounded-full bg-emerald-500 text-white font-semibold px-3 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
+          >
+            {loading
+              ? t("Actualizando…", "Refreshing…")
+              : t("Actualizar datos", "Refresh data")}
+          </button>
         </div>
 
         {errorMsg && (
@@ -286,57 +290,15 @@ export default function AdminInventoryPage() {
         )}
       </section>
 
-      {/* Add inventory – collapsible on mobile, always visible on desktop */}
-      <section className="space-y-3">
-        {/* Mobile toggle card */}
-        <div className="sm:hidden">
-          <button
-            type="button"
-            onClick={() => setShowAddMobile((prev) => !prev)}
-            className="w-full flex items-center justify-between rounded-xl border border-slate-300 bg-white px-3 py-2 text-left shadow-sm active:bg-slate-50"
-          >
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-slate-900">
-                {t("Agregar nuevos pares", "Add new pairs")}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                {showAddMobile
-                  ? t("Toca para ocultar el formulario", "Tap to hide form")
-                  : t("Toca para ver el formulario", "Tap to show form")}
-              </span>
-            </div>
-            <span
-              className={`ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-[11px] text-slate-600 transition-transform ${
-                showAddMobile ? "rotate-90" : ""
-              }`}
-            >
-              ▶
-            </span>
-          </button>
-        </div>
 
-        {/* Form:
-            - Always visible on desktop (sm:block)
-            - On mobile only if showAddMobile === true */}
-        <div className={isMobile ? (showAddMobile ? "block" : "hidden") : "block"}>
-          <AddInventorySection
-            t={t}
-            lang={lang}
-            onAdded={loadItems}
-            onUnauthorized={() =>
-              router.push("/admin/login?redirect=/admin/inventory")
-            }
-          />
-        </div>
-      </section>
 
-      {/* Filters + table / mobile cards */}
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-        {/* Filter bar */}
+      {/* INVENTORY + FILTERS */}
+      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-4">
+        {/* Top summary + filters toggle (mobile) */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm sm:text-base font-semibold text-slate-900">
-              {t("Inventario completo", "Full inventory")}
+              {t("Buscar", "Search")}
             </h2>
             <p className="text-[11px] text-slate-500">
               {t(
@@ -354,8 +316,22 @@ export default function AdminInventoryPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 w-full sm:w-auto sm:min-w-[650px] text-[11px]">
-            {/* status filter */}
+          {/* Mobile: show filters button; Desktop: show full filters bar */}
+          <div className="sm:hidden">
+            <button
+              type="button"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 shadow-sm"
+            >
+              {showFilters
+                ? t("Ocultar filtros", "Hide filters")
+                : t("Mostrar filtros", "Show filters")}
+            </button>
+          </div>
+
+          {/* Desktop filter bar */}
+          <div className="hidden sm:grid sm:grid-cols-5 gap-2 w-full sm:w-auto sm:min-w-[650px] text-[11px]">
+            {/* status */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-700">
                 {t("Estatus", "Status")}
@@ -380,7 +356,7 @@ export default function AdminInventoryPage() {
               </select>
             </div>
 
-            {/* size filter */}
+            {/* size */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-700">
                 {t("Talla", "Size")}
@@ -399,7 +375,7 @@ export default function AdminInventoryPage() {
               </select>
             </div>
 
-            {/* color filter */}
+            {/* color */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-700">
                 {t("Color", "Color")}
@@ -452,7 +428,105 @@ export default function AdminInventoryPage() {
           </div>
         </div>
 
-        {/* Status chips row */}
+        {/* Mobile filters panel */}
+        {showFilters && (
+          <div className="sm:hidden rounded-2xl border border-slate-200 bg-white p-3 space-y-3 text-[11px]">
+            <div className="grid grid-cols-1 gap-2">
+              {/* status */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">
+                  {t("Estatus", "Status")}
+                </span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(
+                      e.target.value === "all"
+                        ? "all"
+                        : (e.target.value as InventoryStatus)
+                    )
+                  }
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="all">{t("Todos", "All")}</option>
+                  {statusOptions.map((st) => (
+                    <option key={st} value={st}>
+                      {statusLabel[st][lang]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* size */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">
+                  {t("Talla", "Size")}
+                </span>
+                <select
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value)}
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="all">{t("Todas", "All")}</option>
+                  {sizeOptions.map((sz) => (
+                    <option key={sz} value={sz}>
+                      {sz}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* color */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">
+                  {t("Color", "Color")}
+                </span>
+                <select
+                  value={colorFilter}
+                  onChange={(e) => setColorFilter(e.target.value)}
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="all">{t("Todos", "All")}</option>
+                  {colorFilterOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {translateColorLabel(c, lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* customer search */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">
+                  {t("Cliente / WhatsApp", "Customer / WhatsApp")}
+                </span>
+                <input
+                  value={customerQuery}
+                  onChange={(e) => setCustomerQuery(e.target.value)}
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  placeholder={
+                    lang === "es"
+                      ? "Buscar nombre o +52..."
+                      : "Search name or +52..."
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={clearFilters}
+                disabled={!hasActiveFilters}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                {t("Limpiar filtros", "Clear filters")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Status chips */}
         <div className="flex flex-wrap gap-2 text-[11px]">
           <StatusChip
             label={t("Disponibles", "Available")}
@@ -486,7 +560,7 @@ export default function AdminInventoryPage() {
           />
         </div>
 
-        {/* Table / cards + pagination */}
+        {/* LIST / TABLE */}
         {items.length === 0 ? (
           <p className="text-xs text-slate-500">
             {t(
@@ -503,21 +577,30 @@ export default function AdminInventoryPage() {
           </p>
         ) : (
           <>
-            {/* Mobile: card layout */}
+            {/* Mobile list */}
             <div className="space-y-3 sm:hidden">
-              {paginatedItems.map((item) => (
-                <InventoryCardMobile
-                  key={item.id}
-                  item={item}
-                  lang={lang}
-                  onUpdate={updateItem}
-                />
-              ))}
+              {paginatedItems.map((item) =>
+                mobileFastMode === "fast" ? (
+                  <InventoryFastRowMobile
+                    key={item.id}
+                    item={item}
+                    lang={lang}
+                    onUpdate={updateItem}
+                  />
+                ) : (
+                  <InventoryCardMobile
+                    key={item.id}
+                    item={item}
+                    lang={lang}
+                    onUpdate={updateItem}
+                  />
+                )
+              )}
             </div>
 
-            {/* Desktop / tablet: table layout */}
-            <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden sm:max-h-[70vh]">
-              <div className="overflow-x-auto">
+            {/* Desktop table */}
+            <div className="hidden sm:block border border-slate-200 rounded-xl">
+              <div className="max-h-[70vh] overflow-y-auto overflow-x-auto">
                 <table className="min-w-full text-[11px]">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                     <tr>
@@ -567,10 +650,10 @@ export default function AdminInventoryPage() {
               </div>
             </div>
 
-            {/* Pagination controls */}
+            {/* Pagination */}
             {totalFiltered > effectivePageSize && (
               <>
-                {/* Mobile pagination */}
+                {/* Mobile */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 mt-3 sm:hidden">
                   <span>
                     {showingFrom}–{showingTo} / {totalFiltered}
@@ -589,9 +672,7 @@ export default function AdminInventoryPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setPage((p) =>
-                          Math.min(totalPages, p + 1)
-                        )
+                        setPage((p) => Math.min(totalPages, p + 1))
                       }
                       disabled={currentPage === totalPages}
                       className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
@@ -601,7 +682,7 @@ export default function AdminInventoryPage() {
                   </div>
                 </div>
 
-                {/* Desktop pagination */}
+                {/* Desktop */}
                 <div className="hidden sm:flex sm:items-center sm:justify-between gap-2 text-[11px] text-slate-600 mt-3">
                   <p>
                     {t(
@@ -646,313 +727,6 @@ export default function AdminInventoryPage() {
         )}
       </section>
     </div>
-  );
-}
-
-/* ---------- AddInventorySection ---------- */
-
-function AddInventorySection({
-  t,
-  lang,
-  onAdded,
-  onUnauthorized,
-}: {
-  t: (es: string, en: string) => string;
-  lang: Lang;
-  onAdded: () => void;
-  onUnauthorized: () => void;
-}) {
-  const [modelName, setModelName] = useState("");
-  const [color, setColor] = useState<string>("");
-  const [size, setSize] = useState("");
-  const [price, setPrice] = useState("0");
-  const [quantity, setQuantity] = useState("0");
-
-  const [models, setModels] = useState<string[]>([]);
-  const [colors, setColors] = useState<string[]>([]);
-  const [sizes, setSizes] = useState<SizeOption[]>([]);
-  const [sizesLoading, setSizesLoading] = useState(true);
-  const [sizesError, setSizesError] = useState<string | null>(null);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  // Load sizes, models, colors from DB
-  useEffect(() => {
-    async function loadSizes() {
-      setSizesLoading(true);
-      setSizesError(null);
-      const { data, error } = await supabase
-        .from("sizes")
-        .select("id, label")
-        .order("sort_order", { ascending: true });
-
-      if (error) {
-        console.error("Error loading sizes:", error);
-        setSizesError("Error loading sizes");
-        setSizesLoading(false);
-        return;
-      }
-
-      setSizes(data ?? []);
-      setSizesLoading(false);
-    }
-
-    async function loadColors() {
-      const { data, error } = await supabase
-        .from("colors")
-        .select("name_en")
-        .order("name_en");
-
-      if (error) {
-        console.error("Error loading colors:", error);
-        return;
-      }
-
-      const colorNames = (data ?? []).map((c) => c.name_en as string);
-      setColors(colorNames);
-    }
-
-    async function loadModels() {
-      const { data, error } = await supabase
-        .from("models")
-        .select("name")
-        .order("name");
-
-      if (error) {
-        console.error("Error loading models:", error);
-        return;
-      }
-
-      const modelNames = (data ?? []).map((m) => m.name as string);
-      setModels(modelNames);
-    }
-
-    loadSizes();
-    loadColors();
-    loadModels();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-
-    if (!modelName.trim() || !color.trim() || !size.trim() || !price.trim()) {
-      setMessage(
-        t(
-          "Completa todos los campos antes de guardar.",
-          "Please fill in all fields before saving."
-        )
-      );
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/admin/inventory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model_name: modelName.trim(), // English from DB
-          color: color.trim(),          // English from DB
-          size: size.trim(),
-          price_mxn: Number(price),
-          quantity: Number(quantity) || 1,
-        }),
-      });
-
-      if (res.status === 401) {
-        onUnauthorized();
-        return;
-      }
-
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error creating inventory:", data);
-        setMessage(
-          data.error ||
-            t(
-              "Error al agregar inventario.",
-              "Error adding inventory."
-            )
-        );
-        return;
-      }
-
-      setMessage(
-        t(
-          "Pares agregados correctamente ✅",
-          "Pairs added successfully ✅"
-        )
-      );
-
-      setSize("");
-      setQuantity("1");
-      onAdded();
-    } catch (err) {
-      console.error(err);
-      setMessage(
-        t(
-          "Error al agregar inventario.",
-          "Error adding inventory."
-        )
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm sm:text-base font-semibold text-slate-900">
-            {t("Agregar nuevos pares", "Add new pairs")}
-          </h2>
-          <p className="text-[11px] text-slate-500">
-            {t(
-              "Se crearán varios registros si pones cantidad mayor a 1.",
-              "Multiple records will be created if quantity is greater than 1."
-            )}
-          </p>
-        </div>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        {/* Model (from DB, localized in label) */}
-        <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-700">
-            {t("Modelo", "Model")}
-          </label>
-          <select
-            value={modelName}
-            onChange={(e) => setModelName(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900
-                       focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            required
-          >
-            <option value="" disabled>
-              {t("Selecciona un modelo", "Select a model")}
-            </option>
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {translateModelLabel(m, lang)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Color (from DB, localized in label) */}
-        <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-700">
-            {t("Color", "Color")}
-          </label>
-          <select
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900
-                       focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            required
-          >
-            <option value="" disabled>
-              {t("Selecciona un color", "Select a color")}
-            </option>
-            {colors.map((c) => (
-              <option key={c} value={c}>
-                {translateColorLabel(c, lang)}
-              </option>
-            ))}
-          </select>
-
-          <p className="text-[10px] text-slate-500">
-            {t(
-              "Modelo y color se guardan en inglés; el público lo ve traducido.",
-              "Model and color are stored in English; the public page will translate them."
-            )}
-          </p>
-        </div>
-
-        {/* Size dropdown from DB */}
-        <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-700">
-            {t("Talla", "Size")}
-          </label>
-          {sizesLoading ? (
-            <div className="text-[11px] text-slate-500">
-              {t("Cargando tallas…", "Loading sizes…")}
-            </div>
-          ) : sizesError ? (
-            <div className="text-[11px] text-rose-600">{sizesError}</div>
-          ) : (
-            <select
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              required
-            >
-              <option value="" disabled>
-                {t("Selecciona una talla", "Select a size")}
-              </option>
-              {sizes.map((s) => (
-                <option key={s.id} value={s.label}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Price */}
-        <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-700">
-            {t("Precio MXN", "Price MXN")}
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            required
-          />
-        </div>
-
-        {/* Quantity */}
-        <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-700">
-            {t("Cantidad", "Quantity")}
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            required
-          />
-        </div>
-
-        {/* Submit */}
-        <div className="sm:col-span-2 lg:col-span-3 flex justify-end items-end">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
-          >
-            {submitting
-              ? t("Guardando…", "Saving…")
-              : t("Agregar pares", "Add pairs")}
-          </button>
-        </div>
-      </form>
-
-      {message && (
-        <p className="text-[11px] text-right text-emerald-700">{message}</p>
-      )}
-    </section>
   );
 }
 
@@ -1121,7 +895,7 @@ function InventoryRow({
   );
 }
 
-/* ---------- Mobile card component ---------- */
+/* ---------- Mobile components ---------- */
 
 function InventoryCardMobile({
   item,
@@ -1141,6 +915,10 @@ function InventoryCardMobile({
   );
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [saving, setSaving] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
+    null
+  );
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -1152,12 +930,33 @@ function InventoryCardMobile({
   }, [item]);
 
   const hasChanges =
-    localStatus !== item.status ||
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
     localNotes !== (item.notes || "");
 
-  async function handleSave() {
+  // save helper
+  async function saveWithStatus(newStatus: InventoryStatus) {
+    setSaving(true);
+    setLocalStatus(newStatus);
+
+    await onUpdate({
+      id: item.id,
+      status: newStatus,
+      customer_name: localCustomerName || null,
+      customer_whatsapp: localWhatsapp || null,
+      notes: localNotes || null,
+    });
+
+    setSaving(false);
+  }
+
+  // every status change opens the confirmation popup
+  function handleStatusClick(newStatus: InventoryStatus) {
+    if (newStatus === localStatus) return;
+    setPendingStatus(newStatus);
+  }
+
+  async function handleSaveDetails() {
     if (!hasChanges) return;
     setSaving(true);
     await onUpdate({
@@ -1182,102 +981,322 @@ function InventoryCardMobile({
       : "bg-rose-50 text-rose-700 border-rose-200";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3 shadow-sm">
-      {/* Top row: basic info */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            {translateModelLabel(item.model_name, lang)} ·{" "}
-            {translateColorLabel(item.color, lang)} · {item.size}
-          </p>
-          <p className="text-[11px] text-slate-500 font-mono">
-            ID: {item.id.slice(0, 8)}…
-          </p>
+    <>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-base font-semibold text-slate-900">
+              {translateModelLabel(item.model_name, lang)} · {item.size}
+            </p>
+            <p className="text-xs text-slate-500">
+              {translateColorLabel(item.color, lang)}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400 font-mono">
+              ID: {item.id.slice(0, 8)}…
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-base font-semibold text-slate-900">
+              ${item.price_mxn.toFixed(0)} MXN
+            </p>
+            <span
+              className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}
+            >
+              {statusLabel[localStatus][lang]}
+            </span>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-semibold text-slate-900">
-            ${item.price_mxn.toFixed(0)} MXN
-          </p>
-          <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold mt-1 ${statusBadgeClass}`}
+
+        {/* big status buttons */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => handleStatusClick("available")}
+            disabled={saving}
+            className="flex-1 rounded-full bg-emerald-500 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {statusLabel[localStatus][lang]}
-          </span>
-        </div>
-      </div>
-
-      {/* Editable fields stacked */}
-      <div className="space-y-2">
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-700">
-            {t("Estatus", "Status")}
-          </label>
-          <select
-            value={localStatus}
-            onChange={(e) =>
-              setLocalStatus(e.target.value as InventoryStatus)
-            }
-            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            {t("Disponible", "Available")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusClick("reserved")}
+            disabled={saving}
+            className="flex-1 rounded-full bg-amber-400 px-3 py-2.5 text-xs font-semibold text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {statusOptions.map((st) => (
-              <option key={st} value={st}>
-                {statusLabel[st][lang]}
-              </option>
-            ))}
-          </select>
+            {t("Apartado", "Reserved")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusClick("paid_complete")}
+            disabled={saving}
+            className="flex-1 rounded-full bg-sky-500 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t("Pagado", "Paid")}
+          </button>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-700">
-            {t("Cliente", "Customer")}
-          </label>
-          <input
-            value={localCustomerName}
-            onChange={(e) => setLocalCustomerName(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            placeholder={t("Nombre", "Name")}
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-700">
-            WhatsApp
-          </label>
-          <input
-            value={localWhatsapp}
-            onChange={(e) => setLocalWhatsapp(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            placeholder="+52..."
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-slate-700">
-            {t("Notas", "Notes")}
-          </label>
-          <textarea
-            value={localNotes}
-            onChange={(e) => setLocalNotes(e.target.value)}
-            className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[48px]"
-          />
-        </div>
-      </div>
-
-      {/* Save */}
-      <div className="flex justify-end">
+        {/* details toggle */}
         <button
           type="button"
-          onClick={handleSave}
-          disabled={!hasChanges || saving}
-          className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+          onClick={() => setShowDetails((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-full bg-slate-100 px-3 py-1.5 text-[11px] text-slate-700"
         >
-          {saving
-            ? t("Guardando…", "Saving…")
-            : hasChanges
-            ? t("Guardar cambios", "Save changes")
-            : t("Sin cambios", "No changes")}
+          <span>
+            {showDetails
+              ? t("Ocultar detalles", "Hide details")
+              : t("Ver / editar detalles", "View / edit details")}
+          </span>
+          <span className="text-xs">{showDetails ? "▲" : "▼"}</span>
         </button>
+
+        {showDetails && (
+          <div className="space-y-2 pt-1 border-t border-slate-200 mt-1">
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-700">
+                {t("Cliente", "Customer")}
+              </label>
+              <input
+                value={localCustomerName}
+                onChange={(e) => setLocalCustomerName(e.target.value)}
+                className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                placeholder={t("Nombre", "Name")}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-700">
+                WhatsApp
+              </label>
+              <input
+                value={localWhatsapp}
+                onChange={(e) => setLocalWhatsapp(e.target.value)}
+                className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                placeholder="+52..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-700">
+                {t("Notas", "Notes")}
+              </label>
+              <textarea
+                value={localNotes}
+                onChange={(e) => setLocalNotes(e.target.value)}
+                className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[48px]"
+              />
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={handleSaveDetails}
+                disabled={!hasChanges || saving}
+                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              >
+                {saving
+                  ? t("Guardando…", "Saving…")
+                  : hasChanges
+                  ? t("Guardar detalles", "Save details")
+                  : t("Sin cambios", "No changes")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* confirm popup (NORMAL mode) */}
+      {pendingStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
+            <p className="text-sm font-semibold text-slate-900">
+              {t("Cambiar estatus del par", "Change pair status")}
+            </p>
+            <p className="text-xs text-slate-600">
+              {t(
+                "Estás a punto de cambiar el estatus:",
+                "You are about to change the status:"
+              )}
+            </p>
+
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+              <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+                {statusLabel[localStatus][lang]}
+              </span>
+              <span className="text-slate-500">→</span>
+              <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                {statusLabel[pendingStatus][lang]}
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingStatus(null)}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  if (!pendingStatus) return;
+                  await saveWithStatus(pendingStatus);
+                  setPendingStatus(null);
+                }}
+                className="rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {t("Confirmar", "Confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function InventoryFastRowMobile({
+  item,
+  lang,
+  onUpdate,
+}: {
+  item: InventoryItem;
+  lang: Lang;
+  onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [localStatus, setLocalStatus] =
+    useState<InventoryStatus>(item.status);
+  const [pendingStatus, setPendingStatus] =
+    useState<InventoryStatus | null>(null);
+
+  const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  useEffect(() => {
+    setLocalStatus(item.status);
+  }, [item]);
+
+  async function saveStatus(newStatus: InventoryStatus) {
+    if (newStatus === localStatus) return;
+
+    setSaving(true);
+    setLocalStatus(newStatus);
+    await onUpdate({ id: item.id, status: newStatus });
+    setSaving(false);
+  }
+
+  function handleStatusClick(newStatus: InventoryStatus) {
+    if (newStatus === localStatus) return;
+    // Open popup
+    setPendingStatus(newStatus);
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900 truncate">
+              {translateModelLabel(item.model_name, lang)} · {item.size}
+            </p>
+            <p className="text-[11px] text-slate-500 truncate">
+              {translateColorLabel(item.color, lang)}
+            </p>
+          </div>
+          <p className="text-sm font-semibold text-slate-900 whitespace-nowrap">
+            ${item.price_mxn.toFixed(0)} MXN
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => handleStatusClick("available")}
+            disabled={saving}
+            className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
+              localStatus === "available"
+                ? "bg-emerald-500 text-white"
+                : "bg-emerald-50 text-emerald-700"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {t("Disponible", "Available")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusClick("reserved")}
+            disabled={saving}
+            className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
+              localStatus === "reserved"
+                ? "bg-amber-400 text-slate-900"
+                : "bg-amber-50 text-amber-700"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {t("Apartado", "Reserved")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusClick("paid_complete")}
+            disabled={saving}
+            className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
+              localStatus === "paid_complete"
+                ? "bg-sky-500 text-white"
+                : "bg-sky-50 text-sky-700"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {t("Pagado", "Paid")}
+          </button>
+        </div>
+      </div>
+
+      {/* confirmation popup (FAST mode) */}
+      {pendingStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
+            <p className="text-sm font-semibold text-slate-900">
+              {t("Cambiar estatus", "Change status")}
+            </p>
+            <p className="text-xs text-slate-600">
+              {t(
+                "Estás a punto de cambiar el estatus:",
+                "You are about to change the status:"
+              )}
+            </p>
+
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+              <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+                {statusLabel[localStatus][lang]}
+              </span>
+              <span className="text-slate-500">→</span>
+              <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                {statusLabel[pendingStatus][lang]}
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingStatus(null)}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  if (!pendingStatus) return;
+                  await saveStatus(pendingStatus);
+                  setPendingStatus(null);
+                }}
+                className="rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {t("Confirmar", "Confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

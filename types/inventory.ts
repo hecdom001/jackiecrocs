@@ -1,3 +1,4 @@
+// types/inventory.ts
 export type InventoryStatus =
   | "available"
   | "reserved"
