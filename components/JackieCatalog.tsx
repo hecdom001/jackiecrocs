@@ -1,3 +1,4 @@
+// components/JackieCatalog.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { track } from "@vercel/analytics";
 
 type Lang = "es" | "en";
+type AppTab = "home" | "catalog" | "messages" | "info";
 
 type PublicItem = {
   id: string;
@@ -12,6 +14,7 @@ type PublicItem = {
   color: string; // English (from colors.name_en)
   size: string;
   price_mxn: number;
+  availableCount: number; // number of pairs for this variant
 };
 
 function translateColor(colorEn: string, lang: Lang) {
@@ -32,41 +35,39 @@ function translateColor(colorEn: string, lang: Lang) {
   }
 }
 
-function colorEmoji(colorEn: string) {
+function colorDotClass(colorEn: string) {
   const key = colorEn.trim().toLowerCase();
   switch (key) {
     case "black":
-      return "🖤";
+      return "bg-slate-900";
     case "white":
-      return "🤍";
+      return "bg-slate-200 border border-slate-300";
     case "beige":
-      return "🤎";
+      return "bg-amber-200";
     case "purple":
-      return "💜";
+      return "bg-purple-400";
     default:
-      return "🎨";
+      return "bg-slate-400";
   }
 }
 
-// keep handy if you want per-color hero later
-function imageForColor(colorEn: string | null | undefined): string {
-  const key = (colorEn || "").trim().toLowerCase();
-  if (key === "black") return "/images/crocs-black.jpg";
-  if (key === "white") return "/images/crocs-white.jpg";
-  if (key === "beige") return "/images/crocs-beige.jpg";
-  return "/images/crocs-black.jpg";
-}
-
-// static gallery row
-const CROCS_PHOTOS: { src: string; label: string }[] = [
-  { src: "/images/crocs-black.jpg", label: "Crocs negros" },
-  { src: "/images/crocs-white.jpg", label: "Crocs blancos" },
-  { src: "/images/crocs-beige.jpg", label: "Crocs beige" },
-];
+const CROCS_PHOTOS = {
+  black: {
+    src: "/images/crocs-black.jpg",
+    label: "Crocs negros",
+  },
+  white: {
+    src: "/images/crocs-white.jpg",
+    label: "Crocs blancos",
+  },
+  beige: {
+    src: "/images/crocs-beige.jpg",
+    label: "Crocs beige",
+  },
+} as const;
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
 
-// delivery chips & sidebar content
 const DELIVERY_SPOTS = [
   "Pinos Presa",
   "Villafloresta",
@@ -82,30 +83,55 @@ const MEX_BANK_INFO = {
   Concepto: "Tu nombre",
 } as const;
 
-// how many products to show at first / each "show more"
-const MOBILE_INITIAL_VISIBLE = 4;
-const DESKTOP_INITIAL_VISIBLE = 10;
+const MOBILE_INITIAL_VISIBLE = 6;
+const DESKTOP_INITIAL_VISIBLE = 12;
 
-// ---------- WhatsApp helpers ----------
+// ---------- Helpers ----------
+
+function availabilityText(count: number, lang: Lang) {
+  if (lang === "es") {
+    if (count <= 0) return "Sin stock";
+    if (count === 1) return "Último par";
+    if (count <= 3) return `Últimos ${count} pares`;
+    if (count <= 9) return `Solo ${count} disponibles`;
+    return `${count} disponibles`;
+  } else {
+    if (count <= 0) return "Out of stock";
+    if (count === 1) return "Last pair";
+    if (count <= 3) return `Last ${count} pairs`;
+    if (count <= 9) return `Only ${count} available`;
+    return `${count} available`;
+  }
+}
 
 function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
   if (!items.length) return "";
 
   const linesEs = items.map((item, idx) => {
     const colorEs = translateColor(item.color, "es");
+    const stockLine =
+      item.availableCount > 1
+        ? `Stock: ${item.availableCount} pares disponibles`
+        : `Stock: 1 par disponible`;
     return `• ${idx + 1}:
   Modelo: ${item.model_name || "Crocs"}
   Color: ${colorEs} (${item.color})
   Talla: ${item.size}
-  Precio: $${item.price_mxn.toFixed(0)} MXN`;
+  Precio: $${item.price_mxn.toFixed(0)} MXN
+  ${stockLine}`;
   });
 
   const linesEn = items.map((item, idx) => {
+    const stockLine =
+      item.availableCount > 1
+        ? `Stock: ${item.availableCount} pairs available`
+        : `Stock: 1 pair available`;
     return `• ${idx + 1}:
   Model: ${item.model_name || "Crocs"}
   Color: ${item.color}
   Size: ${item.size}
-  Price: $${item.price_mxn.toFixed(0)} MXN`;
+  Price: $${item.price_mxn.toFixed(0)} MXN
+  ${stockLine}`;
   });
 
   if (lang === "es") {
@@ -148,6 +174,8 @@ function buildWhatsAppSupportLink(lang: Lang) {
 
 export function JackieCatalog() {
   const [lang, setLang] = useState<Lang>("es");
+  const [tab, setTab] = useState<AppTab>("home");
+
   const [items, setItems] = useState<PublicItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -158,12 +186,34 @@ export function JackieCatalog() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // pageSize = how many per "page" (mobile vs desktop)
   const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
   const [visibleCount, setVisibleCount] =
     useState<number>(MOBILE_INITIAL_VISIBLE);
 
+  const [isMobile, setIsMobile] = useState(false);
+
   const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  // Restore last tab from localStorage (so refresh stays on same tab)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved = window.localStorage.getItem("jackie_tab");
+    if (
+      saved === "home" ||
+      saved === "catalog" ||
+      saved === "messages" ||
+      saved === "info"
+    ) {
+      setTab(saved as AppTab);
+    }
+  }, []);
+
+  // Save tab to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("jackie_tab", tab);
+  }, [tab]);
 
   async function loadInventory() {
     setLoading(true);
@@ -191,14 +241,33 @@ export function JackieCatalog() {
       return;
     }
 
-    const mapped: PublicItem[] =
-      data?.map((row: any) => ({
-        id: row.id,
-        size: row.size,
-        price_mxn: Number(row.price_mxn),
-        model_name: row.models?.name ?? "",
-        color: row.colors?.name_en ?? "",
-      })) ?? [];
+    // Group by model+color+size+price
+    const variantMap = new Map<string, PublicItem>();
+
+    (data ?? []).forEach((row: any) => {
+      const model_name: string = row.models?.name ?? "";
+      const color: string = row.colors?.name_en ?? "";
+      const size: string = row.size;
+      const price_mxn: number = Number(row.price_mxn);
+
+      const key = `${model_name}__${color}__${size}__${price_mxn}`;
+
+      const existing = variantMap.get(key);
+      if (existing) {
+        existing.availableCount += 1;
+      } else {
+        variantMap.set(key, {
+          id: row.id,
+          size,
+          price_mxn,
+          model_name,
+          color,
+          availableCount: 1,
+        });
+      }
+    });
+
+    const mapped: PublicItem[] = Array.from(variantMap.values());
 
     setItems(mapped);
     setSelectedIds((prev) =>
@@ -214,27 +283,24 @@ export function JackieCatalog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // detect mobile vs desktop for pagination (client-only)
+  // detect mobile vs desktop & set page size
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const computePageSize = () =>
-      window.innerWidth >= 1024
-        ? DESKTOP_INITIAL_VISIBLE
-        : MOBILE_INITIAL_VISIBLE;
+    const compute = () => {
+      const width = window.innerWidth;
+      const mobile = width < 768;
+      setIsMobile(mobile);
 
-    const initial = computePageSize();
-    setPageSize(initial);
-    setVisibleCount(initial);
-
-    const handleResize = () => {
-      const next = computePageSize();
-      setPageSize(next);
-      setVisibleCount(next);
+      const nextPageSize =
+        width >= 1024 ? DESKTOP_INITIAL_VISIBLE : MOBILE_INITIAL_VISIBLE;
+      setPageSize(nextPageSize);
+      setVisibleCount(nextPageSize);
     };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
   }, []);
 
   // auto-refresh every 60s
@@ -264,7 +330,6 @@ export function JackieCatalog() {
     return bySize && byColor;
   });
 
-  // only show up to visibleCount on screen
   const limited = filtered.slice(0, visibleCount);
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
@@ -285,10 +350,643 @@ export function JackieCatalog() {
   };
 
   const showingCount = Math.min(visibleCount, filtered.length);
+  const totalPairsFiltered = filtered.reduce(
+    (sum, item) => sum + item.availableCount,
+    0
+  );
+
+  // ------------------------------------------------------------------
+  // MOBILE VIEW
+  // ------------------------------------------------------------------
+
+  if (isMobile) {
+    const renderMobileHome = () => (
+      <div className="space-y-4">
+        {/* Hero card */}
+        <section className="rounded-3xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-4 space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 border border-slate-200">
+            <span>🛍️</span>
+            <span>{t("Catálogo en tiempo real", "Live stock catalog")}</span>
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold tracking-tight">
+              {t(
+                "Crocs disponibles hoy en Tijuana 🐊",
+                "Crocs available today in Tijuana 🐊"
+              )}
+            </h1>
+            <p className="text-[12px] text-slate-600">
+              {t(
+                "Elige color y talla, agrégalos al carrito y mándanos tu pedido por WhatsApp.",
+                "Pick your color and size, add pairs to your cart and send your order on WhatsApp."
+              )}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setTab("catalog")}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-5 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
+          >
+            <span>🛒</span>
+            <span>{t("Ver crocs disponibles", "View available Crocs")}</span>
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+              📍 {t("Entrega en Tijuana", "Pickup in Tijuana")}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+              💵 {t("Efectivo o transferencia", "Cash or bank transfer")}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+              🇺🇸 {t("Tallas americanas", "US sizing")}
+            </span>
+          </div>
+
+          {lastUpdated && (
+            <p className="text-[10px] text-slate-500">
+              {t("Última actualización", "Last updated")}:{" "}
+              {formattedLastUpdated}
+            </p>
+          )}
+        </section>
+
+        {/* Photos strip */}
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 space-y-2">
+          <div className="flex items-center justify-between text-[12px]">
+            <p className="font-medium">
+              {t("Fotos reales del producto", "Real product photos")}
+            </p>
+            <p className="text-[10px] text-slate-500">
+              {t("Tomadas por nosotros.", "Taken by us.")}
+            </p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+            {Object.values(CROCS_PHOTOS).map((photo) => (
+              <div
+                key={photo.src}
+                className="snap-start min-w-[58%] sm:min-w-[30%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.src}
+                  alt={photo.label}
+                  className="h-40 sm:h-48 w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* how it works */}
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+          <h2 className="text-sm font-semibold">
+            {t("¿Cómo funciona?", "How it works")}
+          </h2>
+          <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
+            <li>
+              {t(
+                "Elige tus pares y agrégalos al carrito.",
+                "Choose your pairs and add them to the cart."
+              )}
+            </li>
+            <li>
+              {t(
+                "Envíanos tu carrito por WhatsApp para confirmar disponibilidad.",
+                "Send your cart on WhatsApp to confirm availability."
+              )}
+            </li>
+            <li>
+              {t(
+                "Acuerda punto de entrega y paga en efectivo o transferencia.",
+                "Agree pickup spot and pay in cash or bank transfer."
+              )}
+            </li>
+          </ol>
+        </section>
+      </div>
+    );
+
+    const renderMobileCatalog = () => (
+      <div className="space-y-4">
+        <div className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <p className="font-medium">
+              {t("Crocs disponibles", "Available Crocs")}
+            </p>
+            <button
+              type="button"
+              onClick={loadInventory}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+            >
+              {loading
+                ? t("Actualizando…", "Refreshing…")
+                : t("Actualizar", "Refresh")}
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            {loading
+              ? t("Cargando inventario…", "Loading inventory…")
+              : t(
+                  `${totalPairsFiltered} pares disponibles`,
+                  `${totalPairsFiltered} pairs available`
+                )}
+          </p>
+
+          <div className="mt-1 grid grid-cols-1 gap-2 text-[11px]">
+            <select
+              value={sizeFilter}
+              onChange={(e) => setSizeFilter(e.target.value)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            >
+              <option value="all">
+                {lang === "es" ? "Todas las tallas" : "All sizes"}
+              </option>
+              {allSizes.map((sz) => (
+                <option key={sz} value={sz}>
+                  {sz}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={colorFilter}
+              onChange={(e) => setColorFilter(e.target.value)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            >
+              <option value="all">
+                {lang === "es" ? "Todos los colores" : "All colors"}
+              </option>
+              {allColors.map((color) => (
+                <option key={color} value={color}>
+                  {translateColor(color, lang)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {lastUpdated && (
+            <p className="text-[10px] text-slate-500 mt-1">
+              {t("Última actualización", "Last updated")}: {formattedLastUpdated}
+            </p>
+          )}
+        </div>
+
+        {errorMsg ? (
+          <p className="text-xs text-red-500">{errorMsg}</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-xs text-slate-600">
+            {t(
+              "Por ahora no hay pares con estos filtros.",
+              "No pairs match these filters right now."
+            )}
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {limited.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                const colorText = translateColor(item.color, lang);
+
+                return (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.06)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 transition-all flex flex-col p-3 gap-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl">
+                        🐊
+                      </div>
+
+                      <div className="flex-1">
+                        <p className="text-[11px] font-semibold text-slate-900 line-clamp-1">
+                          {(item.model_name || "Classic") + " Crocs"}
+                        </p>
+                        <p className="text-[10px] text-slate-600 flex items-center gap-1.5">
+                          <span
+                            className={`h-2 w-2 rounded-full ${colorDotClass(
+                              item.color
+                            )}`}
+                          />
+                          <span>{colorText}</span>
+                          <span className="text-slate-400">·</span>
+                          <span>
+                            {lang === "es" ? "Talla" : "Size"} {item.size}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-600">
+                          ${item.price_mxn.toFixed(0)} MXN
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {availabilityText(item.availableCount, lang)}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[9px]">
+                        {lang === "es" ? "Disponible hoy" : "Available today"}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelect(item.id)}
+                      className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
+                        isSelected
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
+                      }`}
+                    >
+                      <span>🛒</span>
+                      <span>
+                        {isSelected
+                          ? lang === "es"
+                            ? "En carrito"
+                            : "In cart"
+                          : lang === "es"
+                          ? "Agregar"
+                          : "Add"}
+                      </span>
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col items-center gap-2 mt-1">
+              <p className="text-[10px] text-slate-500">
+                {lang === "es"
+                  ? `Mostrando ${showingCount} de ${filtered.length} opciones`
+                  : `Showing ${showingCount} of ${filtered.length} options`}
+              </p>
+              {filtered.length > limited.length && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleCount((prev) => prev + pageSize)
+                  }
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                >
+                  {lang === "es"
+                    ? "Mostrar más opciones"
+                    : "Show more options"}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+
+    const renderMobileMessages = () => (
+      <div className="space-y-4">
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+          <h2 className="text-sm font-semibold">
+            {t("Chatea por WhatsApp", "Chat on WhatsApp")}
+          </h2>
+          <p className="text-[11px] text-slate-600">
+            {t(
+              "Mándanos mensaje con talla y color que buscas. Respuestas de 9am a 7pm.",
+              "Send us a message with the size and color you want. We reply from 9am to 7pm."
+            )}
+          </p>
+
+          <a
+            href={supportWaLink || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              if (!WHATSAPP_NUMBER) return;
+              track("whatsapp_click_support", { lang, location: "messages" });
+            }}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+              WHATSAPP_NUMBER
+                ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                : "bg-slate-200 text-slate-500 cursor-not-allowed"
+            }`}
+          >
+            <span className="text-base">📲</span>
+            <span>{t("Abrir WhatsApp", "Open WhatsApp")}</span>
+          </a>
+
+          <ul className="mt-2 space-y-1 text-[11px] text-slate-600">
+            <li>
+              • {t("Incluye talla (US) y color.", "Include size (US) and color.")}
+            </li>
+            <li>
+              •{" "}
+              {t(
+                "Te confirmamos existencia y punto de entrega.",
+                "We confirm stock and pickup spot."
+              )}
+            </li>
+            <li>
+              •{" "}
+              {t(
+                "Puedes mandar captura de transferencia.",
+                "You can send transfer screenshot."
+              )}
+            </li>
+          </ul>
+        </section>
+
+        {selectedItems.length > 0 && (
+          <section className="rounded-3xl.bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+            <h3 className="text-sm font-semibold">
+              {t("Tu carrito", "Your cart")}
+            </h3>
+            <p className="text-[11px] text-slate-600">
+              {t(
+                "Estos pares se enviarán en el mensaje de WhatsApp:",
+                "These pairs will be included in the WhatsApp message:"
+              )}
+            </p>
+            <ul className="space-y-1 text-[11px] text-slate-700">
+              {selectedItems.map((item, idx) => (
+                <li key={item.id}>
+                  {idx + 1}. {translateColor(item.color, lang)} ·{" "}
+                  {t("Talla", "Size")} {item.size} · $
+                  {item.price_mxn.toFixed(0)} MXN
+                </li>
+              ))}
+            </ul>
+
+            <a
+              href={waLinkForSelected || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+                track("whatsapp_click_multi", {
+                  count: selectedItems.length,
+                  lang,
+                  location: "messages_tab",
+                });
+              }}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4.py-2.5 text-sm font-semibold transition ${
+                WHATSAPP_NUMBER && selectedItems.length
+                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
+              }`}
+            >
+              <span>✅</span>
+              <span>
+                {t(
+                  "Enviar carrito por WhatsApp",
+                  "Send cart via WhatsApp"
+                )}
+              </span>
+            </a>
+          </section>
+        )}
+      </div>
+    );
+
+    const renderMobileInfo = () => (
+      <div className="space-y-4">
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+          <h2 className="text-sm font-semibold">
+            {t("¿Cómo funciona?", "How it works")}
+          </h2>
+          <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
+            <li>
+              {t(
+                "Elige tus pares y agrégalos al carrito.",
+                "Choose your pairs and add them to the cart."
+              )}
+            </li>
+            <li>
+              {t(
+                "Envíanos mensaje por WhatsApp para confirmar disponibilidad.",
+                "Send us a WhatsApp message to confirm availability."
+              )}
+            </li>
+            <li>
+              {t(
+                "Acuerda punto de entrega y paga en efectivo o transferencia.",
+                "Agree pickup spot and pay in cash or bank transfer."
+              )}
+            </li>
+          </ol>
+        </section>
+
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <span>🚚</span>
+            <span>{t("Puntos de entrega", "Pickup spots")}</span>
+          </h3>
+          <ul className="space-y-1 text-[11px] text-slate-700">
+            {DELIVERY_SPOTS.map((spot) => (
+              <li key={spot} className="flex items-center gap-2">
+                <span>📍</span>
+                <span>{spot}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <span>💳🇲🇽</span>
+            <span>{t("Pago por transferencia", "Bank transfer details")}</span>
+          </h3>
+          <div className="space-y-1 text-[11px] text-slate-800">
+            <p>
+              <span className="font-medium">{t("Banco: ", "Bank: ")}</span>
+              {MEX_BANK_INFO.bankName}
+            </p>
+            <p>
+              <span className="font-medium">
+                {t("Titular: ", "Account name: ")}
+              </span>
+              {MEX_BANK_INFO.accountName}
+            </p>
+            <p className="break-all">
+              <span className="font-medium">
+                {t("Cuenta: ", "Account: ")}
+              </span>
+              {MEX_BANK_INFO.accountNumber}
+            </p>
+            <p className="break-all">
+              <span className="font-medium">Concepto: </span>
+              {MEX_BANK_INFO.Concepto}
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+
+    const headerSubtitle =
+      tab === "home"
+        ? t("Inicio", "Home")
+        : tab === "catalog"
+        ? t("Catálogo", "Catalog")
+        : tab === "messages"
+        ? t("Mensajes", "Messages")
+        : t("Información", "Info");
+
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] text-slate-900 pb-24">
+        {/* Mobile header */}
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+          <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-base shadow-sm">
+                🐊
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold">Jacky Crocs</p>
+                <p className="text-[10px] text-slate-500">{headerSubtitle}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setLang("es")}
+                  className={`px-2 py-0.5 rounded-full ${
+                    lang === "es"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  ES
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang("en")}
+                  className={`px-2 py-0.5 rounded-full ${
+                    lang === "en"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-md mx-auto px-4 pt-4 pb-24 space-y-4">
+          {tab === "home" && renderMobileHome()}
+          {tab === "catalog" && renderMobileCatalog()}
+          {tab === "messages" && renderMobileMessages()}
+          {tab === "info" && renderMobileInfo()}
+        </main>
+
+        {/* Floating cart bar above bottom tabs */}
+        {selectedItems.length > 0 && (
+          <div className="fixed bottom-16 inset-x-0 z-30">
+            <div className="max-w-md mx-auto px-4">
+              <div className="rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] border border-slate-200 px-4 py-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-700">
+                  {lang === "es"
+                    ? `✅ ${selectedItems.length} ${
+                        selectedItems.length === 1
+                          ? "par en carrito"
+                          : "pares en carrito"
+                      }`
+                    : `✅ ${selectedItems.length} ${
+                        selectedItems.length === 1
+                          ? "pair in cart"
+                          : "pairs in cart"
+                      }`}
+                </p>
+                <a
+                  href={waLinkForSelected || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+                    track("whatsapp_click_multi", {
+                      count: selectedItems.length,
+                      lang,
+                      location: "floating_cart",
+                    });
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                    WHATSAPP_NUMBER && selectedItems.length
+                      ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                      : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                  }`}
+                >
+                  <span className="text-base">📲</span>
+                  <span>{t("Enviar", "Send")}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom tab bar */}
+        <nav className="fixed bottom-0 inset-x-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
+          <div className="max-w-md mx-auto flex items-stretch justify-between">
+            {(
+              [
+                { id: "home", icon: "🏠", labelEs: "Inicio", labelEn: "Home" },
+                {
+                  id: "catalog",
+                  icon: "🛒",
+                  labelEs: "Catálogo",
+                  labelEn: "Catalog",
+                },
+                {
+                  id: "messages",
+                  icon: "💬",
+                  labelEs: "Mensajes",
+                  labelEn: "Messages",
+                },
+                { id: "info", icon: "ℹ️", labelEs: "Info", labelEn: "Info" },
+              ] as {
+                id: AppTab;
+                icon: string;
+                labelEs: string;
+                labelEn: string;
+              }[]
+            ).map(({ id, icon, labelEs, labelEn }) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  className={`flex-1 flex flex-col items-center justify-center py-2 text-[11px] transition ${
+                    active
+                      ? "text-emerald-700"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`h-7 w-7 flex items-center justify-center rounded-full text-base mb-0.5 ${
+                      active ? "bg-emerald-50" : "bg-slate-100"
+                    }`}
+                  >
+                    {icon}
+                  </span>
+                  <span>{lang === "es" ? labelEs : labelEn}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // DESKTOP / TABLET VIEW
+  // ------------------------------------------------------------------
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 pb-24">
-      {/* TOP BAR */}
+    <main className="min-h-screen bg-[#FAFAFA] text-slate-900 pb-24">
+      {/* TOP NAV */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -298,22 +996,13 @@ export function JackieCatalog() {
             <div className="leading-tight">
               <p className="text-sm font-semibold">Jacky Crocs</p>
               <p className="text-[11px] text-slate-500">
-                {t("Crocs originales · Tijuana", "Original Crocs · Tijuana")}
+                {t("Crocs · Tijuana", "Crocs · Tijuana")}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={loadInventory}
-              className="hidden sm:inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
-            >
-              {loading
-                ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar inventario", "Refresh stock")}
-            </button>
-
+            {/* Lang toggle */}
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[11px]">
               <button
                 type="button"
@@ -338,51 +1027,95 @@ export function JackieCatalog() {
                 EN
               </button>
             </div>
+
+            {/* Support CTA */}
+            <a
+              href={supportWaLink || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (!WHATSAPP_NUMBER) return;
+                track("whatsapp_click_support", { lang, location: "nav" });
+              }}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
+                WHATSAPP_NUMBER
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+              }`}
+            >
+              <span>📲</span>
+              <span>
+                {lang === "es"
+                  ? "Dudas por WhatsApp"
+                  : "Questions on WhatsApp"}
+              </span>
+            </a>
           </div>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
-        {/* HERO */}
-        <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-5">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-center">
-            <div className="space-y-3">
-              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-800 border border-slate-200">
-                <span>🛒</span>
-                {lang === "es" ? "Catálogo" : "Catalog"}
-              </span>
-              <div className="space-y-1">
-                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+        {/* HERO / STORE HEADER */}
+        <section className="rounded-3xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-4 sm:p-6">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-center">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 border border-slate-200">
+                <span>🛍️</span>
+                <span>
                   {lang === "es"
-                    ? "Crocs disponibles 🐊✨"
-                    : "Available Crocs 🐊✨"}
+                    ? "Catálogo en tiempo real"
+                    : "Live stock catalog"}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+                  {lang === "es"
+                    ? "Crocs disponibles hoy en Tijuana 🐊"
+                    : "Crocs available today in Tijuana 🐊"}
                 </h1>
                 <p className="text-sm text-slate-600 max-w-md">
                   {lang === "es"
-                    ? "Toca un par, elige tu talla y pídenos por WhatsApp."
-                    : "Tap a pair, pick your size and order via WhatsApp."}
+                    ? "Elige color y talla, agrégalos al carrito y mándanos tu pedido por WhatsApp. Terminamos la compra ahí mismo."
+                    : "Pick your color and size, add pairs to your cart and send your order on WhatsApp. We finish the purchase there."}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs">
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
-                  <span>📍</span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById("inventory-grid");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-6 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
+              >
+                <span>🛒</span>
+                <span>
+                  {lang === "es"
+                    ? "Ver crocs disponibles"
+                    : "View available Crocs"}
+                </span>
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
+                  📍{" "}
                   {lang === "es" ? "Entrega en Tijuana" : "Pickup in Tijuana"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
-                  <span>💵</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
+                  💵{" "}
                   {lang === "es"
                     ? "Pago en efectivo o transferencia"
-                    : "Cash or transfer"}
+                    : "Cash or bank transfer"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
-                  <span>⏰</span>
-                  {lang === "es" ? "Respuestas 9am–7pm" : "Replies 9am–7pm"}
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
+                  🇺🇸 {lang === "es" ? "Tallas americanas" : "US sizing"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 border border-slate-200">
-                  <span>🇺🇸</span>
-                  {lang === "es" ? "Tallas americanas" : "US sizing"}
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
+                  ⏰ {lang === "es" ? "Respuestas 9am–7pm" : "9am–7pm replies"}
                 </span>
               </div>
+
               {lastUpdated && (
                 <p className="text-[11px] text-slate-500">
                   {t("Última actualización", "Last updated")}:{" "}
@@ -391,34 +1124,41 @@ export function JackieCatalog() {
               )}
             </div>
 
-            {/* highlight card */}
-            <div className="w-full max-w-[320px] mx-auto md:max-w-xs md:mx-0 md:justify-self-end">
-              <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-3">
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
-                  🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
-                </span>
+            {/* Hero highlight card */}
+            <div className="w-full max-w-sm mx-auto md:mx-0">
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
+                    🌟 {lang === "es" ? "Crocs" : "Crocs"}
+                  </span>
+                  <p className="text-xs text-slate-500">
+                    {lang === "es" ? "Desde" : "From"} $600 MXN
+                  </p>
+                </div>
 
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                    {lang === "es"
-                      ? "Precio por par desde"
-                      : "Price per pair from"}
-                  </p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    $600 MXN
-                  </p>
+                <div className="rounded-2xl bg-white/70 border border-emerald-100 px-4 py-5 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900">
+                      {lang === "es"
+                        ? "Colores disponibles"
+                        : "Available colors"}
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Negro · Blanco · Beige
+                    </p>
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      {lang === "es"
+                        ? "Tallas americanas para mujer y hombre."
+                        : "US sizing for women and men."}
+                    </p>
+                  </div>
+                  <div className="text-4xl md:text-5xl">🐊</div>
                 </div>
 
                 <p className="text-[11px] text-slate-600">
                   {lang === "es"
-                    ? "Originales, tallas americanas. Entrega en Tijuana y pago en efectivo o transferencia."
-                    : "Original pairs, US sizing. Pickup in Tijuana, pay in cash or bank transfer."}
-                </p>
-
-                <p className="text-[10px] text-slate-500">
-                  {lang === "es"
-                    ? "Agrega los pares que te gustan al carrito y envíanos tu mensaje por WhatsApp."
-                    : "Add the pairs you like to the cart and send your order on WhatsApp."}
+                    ? "Elige tus pares, agrégalos al carrito y mándalos por WhatsApp para confirmar disponibilidad y coordinar entrega."
+                    : "Pick your pairs, add them to the cart and send them on WhatsApp to confirm stock and arrange pickup."}
                 </p>
               </div>
             </div>
@@ -426,7 +1166,7 @@ export function JackieCatalog() {
         </section>
 
         {/* PHOTO STRIP */}
-        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
+        <section className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 sm:p-4 space-y-2">
           <div className="flex items-center justify-between text-[12px] sm:text-sm">
             <p className="font-medium">
               {lang === "es"
@@ -434,63 +1174,61 @@ export function JackieCatalog() {
                 : "Real product photos"}
             </p>
             <p className="text-[11px] text-slate-500">
-              {lang === "es"
-                ? "Tomadas por nosotros, sin filtros."
-                : "Taken by us, no filters."}
+              {lang === "es" ? "Tomadas por nosotros." : "Taken by us."}
             </p>
           </div>
 
-          {/* MOBILE: horizontal scroll, no big empty space */}
-          <div className="flex md:hidden gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
-            {CROCS_PHOTOS.map((photo) => (
+          <div className="flex gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+            {Object.values(CROCS_PHOTOS).map((photo) => (
               <div
                 key={photo.src}
-                className="snap-start min-w-[58%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+                className="snap-start min-w-[58%] sm:min-w-[30%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.src}
                   alt={photo.label}
-                  className="h-40 sm:h-60 w-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* DESKTOP: keep 3-column grid */}
-          <div className="hidden md:grid md:grid-cols-3 gap-3">
-            {CROCS_PHOTOS.map((photo) => (
-              <div
-                key={photo.src}
-                className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.src}
-                  alt={photo.label}
-                  className="h-60 w-full object-cover"
+                  className="h-40 sm:h-48 w-full object-cover"
                 />
               </div>
             ))}
           </div>
         </section>
 
-        {/* FILTERS */}
-        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
+        {/* FILTER BAR */}
+        <section className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-slate-900">
-              {lang === "es" ? "Filtrar inventario" : "Filter inventory"}
+              {lang === "es" ? "Crocs disponibles" : "Available Crocs"}
             </p>
-            <p className="text-[11px] text-slate-500">
-              {lang === "es"
-                ? "Se están vendiendo rápido — confirma por WhatsApp."
-                : "Stock moves quickly — always confirm on WhatsApp."}
-            </p>
+            <div className="flex items-center gap-2 text-[11px]">
+              {loading ? (
+                <span className="text-slate-500">
+                  {t("Cargando...", "Loading...")}
+                </span>
+              ) : (
+                <span className="text-slate-500">
+                  {lang === "es"
+                    ? `${totalPairsFiltered} pares disponibles`
+                    : `${totalPairsFiltered} pairs available`}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={loadInventory}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+              >
+                {loading
+                  ? t("Actualizando…", "Refreshing…")
+                  : t("Actualizar", "Refresh")}
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
-            <div className="flex flex-col gap-1">
+
+          <div className="flex flex-col sm:flex-row gap-3 text-[11px]">
+            <div className="flex-1 flex flex-col gap-1">
               <span className="text-slate-700">
-                {lang === "es" ? "Talla" : "Size"}
+                {lang === "es" ? "Filtrar por talla" : "Filter by size"}
               </span>
               <select
                 value={sizeFilter}
@@ -498,7 +1236,7 @@ export function JackieCatalog() {
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">
-                  {lang === "es" ? "Todas" : "All"}
+                  {lang === "es" ? "Todas las tallas" : "All sizes"}
                 </option>
                 {allSizes.map((sz) => (
                   <option key={sz} value={sz}>
@@ -508,9 +1246,9 @@ export function JackieCatalog() {
               </select>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex-1 flex flex-col gap-1">
               <span className="text-slate-700">
-                {lang === "es" ? "Color" : "Color"}
+                {lang === "es" ? "Filtrar por color" : "Filter by color"}
               </span>
               <select
                 value={colorFilter}
@@ -518,7 +1256,7 @@ export function JackieCatalog() {
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">
-                  {lang === "es" ? "Todos" : "All"}
+                  {lang === "es" ? "Todos los colores" : "All colors"}
                 </option>
                 {allColors.map((color) => (
                   <option key={color} value={color}>
@@ -527,171 +1265,171 @@ export function JackieCatalog() {
                 ))}
               </select>
             </div>
-
-            <div className="flex flex-col justify-between gap-1">
-              <span className="text-slate-700">
-                {lang === "es" ? "Resultado" : "Result"}
-              </span>
-              <div className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-slate-600">
-                  {lang === "es"
-                    ? `${filtered.length} pares disponibles`
-                    : `${filtered.length} pairs available`}
-                </span>
-                <button
-                  type="button"
-                  onClick={loadInventory}
-                  className="inline-flex sm:hidden items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
-                >
-                  {loading
-                    ? t("Actualizando…", "Refreshing…")
-                    : t("Actualizar", "Refresh")}
-                </button>
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* MAIN CONTENT: product grid + sidebar */}
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          {/* LEFT: products */}
-          <div>
-            {loading ? (
-              <p className="text-xs text-slate-600">
-                {t("Cargando inventario…", "Loading inventory…")}
-              </p>
-            ) : errorMsg ? (
-              <p className="text-xs text-red-500">{errorMsg}</p>
-            ) : filtered.length === 0 ? (
-              <p className="text-xs text-slate-600">
-                {t(
-                  "Por ahora no hay pares con estos filtros.",
-                  "No pairs match these filters right now."
-                )}
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* PRODUCT GRID */}
+        <section id="inventory-grid">
+          {loading ? (
+            <p className="text-xs text-slate-600">
+              {t("Cargando inventario…", "Loading inventory…")}
+            </p>
+          ) : errorMsg ? (
+            <p className="text-xs text-red-500">{errorMsg}</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-xs text-slate-600">
+              {t(
+                "Por ahora no hay pares con estos filtros.",
+                "No pairs match these filters right now."
+              )}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {limited.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
                   const colorText = translateColor(item.color, lang);
-                  const emoji = colorEmoji(item.color);
 
                   return (
                     <article
                       key={item.id}
-                      className="rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-3.5 sm:p-4 flex flex-col gap-3"
+                      className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.06)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 transition-all flex flex-col p-4 gap-3"
                     >
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="space-y-1">
-                          <h3 className="text-sm sm:text-base font-medium text-slate-900">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl">
+                          🐊
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-slate-900 line-clamp-1">
                             {(item.model_name || "Classic") + " Crocs"}
                           </h3>
-                          <span className="inline-block text-[10px] text-emerald-600 font-medium">
-                            ✅{" "}
-                            {lang === "es"
-                              ? "Disponible hoy"
-                              : "Available today"}
-                          </span>
-                          <p className="text-[11px] text-slate-600">
-                            {emoji} {colorText} ·{" "}
-                            {lang === "es" ? "Talla" : "Size"} {item.size}
+                          <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${colorDotClass(
+                                item.color
+                              )}`}
+                            />
+                            <span>{colorText}</span>
+                            <span className="text-slate-400">·</span>
+                            <span>
+                              {lang === "es" ? "Talla" : "Size"} {item.size}
+                            </span>
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg sm:text-xl font-semibold text-emerald-600">
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-base font-semibold text-emerald-600">
                             ${item.price_mxn.toFixed(0)} MXN
                           </p>
                           <p className="text-[10px] text-slate-500">
-                            {lang === "es"
-                              ? "Precio por par"
-                              : "Price per pair"}
+                            {availabilityText(item.availableCount, lang)}
                           </p>
                         </div>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-3 py-0.5 text-[10px]">
+                          {lang === "es" ? "Disponible hoy" : "Available today"}
+                        </span>
                       </div>
 
-                      <div className="space-y-1 text-[11px] text-slate-600">
-                        <p>📍 {t("Entrega en Tijuana", "Pickup in Tijuana")}</p>
-                        <p>
-                          💵{" "}
-                          {t(
-                            "Pago en efectivo o transferencia",
-                            "Pay in cash or bank transfer"
-                          )}
-                        </p>
-                      </div>
-
-                      {/* single CTA – toggle select */}
-                      <div className="mt-1 flex">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSelect(item.id)}
-                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.75 text-[11px] font-medium border transition ${
-                            isSelected
-                              ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
-                              : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
-                          }`}
-                        >
-                          <span>{isSelected ? "✅" : "🤍"}</span>
-                          <span>
-                            {isSelected
-                              ? lang === "es"
-                                ? "En carrito"
-                                : "In cart"
-                              : lang === "es"
-                              ? "Lo quiero"
-                              : "I want it"}
-                          </span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSelect(item.id)}
+                        className={`mt-1 inline-flex w-full items-center justify-center gap-2 rounded-full px-3.5 py-2 text-[11px] font-medium border transition ${
+                          isSelected
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                            : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
+                        }`}
+                      >
+                        <span>🛒</span>
+                        <span>
+                          {isSelected
+                            ? lang === "es"
+                              ? "En carrito"
+                              : "In cart"
+                            : lang === "es"
+                            ? "Agregar al carrito"
+                            : "Add to cart"}
+                        </span>
+                      </button>
                     </article>
                   );
                 })}
+              </div>
 
-                {/* count hint */}
-                {filtered.length > 0 && (
-                  <div className="col-span-full mt-1 text-center">
-                    <p className="text-[10px] text-slate-500">
-                      {lang === "es"
-                        ? `Mostrando ${showingCount} de ${filtered.length} pares`
-                        : `Showing ${showingCount} of ${filtered.length} pairs`}
-                    </p>
-                  </div>
-                )}
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-[10px] text-slate-500">
+                  {lang === "es"
+                    ? `Mostrando ${showingCount} de ${filtered.length} opciones`
+                    : `Showing ${showingCount} of ${filtered.length} options`}
+                </p>
 
-                {/* Show more button */}
                 {filtered.length > limited.length && (
-                  <div className="col-span-full mt-2 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setVisibleCount((prev) => prev + pageSize)
-                      }
-                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
-                    >
-                      {lang === "es"
-                        ? "Mostrar más pares"
-                        : "Show more pairs"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleCount((prev) => prev + pageSize)
+                    }
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                  >
+                    {lang === "es"
+                      ? "Mostrar más opciones"
+                      : "Show more options"}
+                  </button>
                 )}
               </div>
-            )}
+            </div>
+          )}
+        </section>
+
+        {/* HOW IT WORKS + DELIVERY / PAYMENT */}
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">
+              {lang === "es" ? "¿Cómo funciona?" : "How it works"}
+            </h3>
+            <div className="grid sm:grid-cols-3 gap-3 text-[11px] text-slate-600">
+              <div className="space-y-1">
+                <p className="font-medium">
+                  1. {t("Elige tus pares", "Pick pairs")}
+                </p>
+                <p>
+                  {t(
+                    "Filtra por talla y color, y agrégalos al carrito.",
+                    "Filter by size and color, then add to cart."
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">2. WhatsApp</p>
+                <p>
+                  {t(
+                    "Envía tu carrito por WhatsApp para confirmar disponibilidad.",
+                    "Send your cart on WhatsApp to confirm stock."
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">
+                  3. {t("Entrega y pago", "Pickup & pay")}
+                </p>
+                <p>
+                  {t(
+                    "Acuerda punto y horario. Pagas en efectivo o transferencia.",
+                    "Agree pickup spot and time. Pay in cash or bank transfer."
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* RIGHT SIDEBAR */}
-          <aside className="space-y-4">
-            {/* Entregas */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
                 <span>🚚</span>
-                {lang === "es" ? "Entregas" : "Deliveries"}
+                {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
               </h3>
-              <p className="text-[11px] text-slate-600">
-                {lang === "es"
-                  ? "Elige el punto que te quede mejor. El horario exacto se confirma por WhatsApp."
-                  : "Pick the spot that works best. Exact time is agreed via WhatsApp."}
-              </p>
-              <ul className="space-y-1 text-[12px] text-slate-800">
+              <ul className="space-y-1 text-[11px] text-slate-700">
                 {DELIVERY_SPOTS.map((spot) => (
                   <li key={spot} className="flex items-center gap-2">
                     <span>📍</span>
@@ -701,20 +1439,14 @@ export function JackieCatalog() {
               </ul>
             </div>
 
-            {/* Bank info */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+            <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
                 <span>💳🇲🇽</span>
                 {lang === "es"
                   ? "Pago por transferencia"
                   : "Pay by bank transfer"}
               </h3>
-              <p className="text-[11px] text-slate-600">
-                {lang === "es"
-                  ? "Después de transferir, envía captura por WhatsApp para confirmar tu pedido."
-                  : "After you transfer, send a screenshot on WhatsApp to confirm your order."}
-              </p>
-              <div className="space-y-1 text-[11px] sm:text-xs text-slate-800">
+              <div className="space-y-1 text-[11px] text-slate-800">
                 <p>
                   <span className="font-medium">
                     {lang === "es" ? "Banco: " : "Bank: "}
@@ -739,48 +1471,11 @@ export function JackieCatalog() {
                 </p>
               </div>
             </div>
-
-            {/* Questions */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-3 sm:p-4 space-y-2">
-              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
-                <span>❓</span>
-                {lang === "es"
-                  ? "¿Dudas sobre tallas o colores?"
-                  : "Questions about sizes or colors?"}
-              </h3>
-              <p className="text-[10px] sm:text-[11px] text-slate-600">
-                {lang === "es"
-                  ? "Mándanos mensaje por WhatsApp y te ayudamos a elegir talla y color. Respuestas de 9am a 7pm."
-                  : "Send us a WhatsApp message and we’ll help you pick size and color. Replies from 9am to 7pm."}
-              </p>
-
-              <a
-                href={supportWaLink || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  if (!WHATSAPP_NUMBER) return;
-                  track("whatsapp_click_support", { lang });
-                }}
-                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.75 text-[11px] font-medium border transition ${
-                  WHATSAPP_NUMBER
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                }`}
-              >
-                <span>📲</span>
-                <span>
-                  {lang === "es"
-                    ? "Preguntar por WhatsApp"
-                    : "Ask on WhatsApp"}
-                </span>
-              </a>
-            </div>
-          </aside>
+          </div>
         </section>
       </div>
 
-      {/* STICKY CART BAR */}
+      {/* STICKY CART BAR (desktop/tablet) */}
       {selectedItems.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_30px_rgba(15,23,42,0.12)]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -788,13 +1483,13 @@ export function JackieCatalog() {
               {lang === "es"
                 ? `✅ ${selectedItems.length} ${
                     selectedItems.length === 1
-                      ? "par listo para enviar"
-                      : "pares listos para enviar"
+                      ? "par listo para enviar por WhatsApp"
+                      : "pares listos para enviar por WhatsApp"
                   }`
                 : `✅ ${selectedItems.length} ${
                     selectedItems.length === 1
-                      ? "pair ready to send"
-                      : "pairs ready to send"
+                      ? "pair ready to send on WhatsApp"
+                      : "pairs ready to send on WhatsApp"
                   }`}
             </p>
             <a
@@ -806,6 +1501,7 @@ export function JackieCatalog() {
                 track("whatsapp_click_multi", {
                   count: selectedItems.length,
                   lang,
+                  location: "sticky_cart",
                 });
               }}
               className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
