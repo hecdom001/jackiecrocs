@@ -70,25 +70,17 @@ function formatSizeLabel(size: string, lang: Lang) {
 
 
 const CROCS_PHOTOS = {
-  black_1: {
-    src: "/images/crocs-black-1.jpg",
-    label: "Crocs negros 1",
+  black: {
+    src: "/images/crocs-black.jpg",
+    label: "Crocs negros",
   },
-  beige_1: {
-    src: "/images/crocs-beige-1.jpg",
-    label: "Crocs beige 1",
+  beige: {
+    src: "/images/crocs-beige.jpg",
+    label: "Crocs beige",
   },
   white: {
     src: "/images/crocs-white.jpg",
     label: "Crocs blancos",
-  },
-  black_2: {
-    src: "/images/crocs-black-3.jpg",
-    label: "Crocs negros 2",
-  },
-  beige_2: {
-    src: "/images/crocs-beige-2.jpg",
-    label: "Crocs beige 2",
   },
 } as const;
 
