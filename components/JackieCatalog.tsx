@@ -17,6 +17,11 @@ type PublicItem = {
   availableCount: number; // number of pairs for this variant
 };
 
+type CartLine = {
+  item: PublicItem;
+  count: number;
+};
+
 function translateColor(colorEn: string, lang: Lang) {
   if (lang === "en") return colorEn;
 
@@ -50,6 +55,19 @@ function colorDotClass(colorEn: string) {
       return "bg-slate-400";
   }
 }
+
+function formatSizeLabel(size: string, lang: Lang) {
+  if (lang !== "es") return size;
+
+  // Expected format: M10-W12
+  const [m, w] = size.split("-");
+
+  const hombre = m?.replace("M", "");
+  const mujer = w?.replace("W", "");
+
+  return `Hombre ${hombre} / Mujer ${mujer}`;
+}
+
 
 const CROCS_PHOTOS = {
   black: {
@@ -104,34 +122,28 @@ function availabilityText(count: number, lang: Lang) {
   }
 }
 
-function buildWhatsAppMessage(items: PublicItem[], lang: Lang) {
-  if (!items.length) return "";
+function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
+  if (!cart.length) return "";
 
-  const linesEs = items.map((item, idx) => {
+  const linesEs = cart.map(({ item, count }, idx) => {
     const colorEs = translateColor(item.color, "es");
-    const stockLine =
-      item.availableCount > 1
-        ? `Stock: ${item.availableCount} pares disponibles`
-        : `Stock: 1 par disponible`;
+    const qtyLine = `Cantidad: ${count} ${count === 1 ? "par" : "pares"}`;
     return `• ${idx + 1}:
   Modelo: ${item.model_name || "Crocs"}
   Color: ${colorEs} (${item.color})
   Talla: ${item.size}
-  Precio: $${item.price_mxn.toFixed(0)} MXN
-  ${stockLine}`;
+  Precio por par: $${item.price_mxn.toFixed(0)} MXN
+  ${qtyLine}`;
   });
 
-  const linesEn = items.map((item, idx) => {
-    const stockLine =
-      item.availableCount > 1
-        ? `Stock: ${item.availableCount} pairs available`
-        : `Stock: 1 pair available`;
+  const linesEn = cart.map(({ item, count }, idx) => {
+    const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
     return `• ${idx + 1}:
   Model: ${item.model_name || "Crocs"}
   Color: ${item.color}
   Size: ${item.size}
-  Price: $${item.price_mxn.toFixed(0)} MXN
-  ${stockLine}`;
+  Price per pair: $${item.price_mxn.toFixed(0)} MXN
+  ${qtyLine}`;
   });
 
   if (lang === "es") {
@@ -149,9 +161,9 @@ ${linesEn.join("\n\n")}
 Are they still available?`;
 }
 
-function buildWhatsAppLink(items: PublicItem[], lang: Lang) {
-  if (!WHATSAPP_NUMBER || !items.length) return "#";
-  const message = buildWhatsAppMessage(items, lang);
+function buildWhatsAppLink(cart: CartLine[], lang: Lang) {
+  if (!WHATSAPP_NUMBER || !cart.length) return "#";
+  const message = buildWhatsAppMessage(cart, lang);
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
     message
   )}`;
@@ -184,7 +196,8 @@ export function JackieCatalog() {
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // item.id -> how many pairs user wants of that variant
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
   const [visibleCount, setVisibleCount] =
@@ -270,9 +283,17 @@ export function JackieCatalog() {
     const mapped: PublicItem[] = Array.from(variantMap.values());
 
     setItems(mapped);
-    setSelectedIds((prev) =>
-      prev.filter((id) => mapped.some((i) => i.id === id))
-    );
+
+    // Clean up quantities for items that no longer exist
+    setQuantities((prev) => {
+      const next: Record<string, number> = {};
+      for (const item of mapped) {
+        const qty = prev[item.id] ?? 0;
+        if (qty > 0) next[item.id] = Math.min(qty, item.availableCount);
+      }
+      return next;
+    });
+
     setLastUpdated(new Date());
     setLoading(false);
   }
@@ -332,9 +353,17 @@ export function JackieCatalog() {
 
   const limited = filtered.slice(0, visibleCount);
 
-  const selectedItems = items.filter((i) => selectedIds.includes(i.id));
-  const waLinkForSelected = buildWhatsAppLink(selectedItems, lang);
+  const cartLines: CartLine[] = items
+    .map((item) => ({
+      item,
+      count: quantities[item.id] ?? 0,
+    }))
+    .filter((line) => line.count > 0);
+
+  const waLinkForCart = buildWhatsAppLink(cartLines, lang);
   const supportWaLink = buildWhatsAppSupportLink(lang);
+
+  const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
   const formattedLastUpdated =
     lastUpdated &&
@@ -343,11 +372,26 @@ export function JackieCatalog() {
       minute: "2-digit",
     })}`;
 
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const handleAddToCart = (item: PublicItem) => {
+    setQuantities((prev) => {
+      const current = prev[item.id] ?? 0;
+      if (current >= item.availableCount) return prev;
+      return { ...prev, [item.id]: current + 1 };
+    });
   };
+
+    const handleRemoveFromCart = (itemId: string) => {
+    setQuantities((prev) => {
+      const current = prev[itemId] ?? 0;
+      if (current <= 1) {
+        // remove from cart completely
+        const { [itemId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [itemId]: current - 1 };
+    });
+  };
+
 
   const showingCount = Math.min(visibleCount, filtered.length);
   const totalPairsFiltered = filtered.reduce(
@@ -363,8 +407,8 @@ export function JackieCatalog() {
     const renderMobileHome = () => (
       <div className="space-y-4">
         {/* Hero card */}
-        <section className="rounded-3xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-4 space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 border border-slate-200">
+        <section className="rounded-3xl bg-white/95 border border-emerald-100 shadow-sm p-4 space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
             <span>🛍️</span>
             <span>{t("Catálogo en tiempo real", "Live stock catalog")}</span>
           </div>
@@ -414,7 +458,7 @@ export function JackieCatalog() {
         </section>
 
         {/* Photos strip */}
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 space-y-2">
+        <section className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2">
           <div className="flex items-center justify-between text-[12px]">
             <p className="font-medium">
               {t("Fotos reales del producto", "Real product photos")}
@@ -441,7 +485,7 @@ export function JackieCatalog() {
         </section>
 
         {/* how it works */}
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+        <section className="rounded-3xl bg-white/95 border border-slate-100 p-4 space-y-2">
           <h2 className="text-sm font-semibold">
             {t("¿Cómo funciona?", "How it works")}
           </h2>
@@ -471,7 +515,7 @@ export function JackieCatalog() {
 
     const renderMobileCatalog = () => (
       <div className="space-y-4">
-        <div className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 space-y-2">
+        <div className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2 shadow-sm">
           <div className="flex items-center justify-between text-xs">
             <p className="font-medium">
               {t("Crocs disponibles", "Available Crocs")}
@@ -506,7 +550,7 @@ export function JackieCatalog() {
               </option>
               {allSizes.map((sz) => (
                 <option key={sz} value={sz}>
-                  {sz}
+                  {lang === "es" ? formatSizeLabel(sz, lang) : sz}
                 </option>
               ))}
             </select>
@@ -527,9 +571,17 @@ export function JackieCatalog() {
             </select>
           </div>
 
+          <p className="mt-2 text-[10px] text-slate-500">
+            {t(
+              "Puedes agregar más de un par del mismo modelo dando varios toques en Agregar.",
+              "You can add more than one pair of the same model by tapping Add multiple times."
+            )}
+          </p>
+
           {lastUpdated && (
             <p className="text-[10px] text-slate-500 mt-1">
-              {t("Última actualización", "Last updated")}: {formattedLastUpdated}
+              {t("Última actualización", "Last updated")}:{" "}
+              {formattedLastUpdated}
             </p>
           )}
         </div>
@@ -547,16 +599,30 @@ export function JackieCatalog() {
           <>
             <div className="grid grid-cols-2 gap-3">
               {limited.map((item) => {
-                const isSelected = selectedIds.includes(item.id);
+                const qty = quantities[item.id] ?? 0;
                 const colorText = translateColor(item.color, lang);
+                const atMax = qty >= item.availableCount;
+
+                let buttonLabel: string;
+                if (qty === 0) {
+                  buttonLabel = lang === "es" ? "Agregar" : "Add";
+                } else if (atMax) {
+                  buttonLabel =
+                    (lang === "es" ? "Máximo en carrito · " : "Max in cart · ") +
+                    qty;
+                } else {
+                  buttonLabel =
+                    (lang === "es" ? "Agregar otro · " : "Add another · ") +
+                    qty;
+                }
 
                 return (
                   <article
                     key={item.id}
-                    className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.06)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 transition-all flex flex-col p-3 gap-2"
+                    className="rounded-3xl bg-white/95 border border-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.03)] hover:shadow-[0_12px_32px_rgba(15,23,42,0.07)] hover:-translate-y-0.5 transition-all flex flex-col p-3 gap-2"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl">
+                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 flex items-center justify-center text-xl">
                         🐊
                       </div>
 
@@ -573,7 +639,7 @@ export function JackieCatalog() {
                           <span>{colorText}</span>
                           <span className="text-slate-400">·</span>
                           <span>
-                            {lang === "es" ? "Talla" : "Size"} {item.size}
+                            {lang === "es" ? "Talla" : "Size"} {formatSizeLabel(item.size, lang)}
                           </span>
                         </p>
                       </div>
@@ -588,31 +654,58 @@ export function JackieCatalog() {
                           {availabilityText(item.availableCount, lang)}
                         </p>
                       </div>
-                      <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[9px]">
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[9px]">
                         {lang === "es" ? "Disponible hoy" : "Available today"}
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSelect(item.id)}
-                      className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
-                        isSelected
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                          : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
-                      }`}
-                    >
-                      <span>🛒</span>
-                      <span>
-                        {isSelected
-                          ? lang === "es"
-                            ? "En carrito"
-                            : "In cart"
-                          : lang === "es"
-                          ? "Agregar"
-                          : "Add"}
-                      </span>
-                    </button>
+                                        {/* BUTTONS / QTY CONTROL */}
+                    <div className="mt-2">
+                      {qty === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAddToCart(item)}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
+                        >
+                          <span>🛒</span>
+                          <span>{lang === "es" ? "Agregar" : "Add"}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromCart(item.id)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                          >
+                            –
+                          </button>
+
+                          <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
+                            <span className="mr-1">🛒</span>
+                            <span> x {qty} </span>
+                            {atMax && (
+                              <span className="ml-1 text-[10px] text-emerald-700">
+                                ({lang === "es" ? "Máximo" : "Max"})
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(item)}
+                            disabled={atMax}
+                            className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
+                              atMax
+                                ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                                : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                            }`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                   </article>
                 );
               })}
@@ -645,7 +738,7 @@ export function JackieCatalog() {
 
     const renderMobileMessages = () => (
       <div className="space-y-4">
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
           <h2 className="text-sm font-semibold">
             {t("Chatea por WhatsApp", "Chat on WhatsApp")}
           </h2>
@@ -695,8 +788,8 @@ export function JackieCatalog() {
           </ul>
         </section>
 
-        {selectedItems.length > 0 && (
-          <section className="rounded-3xl.bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+        {cartLines.length > 0 && (
+          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
             <h3 className="text-sm font-semibold">
               {t("Tu carrito", "Your cart")}
             </h3>
@@ -707,29 +800,29 @@ export function JackieCatalog() {
               )}
             </p>
             <ul className="space-y-1 text-[11px] text-slate-700">
-              {selectedItems.map((item, idx) => (
+              {cartLines.map(({ item, count }, idx) => (
                 <li key={item.id}>
                   {idx + 1}. {translateColor(item.color, lang)} ·{" "}
-                  {t("Talla", "Size")} {item.size} · $
+                  {t("Talla", "Size")} {item.size} · x{count} · $
                   {item.price_mxn.toFixed(0)} MXN
                 </li>
               ))}
             </ul>
 
             <a
-              href={waLinkForSelected || "#"}
+              href={waLinkForCart || "#"}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => {
-                if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+                if (!WHATSAPP_NUMBER || !cartLines.length) return;
                 track("whatsapp_click_multi", {
-                  count: selectedItems.length,
+                  count: totalCartPairs,
                   lang,
                   location: "messages_tab",
                 });
               }}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4.py-2.5 text-sm font-semibold transition ${
-                WHATSAPP_NUMBER && selectedItems.length
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                WHATSAPP_NUMBER && cartLines.length
                   ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
                   : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
@@ -749,7 +842,7 @@ export function JackieCatalog() {
 
     const renderMobileInfo = () => (
       <div className="space-y-4">
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
           <h2 className="text-sm font-semibold">
             {t("¿Cómo funciona?", "How it works")}
           </h2>
@@ -775,7 +868,7 @@ export function JackieCatalog() {
           </ol>
         </section>
 
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <span>🚚</span>
             <span>{t("Puntos de entrega", "Pickup spots")}</span>
@@ -790,7 +883,7 @@ export function JackieCatalog() {
           </ul>
         </section>
 
-        <section className="rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <span>💳🇲🇽</span>
             <span>{t("Pago por transferencia", "Bank transfer details")}</span>
@@ -831,9 +924,9 @@ export function JackieCatalog() {
         : t("Información", "Info");
 
     return (
-      <div className="min-h-screen bg-[#FAFAFA] text-slate-900 pb-24">
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-slate-50 to-white text-slate-900 pb-24">
         {/* Mobile header */}
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-emerald-100 bg-white/90 backdrop-blur">
           <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-base shadow-sm">
@@ -882,37 +975,37 @@ export function JackieCatalog() {
         </main>
 
         {/* Floating cart bar above bottom tabs */}
-        {selectedItems.length > 0 && (
+        {totalCartPairs > 0 && (
           <div className="fixed bottom-16 inset-x-0 z-30">
             <div className="max-w-md mx-auto px-4">
-              <div className="rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] border border-slate-200 px-4 py-2 flex items-center justify-between gap-2">
+              <div className="rounded-full bg-white shadow-lg border border-emerald-100 px-4 py-2 flex items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-700">
                   {lang === "es"
-                    ? `✅ ${selectedItems.length} ${
-                        selectedItems.length === 1
+                    ? `✅ ${totalCartPairs} ${
+                        totalCartPairs === 1
                           ? "par en carrito"
                           : "pares en carrito"
                       }`
-                    : `✅ ${selectedItems.length} ${
-                        selectedItems.length === 1
+                    : `✅ ${totalCartPairs} ${
+                        totalCartPairs === 1
                           ? "pair in cart"
                           : "pairs in cart"
                       }`}
                 </p>
                 <a
-                  href={waLinkForSelected || "#"}
+                  href={waLinkForCart || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => {
-                    if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+                    if (!WHATSAPP_NUMBER || !totalCartPairs) return;
                     track("whatsapp_click_multi", {
-                      count: selectedItems.length,
+                      count: totalCartPairs,
                       lang,
                       location: "floating_cart",
                     });
                   }}
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                    WHATSAPP_NUMBER && selectedItems.length
+                    WHATSAPP_NUMBER && totalCartPairs
                       ? "bg-emerald-500 text-white hover:bg-emerald-400"
                       : "bg-slate-200 text-slate-500 cursor-not-allowed"
                   }`}
@@ -985,7 +1078,7 @@ export function JackieCatalog() {
   // ------------------------------------------------------------------
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] text-slate-900 pb-24">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-white text-slate-900 pb-24">
       {/* TOP NAV */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
@@ -1056,10 +1149,10 @@ export function JackieCatalog() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
         {/* HERO / STORE HEADER */}
-        <section className="rounded-3xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-4 sm:p-6">
+        <section className="rounded-3xl bg-white/90 border border-emerald-100 shadow-sm p-4 sm:p-6">
           <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-center">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 border border-slate-200">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
                 <span>🛍️</span>
                 <span>
                   {lang === "es"
@@ -1129,7 +1222,7 @@ export function JackieCatalog() {
               <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
-                    🌟 {lang === "es" ? "Crocs" : "Crocs"}
+                    🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
                   </span>
                   <p className="text-xs text-slate-500">
                     {lang === "es" ? "Desde" : "From"} $600 MXN
@@ -1166,7 +1259,7 @@ export function JackieCatalog() {
         </section>
 
         {/* PHOTO STRIP */}
-        <section className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 sm:p-4 space-y-2">
+        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
           <div className="flex items-center justify-between text-[12px] sm:text-sm">
             <p className="font-medium">
               {lang === "es"
@@ -1196,7 +1289,7 @@ export function JackieCatalog() {
         </section>
 
         {/* FILTER BAR */}
-        <section className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 sm:p-4 space-y-3">
+        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-slate-900">
               {lang === "es" ? "Crocs disponibles" : "Available Crocs"}
@@ -1216,7 +1309,7 @@ export function JackieCatalog() {
               <button
                 type="button"
                 onClick={loadInventory}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                className="inline-flex.items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
               >
                 {loading
                   ? t("Actualizando…", "Refreshing…")
@@ -1240,8 +1333,8 @@ export function JackieCatalog() {
                 </option>
                 {allSizes.map((sz) => (
                   <option key={sz} value={sz}>
-                    {sz}
-                  </option>
+                  {lang === "es" ? formatSizeLabel(sz, lang) : sz}
+                </option>
                 ))}
               </select>
             </div>
@@ -1266,6 +1359,13 @@ export function JackieCatalog() {
               </select>
             </div>
           </div>
+
+          <p className="mt-1 text-[10px] text-slate-500">
+            {t(
+              "Puedes agregar varios pares del mismo modelo haciendo clic en Agregar varias veces.",
+              "You can add multiple pairs of the same model by clicking Add several times."
+            )}
+          </p>
         </section>
 
         {/* PRODUCT GRID */}
@@ -1287,16 +1387,30 @@ export function JackieCatalog() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {limited.map((item) => {
-                  const isSelected = selectedIds.includes(item.id);
+                  const qty = quantities[item.id] ?? 0;
                   const colorText = translateColor(item.color, lang);
+                  const atMax = qty >= item.availableCount;
+
+                  let buttonLabel: string;
+                  if (qty === 0) {
+                    buttonLabel = lang === "es" ? "Agregar al carrito" : "Add to cart";
+                  } else if (atMax) {
+                    buttonLabel =
+                      (lang === "es" ? "Máximo en carrito · " : "Max in cart · ") +
+                      qty;
+                  } else {
+                    buttonLabel =
+                      (lang === "es" ? "Agregar otro · " : "Add another · ") +
+                      qty;
+                  }
 
                   return (
                     <article
                       key={item.id}
-                      className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.06)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 transition-all flex flex-col p-4 gap-3"
+                      className="rounded-3xl bg-white border border-slate-100 shadow-[0_10px_26px_rgba(15,23,42,0.03)] hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 transition-all flex flex-col p-4 gap-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl">
+                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 flex items-center justify-center text-2xl">
                           🐊
                         </div>
                         <div className="flex-1">
@@ -1312,7 +1426,7 @@ export function JackieCatalog() {
                             <span>{colorText}</span>
                             <span className="text-slate-400">·</span>
                             <span>
-                              {lang === "es" ? "Talla" : "Size"} {item.size}
+                             {lang === "es" ? "Talla" : "Size"} {formatSizeLabel(item.size, lang)}
                             </span>
                           </p>
                         </div>
@@ -1327,31 +1441,61 @@ export function JackieCatalog() {
                             {availabilityText(item.availableCount, lang)}
                           </p>
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-3 py-0.5 text-[10px]">
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-0.5 text-[10px]">
                           {lang === "es" ? "Disponible hoy" : "Available today"}
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSelect(item.id)}
-                        className={`mt-1 inline-flex w-full items-center justify-center gap-2 rounded-full px-3.5 py-2 text-[11px] font-medium border transition ${
-                          isSelected
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                            : "bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700"
-                        }`}
-                      >
-                        <span>🛒</span>
-                        <span>
-                          {isSelected
-                            ? lang === "es"
-                              ? "En carrito"
-                              : "In cart"
-                            : lang === "es"
-                            ? "Agregar al carrito"
-                            : "Add to cart"}
-                        </span>
-                      </button>
+                    {/* BUTTONS / QTY CONTROL */}
+                    <div className="mt-2">
+                      {qty === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAddToCart(item)}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
+                        >
+                          <span>🛒</span>
+                          <span>{lang === "es" ? "Agregar" : "Add"}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromCart(item.id)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                          >
+                            –
+                          </button>
+
+                          <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
+                            <span className="mr-1">🛒</span>
+                            <span>
+                              {lang === "es" ? "En carrito" : "In cart"} · x
+                              {qty}
+                            </span>
+                            {atMax && (
+                              <span className="ml-1 text-[10px] text-emerald-700">
+                                ({lang === "es" ? "Máximo" : "Max"})
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(item)}
+                            disabled={atMax}
+                            className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
+                              atMax
+                                ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                                : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                            }`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     </article>
                   );
                 })}
@@ -1384,7 +1528,7 @@ export function JackieCatalog() {
 
         {/* HOW IT WORKS + DELIVERY / PAYMENT */}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-3">
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">
             <h3 className="text-sm font-semibold text-slate-900">
               {lang === "es" ? "¿Cómo funciona?" : "How it works"}
             </h3>
@@ -1424,7 +1568,7 @@ export function JackieCatalog() {
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
                 <span>🚚</span>
                 {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
@@ -1439,7 +1583,7 @@ export function JackieCatalog() {
               </ul>
             </div>
 
-            <div className="rounded-2xl bg-white shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 space-y-2">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
                 <span>💳🇲🇽</span>
                 {lang === "es"
@@ -1476,30 +1620,30 @@ export function JackieCatalog() {
       </div>
 
       {/* STICKY CART BAR (desktop/tablet) */}
-      {selectedItems.length > 0 && (
+      {totalCartPairs > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_30px_rgba(15,23,42,0.12)]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-[11px] text-slate-700">
               {lang === "es"
-                ? `✅ ${selectedItems.length} ${
-                    selectedItems.length === 1
+                ? `✅ ${totalCartPairs} ${
+                    totalCartPairs === 1
                       ? "par listo para enviar por WhatsApp"
                       : "pares listos para enviar por WhatsApp"
                   }`
-                : `✅ ${selectedItems.length} ${
-                    selectedItems.length === 1
+                : `✅ ${totalCartPairs} ${
+                    totalCartPairs === 1
                       ? "pair ready to send on WhatsApp"
                       : "pairs ready to send on WhatsApp"
                   }`}
             </p>
             <a
-              href={waLinkForSelected || "#"}
+              href={waLinkForCart || "#"}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => {
-                if (!WHATSAPP_NUMBER || !selectedItems.length) return;
+                if (!WHATSAPP_NUMBER || !totalCartPairs) return;
                 track("whatsapp_click_multi", {
-                  count: selectedItems.length,
+                  count: totalCartPairs,
                   lang,
                   location: "sticky_cart",
                 });
