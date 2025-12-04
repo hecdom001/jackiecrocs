@@ -8,7 +8,7 @@ Live inventory & order system for a viral Crocs reselling business
 
 ## Overview
 
-JackyCrocs started as a small side business between my girlfriend and me, reselling Crocs locally in **Tijuana, Mexico**.
+JackyCrocs started as a small side business, reselling Crocs locally in **Tijuana, Mexico**.
 
 After unexpectedly going **viral on TikTok**, we were suddenly flooded with **~1,000+ DMs**, all asking for colors, sizes, prices, and availability. Managing everything manually through WhatsApp between just two people became overwhelming very quickly.
 
