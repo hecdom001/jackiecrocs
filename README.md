@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JackyCrocs 🐊  
+Live inventory & order system for a viral Crocs reselling business
 
-## Getting Started
+🌐 **Live site:** https://jackycrocs.com/  
+🚀 **Hosting:** Vercel (Production)
 
-First, run the development server:
+---
+
+## Overview
+
+JackyCrocs started as a small side business between my girlfriend and me, reselling Crocs locally in **Tijuana, Mexico**.
+
+After unexpectedly going **viral on TikTok**, we were suddenly flooded with **~1,000+ DMs**, all asking for colors, sizes, prices, and availability. Managing everything manually through WhatsApp between just two people became overwhelming very quickly.
+
+To solve this, I built a **simple, functional website as fast as possible** — nothing fancy, just what we needed to survive the volume and stay organized.
+
+This repository contains the source code for that solution, which is now **live in production** and actively used to manage real inventory and orders.
+
+---
+
+## What This Project Solves
+
+✅ Reduces repetitive WhatsApp messages  
+✅ Shows customers **live inventory**  
+✅ Prevents selling out-of-stock sizes/colors  
+✅ Keeps the workflow simple for non-technical users  
+✅ Works well for mobile customers  
+✅ Scales better than pure DM-based selling
+
+---
+
+## Features
+
+### 🛍 Public Storefront
+- Live inventory by **color and size**
+- Add multiple pairs to cart
+- Spanish-first UI with **English / Spanish toggle**
+- Mobile-friendly (most customers come from TikTok)
+
+<img width="1022" height="1352" alt="Screenshot 2025-12-03 at 10 05 22 PM" src="https://github.com/user-attachments/assets/a4627f2e-2699-4cc9-aeaa-cc9623f52312" />
+
+
+---
+
+### 🔐 Admin Panel (Private)
+- Manage inventory counts
+- Update colors and sizes
+- View basic dashboard metrics
+- Simple and fast — designed for real-time selling
+
+<img width="2548" height="1356" alt="Screenshot 2025-12-03 at 10 08 57 PM" src="https://github.com/user-attachments/assets/1afbda53-990d-4b35-9392-10ef629e7d47" />
+<img width="2556" height="1353" alt="Screenshot 2025-12-03 at 10 08 50 PM" src="https://github.com/user-attachments/assets/e6b4e0f5-d2b1-49d0-9aea-3a85de9ea36d" />
+
+---
+
+## Order Flow (Current)
+
+1. Customer selects **color & size**
+2. Adds items to cart
+3. Clicks **“Send Order”**
+4. Site opens **WhatsApp** with a **pre-filled order message**
+5. Payment & pickup are handled manually via WhatsApp
+
+
+This flow keeps things simple while still:
+- Reducing message back-and-forth
+- Standardizing order formats
+- Letting us close sales quickly
+
+---
+
+## Tech Stack
+
+- **Framework:** Next.js (App Router)
+- **Frontend:** React + TypeScript
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
+- **Messaging Integration:** WhatsApp deep links
+- **Language Support:** Spanish / English toggle
+
+---
+
+## Why Vercel?
+
+- Zero-config deployments
+- Fast global CDN
+- Perfect for rapid iteration during viral growth
+- Reliable production performance with minimal overhead
+
+This app is **actively used in production** for a real business.
+
+---
+
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App will run locally at:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+* http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Vercel
 
-## Learn More
+https://vercel.com/hector-dominguezs-projects/jackiecrocs
 
-To learn more about Next.js, take a look at the following resources:
+## Database
+* https://supabase.com/
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
