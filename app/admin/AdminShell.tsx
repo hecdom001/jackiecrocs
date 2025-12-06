@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 import { useAdminLang } from "./adminLangContext";
 
 const navItems = [
@@ -30,14 +29,104 @@ const navItems = [
   },
 ];
 
+// --- MOBILE BOTTOM NAV (tabs) ---
+function AdminMobileNav({
+  pathname,
+  lang,
+}: {
+  pathname: string;
+  lang: "es" | "en";
+}) {
+  const router = useRouter();
+
+  // Map each nav item to an icon for the tab bar
+  const items = [
+    {
+      href: "/admin",
+      icon: "📊",
+    },
+    {
+      href: "/admin/inventory",
+      icon: "📦",
+    },
+    {
+      href: "/admin/inventory/add",
+      icon: "➕",
+    },
+    {
+      href: "/admin/feedback",
+      icon: "💬",
+    },
+    {
+      href: "/admin/history",
+      icon: "📜",
+    },
+  ].map((tab) => {
+    const base = navItems.find((n) => n.href === tab.href)!;
+    return {
+      ...base,
+      icon: tab.icon,
+    };
+  });
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 bg-white/90 backdrop-blur border-t border-slate-200 md:hidden">
+      <div className="mx-auto max-w-md px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2">
+        <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-[11px] shadow-lg">
+          {items.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
+
+            const label = item.label[lang];
+
+            if (item.disabled) {
+              return (
+                <div
+                  key={item.href}
+                  className="flex flex-1 flex-col items-center gap-0.5 text-slate-300 cursor-not-allowed"
+                >
+                  <span className="mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base bg-slate-100">
+                    {item.icon}
+                  </span>
+                  <span className="font-normal opacity-70">{label}</span>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => router.push(item.href)}
+                className={`flex flex-1 flex-col items-center gap-0.5 ${
+                  active ? "text-emerald-600" : "text-slate-400"
+                }`}
+              >
+                <span
+                  className={`mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base ${
+                    active ? "bg-emerald-50" : "bg-slate-100"
+                  }`}
+                >
+                  {item.icon}
+                </span>
+                <span className={active ? "font-medium" : ""}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 export default function AdminShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathnameRaw = usePathname();
+  const pathname = pathnameRaw ?? "";
   const isLoginPage = pathname === "/admin/login";
   const router = useRouter();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { lang, setLang, t } = useAdminLang();
 
-  // ✅ single source of truth for “active” state
   const isActive = (href: string) => pathname === href;
 
   const pageTitle: string =
@@ -59,55 +148,55 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <div className="flex">
         {/* Desktop sidebar */}
         {!isLoginPage && (
-            <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
-          <div className="flex items-center gap-2 px-4 py-4 border-b border-slate-200">
-            <Link href="/admin" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full overflow-hidden bg-emerald-600" />
-              <span className="text-sm font-semibold">JackyCrocs</span>
-            </Link>
-          </div>
+          <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
+            <div className="flex items-center gap-2 px-4 py-4 border-b border-slate-200">
+              <Link href="/admin" className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full overflow-hidden bg-emerald-600" />
+                <span className="text-sm font-semibold">JackyCrocs</span>
+              </Link>
+            </div>
 
-          <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              const baseClasses =
-                "flex items-center justify-between rounded-xl px-3 py-2 transition";
+            <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
+              {navItems.map((item) => {
+                const active = isActive(item.href);
+                const baseClasses =
+                  "flex items-center justify-between rounded-xl px-3 py-2 transition";
 
-              if (item.disabled) {
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.href}
+                      className={`${baseClasses} text-slate-400 cursor-not-allowed`}
+                    >
+                      <span>{item.label[lang]}</span>
+                      <span className="text-[10px] uppercase">
+                        {lang === "es" ? "Pronto" : "Soon"}
+                      </span>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div
+                  <Link
                     key={item.href}
-                    className={`${baseClasses} text-slate-400 cursor-not-allowed`}
+                    href={item.href}
+                    className={
+                      active
+                        ? `${baseClasses} bg-emerald-50 text-emerald-700`
+                        : `${baseClasses} text-slate-600 hover:bg-slate-100`
+                    }
                   >
                     <span>{item.label[lang]}</span>
-                    <span className="text-[10px] uppercase">
-                      {lang === "es" ? "Pronto" : "Soon"}
-                    </span>
-                  </div>
+                  </Link>
                 );
-              }
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    active
-                      ? `${baseClasses} bg-emerald-50 text-emerald-700`
-                      : `${baseClasses} text-slate-600 hover:bg-slate-100`
-                  }
-                >
-                  <span>{item.label[lang]}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+              })}
+            </nav>
+          </aside>
         )}
 
         {/* Main column */}
         <div className="flex-1 flex flex-col min-h-screen">
-         {!isLoginPage && (
+          {!isLoginPage && (
             <header className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
               <div className="flex items-center gap-3">
                 <Link href="/admin" className="flex items-center gap-2">
@@ -145,115 +234,35 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   </button>
                 </div>
 
-                {/* Desktop logout */}
+                {/* Logout – now visible on mobile AND desktop */}
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="hidden sm:inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 hover:border-rose-400 hover:text-rose-700 transition"
+                  className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 hover:border-rose-400 hover:text-rose-700 transition"
                 >
                   {t("Cerrar sesión", "Log out")}
-                </button>
-
-                {/* Mobile hamburger */}
-                <button
-                  type="button"
-                  aria-label={t("Abrir menú", "Open menu")}
-                  className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white"
-                  onClick={() => setMobileMenuOpen(true)}
-                >
-                  <div className="space-y-0.5">
-                    <span className="block h-0.5 w-4 bg-slate-700 rounded-full" />
-                    <span className="block h-0.5 w-4 bg-slate-700 rounded-full" />
-                    <span className="block h-0.5 w-4 bg-slate-700 rounded-full" />
-                  </div>
                 </button>
               </div>
             </header>
           )}
-          <main className={ isLoginPage
+
+          <main
+            className={
+              isLoginPage
                 ? "flex-1 flex items-center justify-center bg-slate-50"
-                : "flex-1 px-3 py-4 md:px-6 md:py-6"
+                : // Extra bottom padding on mobile so content isn't hidden behind bottom nav
+                  "flex-1 px-3 py-4 md:px-6 md:py-6 pb-24 md:pb-6"
             }
           >
-          {children}</main>
+            {children}
+          </main>
+
+          {/* Mobile bottom nav (only when logged in) */}
+          {!isLoginPage && (
+            <AdminMobileNav pathname={pathname} lang={lang as "es" | "en"} />
+          )}
         </div>
       </div>
-
-      {/* Mobile slide-over menu */}
-      {!isLoginPage && mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-64 bg-white shadow-lg flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-              <span className="text-sm font-semibold">JackyCrocs</span>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(false)}
-                className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center"
-              >
-                ✕
-              </button>
-            </div>
-
-            <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-              {navItems.map((item) => {
-                const active = isActive(item.href);
-                const baseClasses =
-                  "flex items-center justify-between rounded-xl px-3 py-2 transition";
-
-                if (item.disabled) {
-                  return (
-                    <div
-                      key={item.href}
-                      className={`${baseClasses} text-slate-400 cursor-not-allowed`}
-                    >
-                      <span>{item.label[lang]}</span>
-                      <span className="text-[10px] uppercase">
-                        {lang === "es" ? "Pronto" : "Soon"}
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={
-                      active
-                        ? `${baseClasses} bg-emerald-50 text-emerald-700`
-                        : `${baseClasses} text-slate-600 hover:bg-slate-100`
-                    }
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span>{item.label[lang]}</span>
-                  </Link>
-                );
-              })}
-
-              {/* Mobile logout */}
-              <div className="border-t border-slate-200 px-2 py-3">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setMobileMenuOpen(false);
-                    await handleLogout();
-                  }}
-                  className="w-full rounded-xl px-3 py-2 text-sm font-semibold
-                            text-rose-600 hover:bg-rose-50 transition
-                            flex items-center gap-2"
-                >
-                  <span>🚪</span>
-                  <span>{t("Cerrar sesión", "Log out")}</span>
-                </button>
-              </div>
-            </nav>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
