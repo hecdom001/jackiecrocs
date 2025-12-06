@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
   // Join inventory_items with models + colors
   const { data, error } = await supabase
     .from("inventory_items")
-    .select(
-      `
+    .select(`
       id,
       model_id,
       color_id,

@@ -56,8 +56,10 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   if (lang === "en") return modelEn;
   const key = modelEn.trim().toLowerCase();
   switch (key) {
-    case "classic":
+   case "classic":
       return "Clásico";
+    case "classic platform":
+      return "Plataforma Clásica";
     default:
       return modelEn;
   }

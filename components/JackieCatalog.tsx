@@ -61,31 +61,22 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   }
 }
 
-function colorDotClass(colorEn: string) {
-  const key = colorEn.trim().toLowerCase();
-
-  switch (key) {
+function colorLineClass(colorEn: string) {
+  switch (colorEn.trim().toLowerCase()) {
     case "black":
       return "bg-slate-900";
-
     case "white":
-      return "bg-slate-200 border border-slate-300";
-
+      return "bg-slate-200";
     case "beige":
-      return "bg-amber-200";
-
-    case "purple":
-      return "bg-purple-400";
-
+      return "bg-yellow-100";
+    case "pink":
     case "baby pink":
+    case "rosa pastel":
       return "bg-pink-200";
-
     case "red":
       return "bg-red-500";
-
     case "lilac":
       return "bg-violet-200";
-
     default:
       return "bg-slate-300";
   }
@@ -454,8 +445,8 @@ export function JackieCatalog() {
           <div className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight">
               {t(
-                "Crocs disponibles hoy en Tijuana 🐊",
-                "Crocs available today in Tijuana 🐊"
+                "Crocs disponibles en Tijuana 🐊",
+                "Crocs available in Tijuana 🐊"
               )}
             </h1>
             <p className="text-[12px] text-slate-600">
@@ -661,24 +652,24 @@ export function JackieCatalog() {
                     className="rounded-3xl bg-white/95 border border-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.03)] hover:shadow-[0_12px_32px_rgba(15,23,42,0.07)] hover:-translate-y-0.5 transition-all flex flex-col p-3 gap-2"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 flex items-center justify-center text-xl">
-                        🐊
-                      </div>
-
                       <div className="flex-1">
                         <p className="text-[11px] font-semibold text-slate-900 line-clamp-1">
                           {modelLabel} Crocs
                         </p>
-                        <p className="text-[10px] text-slate-600 flex items-center gap-1.5">
-                          <span
-                            className={`h-2 w-2 rounded-full ${colorDotClass(
-                              item.color
-                            )}`}
-                          />
+
+                        {/* COLOR LINE */}
+                        <div
+                          className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
+                            item.color
+                          )} opacity-80`}
+                        />
+
+                        <p className="mt-1 text-[10px] text-slate-600 flex items-center gap-1.5">
                           <span>{colorText}</span>
                           <span className="text-slate-400">·</span>
                           <span>
-                            {lang === "es" ? "Talla" : "Size"} {formatSizeLabel(item.size, lang)}
+                            {lang === "es" ? "Talla" : "Size"}{" "}
+                            {formatSizeLabel(item.size, lang)}
                           </span>
                         </p>
                       </div>
@@ -694,7 +685,7 @@ export function JackieCatalog() {
                         </p>
                       </div>
                       <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[9px]">
-                        {lang === "es" ? "Disponible hoy" : "Available today"}
+                        {lang === "es" ? "Disponible" : "Available"}
                       </span>
                     </div>
 
@@ -1203,8 +1194,8 @@ export function JackieCatalog() {
               <div className="space-y-2">
                 <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                   {lang === "es"
-                    ? "Crocs disponibles hoy en Tijuana 🐊"
-                    : "Crocs available today in Tijuana 🐊"}
+                    ? "Crocs disponibles en Tijuana 🐊"
+                    : "Crocs available in Tijuana 🐊"}
                 </h1>
                 <p className="text-sm text-slate-600 max-w-md">
                   {lang === "es"
@@ -1276,7 +1267,9 @@ export function JackieCatalog() {
                         : "Available colors"}
                     </p>
                     <p className="text-[11px] text-slate-600">
-                      Negro · Blanco · Beige
+                       {lang === "es"
+                        ? "Negro · Blanco · Beige · Rojo · Lila · Rosa Pastel"
+                        : "Black · White · Beige · Red · Lilac · Light Pink"}
                     </p>
                     <p className="mt-2 text-[10px] text-slate-500">
                       {lang === "es"
@@ -1450,23 +1443,23 @@ export function JackieCatalog() {
                       className="rounded-3xl bg-white border border-slate-100 shadow-[0_10px_26px_rgba(15,23,42,0.03)] hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 transition-all flex flex-col p-4 gap-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 flex items-center justify-center text-2xl">
-                          🐊
-                        </div>
                         <div className="flex-1">
                           <h3 className="text-sm font-semibold text-slate-900 line-clamp-1">
                             {modelLabel} Crocs
                           </h3>
-                          <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full ${colorDotClass(
-                                item.color
-                              )}`}
-                            />
+
+                          <div
+                            className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
+                              item.color
+                            )} opacity-80`}
+                          />
+
+                          <p className="mt-1 text-[11px] text-slate-600 flex items-center gap-1.5">
                             <span>{colorText}</span>
                             <span className="text-slate-400">·</span>
                             <span>
-                             {lang === "es" ? "Talla" : "Size"} {formatSizeLabel(item.size, lang)}
+                              {lang === "es" ? "Talla" : "Size"}{" "}
+                              {formatSizeLabel(item.size, lang)}
                             </span>
                           </p>
                         </div>
@@ -1482,7 +1475,7 @@ export function JackieCatalog() {
                           </p>
                         </div>
                         <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-0.5 text-[10px]">
-                          {lang === "es" ? "Disponible hoy" : "Available today"}
+                          {lang === "es" ? "Disponible" : "Available"}
                         </span>
                       </div>
 
