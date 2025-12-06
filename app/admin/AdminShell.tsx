@@ -25,7 +25,7 @@ const navItems = [
   {
     href: "/admin/history",
     label: { es: "Historial", en: "History" },
-    disabled: true,
+    disabled: false,
   },
 ];
 
