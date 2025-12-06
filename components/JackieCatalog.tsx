@@ -211,6 +211,130 @@ function buildWhatsAppSupportLink(lang: Lang) {
   )}`;
 }
 
+function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">(
+    "idle"
+  );
+
+  // allow any non-empty message; only block while sending
+  const disabled = message.trim().length === 0 || status === "sending";
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (disabled) return;
+
+    try {
+      setStatus("sending");
+
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, lang, context }),
+      });
+
+      if (!res.ok) throw new Error("Request failed");
+
+      setStatus("success");
+      setMessage("");
+
+      // clear success after a bit so user can see it but send again later
+      setTimeout(() => {
+        setStatus("idle");
+      }, 3000);
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
+    }
+  }
+
+  const label =
+    lang === "es"
+      ? "¿Cómo podemos mejorar tu experiencia?"
+      : "How can we improve your experience?";
+
+  const placeholder =
+    lang === "es"
+      ? "Cuéntanos si algo te confundió o qué te gustaría ver mejorado…"
+      : "Tell us if something was confusing or what we could improve…";
+
+  const buttonText =
+    status === "sending"
+      ? lang === "es"
+        ? "Enviando..."
+        : "Sending..."
+      : lang === "es"
+      ? "Enviar comentario"
+      : "Send feedback";
+
+  const successText =
+    lang === "es"
+      ? "¡Gracias por tu comentario! 💚"
+      : "Thanks for your feedback! 💚";
+
+  const errorText =
+    lang === "es"
+      ? "Hubo un error al enviar. Intenta de nuevo 🙏"
+      : "There was an error sending. Please try again 🙏";
+
+  return (
+    <section className="mt-4 rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <label className="block text-sm font-semibold text-slate-900">
+          {label}
+        </label>
+
+        <textarea
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition"
+          rows={3}
+          value={message}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            // if there was a success / error message and user starts typing again, go back to idle
+            if (status === "success" || status === "error") {
+              setStatus("idle");
+            }
+          }}
+          placeholder={placeholder}
+          inputMode="text"
+          autoComplete="off"
+          autoCorrect="on"
+          spellCheck={true}
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] text-slate-500">
+            {lang === "es"
+              ? "Se envía de forma anónima y se guarda en nuestra base de datos."
+              : "Sent anonymously and stored in our database."}
+          </p>
+          <button
+            type="submit"
+            disabled={disabled}
+            className={`inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold text-white transition ${
+              disabled
+                ? "bg-emerald-300 cursor-not-allowed"
+                : "bg-emerald-500 hover:bg-emerald-400"
+            }`}
+          >
+            {buttonText}
+          </button>
+        </div>
+      </form>
+
+      {status === "success" && (
+        <p className="text-[11px] text-emerald-600">{successText}</p>
+      )}
+      {status === "error" && (
+        <p className="text-[11px] text-red-500">{errorText}</p>
+      )}
+    </section>
+  );
+}
+
+
+
 // ---------- Component ----------
 
 export function JackieCatalog() {
@@ -941,6 +1065,8 @@ export function JackieCatalog() {
             </p>
           </div>
         </section>
+         {/* Feedback box */}
+        <FeedbackBox lang={lang} context="messages_mobile" />
       </div>
     );
 
