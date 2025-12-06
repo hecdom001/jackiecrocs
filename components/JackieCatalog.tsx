@@ -118,13 +118,15 @@ const DELIVERY_SPOTS = [
   "Otay",
   "20 de Noviembre",
   "Macro Burger King",
+  "Siglo XXI",
+  "BLVD De las Americas",
+  "Zona Rio"
 ];
 
 const MEX_BANK_INFO = {
-  bankName: "Santander",
+  bankName: "BBVA",
   accountName: "Jackeline Monge",
-  accountNumber: "014020260401072579",
-  Concepto: "Tu nombre",
+  accountNumber: "4152 3140 4365 9724",
 } as const;
 
 const MOBILE_INITIAL_VISIBLE = 6;
@@ -998,32 +1000,6 @@ export function JackieCatalog() {
     const renderMobileInfo = () => (
       <div className="space-y-4">
         <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
-          <h2 className="text-sm font-semibold">
-            {t("¿Cómo funciona?", "How it works")}
-          </h2>
-          <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
-            <li>
-              {t(
-                "Elige tus pares y agrégalos al carrito.",
-                "Choose your pairs and add them to the cart."
-              )}
-            </li>
-            <li>
-              {t(
-                "Envíanos mensaje por WhatsApp para confirmar disponibilidad.",
-                "Send us a WhatsApp message to confirm availability."
-              )}
-            </li>
-            <li>
-              {t(
-                "Acuerda punto de entrega y paga en efectivo o transferencia.",
-                "Agree pickup spot and pay in cash or bank transfer."
-              )}
-            </li>
-          </ol>
-        </section>
-
-        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <span>🚚</span>
             <span>{t("Puntos de entrega", "Pickup spots")}</span>
@@ -1040,9 +1016,26 @@ export function JackieCatalog() {
 
         <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
           <h3 className="text-sm font-semibold flex items-center gap-2">
-            <span>💳🇲🇽</span>
-            <span>{t("Pago por transferencia", "Bank transfer details")}</span>
+            <span>🛍️</span>
+            <span>{t("Apartados", "Reservations")}</span>
+            <span>-</span>
+            <span>{t("Pago por transferencia", "Pay by bank transfer")}</span>
           </h3>
+
+          <p className="text-[11px] text-slate-700 leading-relaxed">
+            {t(
+              "Para apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 50% del total de tu compra.",
+              "To reserve your Crocs under your name, a 50% deposit of the total purchase is required."
+            )}
+          </p>
+
+          <p className="text-[11px] text-slate-700">
+            {t(
+              "Puedes hacerlo a la siguiente cuenta:",
+              "You can make the deposit to the following account:"
+            )}
+          </p>
+
           <div className="space-y-1 text-[11px] text-slate-800">
             <p>
               <span className="font-medium">{t("Banco: ", "Bank: ")}</span>
@@ -1060,11 +1053,18 @@ export function JackieCatalog() {
               </span>
               {MEX_BANK_INFO.accountNumber}
             </p>
-            <p className="break-all">
-              <span className="font-medium">Concepto: </span>
-              {MEX_BANK_INFO.Concepto}
+            <p>
+              <span className="font-medium">{t("Concepto: ", "Reference: ")}</span>
+               {t("Tu Nombre", "Your Name")}
             </p>
           </div>
+
+          <p className="text-[10px] text-slate-500 mt-1">
+            {t(
+              "Recuerda mandar foto de tu comprobante.",
+              "Please remember to send a photo of your payment receipt."
+            )}
+          </p>
         </section>
          {/* Feedback box */}
         <FeedbackBox lang={lang} context="messages_mobile" />
@@ -1696,11 +1696,26 @@ export function JackieCatalog() {
 
             <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
-                <span>💳🇲🇽</span>
-                {lang === "es"
-                  ? "Pago por transferencia"
-                  : "Pay by bank transfer"}
+                <span>🛍️</span>
+                <span>{t("Apartados", "Reservations")}</span>
+                <span>-</span>
+                <span>{t("Pago por transferencia", "Pay by bank transfer")}</span>
               </h3>
+
+               <p className="text-[11px] text-slate-700 leading-relaxed">
+                {t(
+                  "Para apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 50% del total de tu compra.",
+                  "To reserve your Crocs under your name, a 50% deposit of the total purchase is required."
+                )}
+              </p>
+
+              <p className="text-[11px] text-slate-700">
+                {t(
+                  "Puedes hacerlo a la siguiente cuenta:",
+                  "You can make the deposit to the following account:"
+                )}
+              </p>
+
               <div className="space-y-1 text-[11px] text-slate-800">
                 <p>
                   <span className="font-medium">
@@ -1722,7 +1737,7 @@ export function JackieCatalog() {
                 </p>
                 <p className="break-all">
                   <span className="font-medium">Concepto: </span>
-                  {MEX_BANK_INFO.Concepto}
+                  {t("Tu Nombre", "Your Name")}
                 </p>
               </div>
             </div>
