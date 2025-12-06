@@ -26,6 +26,14 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Blanco";
     case "beige":
       return "Beige";
+    case "purple":
+      return "Morado";
+    case "baby pink":
+      return "Rosa Pastel";
+    case "red":
+      return "Rojo";
+    case "lilac":
+      return "Lila";
     default:
       return colorEn;
   }
@@ -38,6 +46,8 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   switch (key) {
     case "classic":
       return "Clásico";
+    case "classic platform":
+      return "Plataforma Clásica";
     default:
       return modelEn;
   }

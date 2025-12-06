@@ -35,24 +35,59 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Beige";
     case "purple":
       return "Morado";
+    case "baby pink":
+      return "Rosa Pastel";
+    case "red":
+      return "Rojo";
+    case "lilac":
+      return "Lila";
     default:
       return colorEn;
   }
 }
 
+function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
+  if (!modelEn) return "";
+  if (lang === "en") return modelEn;
+
+  const key = modelEn.trim().toLowerCase();
+  switch (key) {
+    case "classic":
+      return "Clásico";
+    case "classic platform":
+      return "Plataforma Clásica";
+    default:
+      return modelEn;
+  }
+}
+
 function colorDotClass(colorEn: string) {
   const key = colorEn.trim().toLowerCase();
+
   switch (key) {
     case "black":
       return "bg-slate-900";
+
     case "white":
       return "bg-slate-200 border border-slate-300";
+
     case "beige":
       return "bg-amber-200";
+
     case "purple":
       return "bg-purple-400";
+
+    case "baby pink":
+      return "bg-pink-200";
+
+    case "red":
+      return "bg-red-500";
+
+    case "lilac":
+      return "bg-violet-200";
+
     default:
-      return "bg-slate-400";
+      return "bg-slate-300";
   }
 }
 
@@ -127,38 +162,41 @@ function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
 
   const linesEs = cart.map(({ item, count }, idx) => {
     const colorEs = translateColor(item.color, "es");
+    const modelEs =
+      translateModelLabel(item.model_name || "Classic", "es") || "Crocs";
     const qtyLine = `Cantidad: ${count} ${count === 1 ? "par" : "pares"}`;
     return `• ${idx + 1}:
-  Modelo: ${item.model_name || "Crocs"}
-  Color: ${colorEs} (${item.color})
-  Talla: ${item.size}
-  Precio por par: $${item.price_mxn.toFixed(0)} MXN
-  ${qtyLine}`;
-  });
+      Modelo: ${modelEs} Crocs
+      Color: ${colorEs} (${item.color})
+      Talla: ${item.size}
+      Precio por par: $${item.price_mxn.toFixed(0)} MXN
+      ${qtyLine}`;
+      });
 
-  const linesEn = cart.map(({ item, count }, idx) => {
-    const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
-    return `• ${idx + 1}:
-  Model: ${item.model_name || "Crocs"}
-  Color: ${item.color}
-  Size: ${item.size}
-  Price per pair: $${item.price_mxn.toFixed(0)} MXN
-  ${qtyLine}`;
-  });
+      const linesEn = cart.map(({ item, count }, idx) => {
+        const modelEn = translateModelLabel(item.model_name || "Classic", "en");
+        const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
+        return `• ${idx + 1}:
+      Model: ${modelEn} Crocs
+      Color: ${item.color}
+      Size: ${item.size}
+      Price per pair: $${item.price_mxn.toFixed(0)} MXN
+      ${qtyLine}`;
+      });
 
-  if (lang === "es") {
-    return `Hola 👋 Me interesan estos pares de Crocs:
+      if (lang === "es") {
+        return `Hola 👋 Me interesan estos pares de Crocs:
 
-${linesEs.join("\n\n")}
+    ${linesEs.join("\n\n")}
 
-¿Siguen disponibles?`;
-  }
+    ¿Siguen disponibles?`;
+      }
 
-  return `Hi 👋 I'm interested in these Crocs:
+      return `Hi 👋 I'm interested in these Crocs:
 
-${linesEn.join("\n\n")}
+    ${linesEn.join("\n\n")}
 
-Are they still available?`;
+    Are they still available?`;
 }
 
 function buildWhatsAppLink(cart: CartLine[], lang: Lang) {
@@ -602,6 +640,7 @@ export function JackieCatalog() {
                 const qty = quantities[item.id] ?? 0;
                 const colorText = translateColor(item.color, lang);
                 const atMax = qty >= item.availableCount;
+                const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
 
                 let buttonLabel: string;
                 if (qty === 0) {
@@ -628,7 +667,7 @@ export function JackieCatalog() {
 
                       <div className="flex-1">
                         <p className="text-[11px] font-semibold text-slate-900 line-clamp-1">
-                          {(item.model_name || "Classic") + " Crocs"}
+                          {modelLabel} Crocs
                         </p>
                         <p className="text-[10px] text-slate-600 flex items-center gap-1.5">
                           <span
@@ -1390,6 +1429,7 @@ export function JackieCatalog() {
                   const qty = quantities[item.id] ?? 0;
                   const colorText = translateColor(item.color, lang);
                   const atMax = qty >= item.availableCount;
+                  const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
 
                   let buttonLabel: string;
                   if (qty === 0) {
@@ -1415,7 +1455,7 @@ export function JackieCatalog() {
                         </div>
                         <div className="flex-1">
                           <h3 className="text-sm font-semibold text-slate-900 line-clamp-1">
-                            {(item.model_name || "Classic") + " Crocs"}
+                            {modelLabel} Crocs
                           </h3>
                           <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
                             <span

@@ -38,6 +38,14 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Blanco";
     case "beige":
       return "Beige";
+    case "purple":
+      return "Morado";
+    case "baby pink":
+      return "Rosa Pastel";
+    case "red":
+      return "Rojo";
+    case "lilac":
+      return "Lila";
     default:
       return colorEn;
   }
