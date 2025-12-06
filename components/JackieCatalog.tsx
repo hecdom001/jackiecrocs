@@ -1264,7 +1264,7 @@ export function JackieCatalog() {
                     🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
                   </span>
                   <p className="text-xs text-slate-500">
-                    {lang === "es" ? "Desde" : "From"} $600 MXN
+                    {lang === "es" ? "Desde" : "From"} $700 MXN
                   </p>
                 </div>
 
