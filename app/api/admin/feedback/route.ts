@@ -41,3 +41,29 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from("feedback")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error("Error loading feedback:", error);
+      return NextResponse.json(
+        { error: "Error loading feedback" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ feedback: data ?? [] });
+  } catch (err) {
+    console.error("Unexpected error in /api/admin/feedback:", err);
+    return NextResponse.json(
+      { error: "Unexpected error loading feedback" },
+      { status: 500 }
+    );
+  }
+}

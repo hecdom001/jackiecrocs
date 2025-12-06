@@ -20,6 +20,10 @@ const navItems = [
     label: { es: "Agregar pares", en: "Add pairs" },
   },
   {
+    href: "/admin/feedback",
+    label: { es: "Comentarios", en: "Feedback" },
+  },
+  {
     href: "/admin/history",
     label: { es: "Historial", en: "History" },
     disabled: true,
