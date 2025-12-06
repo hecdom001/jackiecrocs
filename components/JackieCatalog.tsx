@@ -309,8 +309,8 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-slate-500">
             {lang === "es"
-              ? "Se envía de forma anónima y se guarda en nuestra base de datos."
-              : "Sent anonymously and stored in our database."}
+              ? "Se envía de forma anónima"
+              : "Sent anonymously"}
           </p>
           <button
             type="submit"
