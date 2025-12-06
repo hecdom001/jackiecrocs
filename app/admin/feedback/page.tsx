@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAdminLang, type Lang } from "../adminLangContext";
 
 type FeedbackRow = {
   id: string;
@@ -13,6 +14,7 @@ type FeedbackRow = {
 };
 
 export default function AdminFeedbackPage() {
+  const { lang, t } = useAdminLang();
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,10 +50,10 @@ export default function AdminFeedbackPage() {
       <header className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
-            Feedback de clientes
+            {t("Comentarios de clientes", "Customer Feedback")}
           </h1>
           <p className="text-sm text-slate-500">
-            Comentarios enviados desde la página pública (Info tab).
+            {t("Comentarios enviados desde la página pública", "Comments sent from the public page")}
           </p>
         </div>
 
@@ -64,8 +66,10 @@ export default function AdminFeedbackPage() {
               ? "bg-slate-100 border-slate-200 text-slate-400 cursor-wait"
               : "bg-white border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-700"
           }`}
-        >
-          {loading ? "Actualizando…" : "Actualizar"}
+        >  
+          {loading
+                ? t("Actualizando…", "Refreshing…")
+                : t("Actualizar datos", "Refresh data")}
         </button>
       </header>
 
@@ -77,7 +81,7 @@ export default function AdminFeedbackPage() {
 
       {!loading && !error && rows.length === 0 && (
         <p className="text-sm text-slate-500">
-          Aún no hay comentarios registrados.
+          {t(" Aún no hay comentarios registrados.", "There are no comments registered yet.")}
         </p>
       )}
 

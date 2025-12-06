@@ -1,7 +1,7 @@
 // components/JackieCatalog.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { track } from "@vercel/analytics";
 
@@ -220,7 +220,7 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
   // allow any non-empty message; only block while sending
   const disabled = message.trim().length === 0 || status === "sending";
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (disabled) return;
 
@@ -248,6 +248,7 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
       setTimeout(() => setStatus("idle"), 3000);
     }
   }
+
 
   const label =
     lang === "es"
@@ -1080,153 +1081,104 @@ export function JackieCatalog() {
         : t("Información", "Info");
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-slate-50 to-white text-slate-900 pb-24">
-        {/* Mobile header */}
-        <header className="sticky top-0 z-20 border-b border-emerald-100 bg-white/90 backdrop-blur">
-          <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-base shadow-sm">
-                🐊
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-semibold">Jacky Crocs</p>
-                <p className="text-[10px] text-slate-500">{headerSubtitle}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setLang("es")}
-                  className={`px-2 py-0.5 rounded-full ${
-                    lang === "es"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  ES
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLang("en")}
-                  className={`px-2 py-0.5 rounded-full ${
-                    lang === "en"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  EN
-                </button>
-              </div>
-            </div>
+  <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
+    {/* Mobile header */}
+    <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">
+            🐊
           </div>
-        </header>
-
-        <main className="max-w-md mx-auto px-4 pt-4 pb-24 space-y-4">
-          {tab === "home" && renderMobileHome()}
-          {tab === "catalog" && renderMobileCatalog()}
-          {tab === "messages" && renderMobileMessages()}
-          {tab === "info" && renderMobileInfo()}
-        </main>
-
-        {/* Floating cart bar above bottom tabs */}
-        {totalCartPairs > 0 && (
-          <div className="fixed bottom-16 inset-x-0 z-30">
-            <div className="max-w-md mx-auto px-4">
-              <div className="rounded-full bg-white shadow-lg border border-emerald-100 px-4 py-2 flex items-center justify-between gap-2">
-                <p className="text-[11px] text-slate-700">
-                  {lang === "es"
-                    ? `✅ ${totalCartPairs} ${
-                        totalCartPairs === 1
-                          ? "par en carrito"
-                          : "pares en carrito"
-                      }`
-                    : `✅ ${totalCartPairs} ${
-                        totalCartPairs === 1
-                          ? "pair in cart"
-                          : "pairs in cart"
-                      }`}
-                </p>
-                <a
-                  href={waLinkForCart || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    if (!WHATSAPP_NUMBER || !totalCartPairs) return;
-                    track("whatsapp_click_multi", {
-                      count: totalCartPairs,
-                      lang,
-                      location: "floating_cart",
-                    });
-                  }}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                    WHATSAPP_NUMBER && totalCartPairs
-                      ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                      : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                  }`}
-                >
-                  <span className="text-base">📲</span>
-                  <span>{t("Enviar", "Send")}</span>
-                </a>
-              </div>
-            </div>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold">Jacky Crocs</p>
+            <p className="text-[10px] text-slate-500">
+              {tab === "home"
+                ? t("Inicio", "Home")
+                : tab === "catalog"
+                ? t("Catálogo", "Catalog")
+                : tab === "messages"
+                ? t("Mensajes", "Messages")
+                : t("Información", "Info")}
+            </p>
           </div>
-        )}
+        </div>
 
-        {/* Bottom tab bar */}
-        <nav className="fixed bottom-0 inset-x-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
-          <div className="max-w-md mx-auto flex items-stretch justify-between">
-            {(
-              [
-                { id: "home", icon: "🏠", labelEs: "Inicio", labelEn: "Home" },
-                {
-                  id: "catalog",
-                  icon: "🛒",
-                  labelEs: "Catálogo",
-                  labelEn: "Catalog",
-                },
-                {
-                  id: "messages",
-                  icon: "💬",
-                  labelEs: "Mensajes",
-                  labelEn: "Messages",
-                },
-                { id: "info", icon: "ℹ️", labelEs: "Info", labelEn: "Info" },
-              ] as {
-                id: AppTab;
-                icon: string;
-                labelEs: string;
-                labelEn: string;
-              }[]
-            ).map(({ id, icon, labelEs, labelEn }) => {
-              const active = tab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id)}
-                  className={`flex-1 flex flex-col items-center justify-center py-2 text-[11px] transition ${
-                    active
-                      ? "text-emerald-700"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <span
-                    className={`h-7 w-7 flex items-center justify-center rounded-full text-base mb-0.5 ${
-                      active ? "bg-emerald-50" : "bg-slate-100"
-                    }`}
-                  >
-                    {icon}
-                  </span>
-                  <span>{lang === "es" ? labelEs : labelEn}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+        {/* language toggle */}
+        <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
+          <button
+            type="button"
+            onClick={() => setLang("es")}
+            className={`px-2 py-0.5 rounded-full ${
+              lang === "es"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            ES
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("en")}
+            className={`px-2 py-0.5 rounded-full ${
+              lang === "en"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            EN
+          </button>
+        </div>
       </div>
-    );
+    </header>
+
+    {/* Main */}
+    <main className="mx-auto max-w-md px-4 pt-4 pb-28 space-y-4">
+      {tab === "home" && renderMobileHome()}
+      {tab === "catalog" && renderMobileCatalog()}
+      {tab === "messages" && renderMobileMessages()}
+      {tab === "info" && renderMobileInfo()}
+    </main>
+
+    <nav className="fixed inset-x-0 bottom-0 z-20 bg-white/90 backdrop-blur border-t border-slate-200">
+      <div className="mx-auto max-w-md px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2">
+        <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-[11px] shadow-lg">
+          {(
+            [
+              { id: "home", icon: "🏠", labelEs: "Inicio", labelEn: "Home" },
+              { id: "catalog", icon: "🛒", labelEs: "Catálogo", labelEn: "Catalog" },
+              { id: "messages", icon: "💬", labelEs: "Mensajes", labelEn: "Messages" },
+              { id: "info", icon: "ℹ️", labelEs: "Info", labelEn: "Info" },
+            ] as { id: AppTab; icon: string; labelEs: string; labelEn: string }[]
+          ).map(({ id, icon, labelEs, labelEn }) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={`flex flex-1 flex-col items-center gap-0.5 ${
+                  active ? "text-emerald-600" : "text-slate-400"
+                }`}
+              >
+                <span
+                  className={`mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base ${
+                    active ? "bg-emerald-50" : "bg-slate-100"
+                  }`}
+                >
+                  {icon}
+                </span>
+                <span className={active ? "font-medium" : ""}>
+                  {lang === "es" ? labelEs : labelEn}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  </div>
+);
+
   }
 
   // ------------------------------------------------------------------
@@ -1467,7 +1419,7 @@ export function JackieCatalog() {
               <button
                 type="button"
                 onClick={loadInventory}
-                className="inline-flex.items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
               >
                 {loading
                   ? t("Actualizando…", "Refreshing…")
