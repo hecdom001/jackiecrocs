@@ -108,10 +108,6 @@ const CROCS_PHOTOS = {
     src: "/images/crocs-white.png",
     label: "Crocs blancos",
   },
-  red: {
-    src: "/images/crocs-red.png",
-    label: "Crocs rojos",
-  },
   lila: {
     src: "/images/crocs-lila.png",
     label: "Crocs lila",
@@ -119,6 +115,10 @@ const CROCS_PHOTOS = {
   light_pink: {
     src: "/images/crocs-light-pink.png",
     label: "Crocs rosa pastel",
+  },
+  red: {
+    src: "/images/crocs-red.png",
+    label: "Crocs rojos",
   },
 } as const;
 
