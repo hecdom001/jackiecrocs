@@ -232,20 +232,23 @@ const CROCS_PHOTOS = {
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
 
 const DELIVERY_SPOTS = [
-  "Pinos Presa",
-  "Villafloresta",
-  "Otay",
-  "20 de Noviembre",
-  "Macro Burger King",
-  "Siglo XXI",
-  "BLVD De las Americas",
-  "Zona Rio",
+  "Privada Pizaro - BLVD De las Americas",
+  "Colectivo Paseo del Rio",
+  "Zona Rio - Calimax Plus Rio",
+  "Terrazas de la Presa",
+  "UABC Otay",
 ];
 
+function googleMapsLink(place: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    place + " Tijuana"
+  )}`;
+}
+
 const MEX_BANK_INFO = {
-  bankName: "BBVA",
+  bankName: "Santander",
   accountName: "Jackeline Monge",
-  accountNumber: "4152 3140 4365 9724",
+  accountNumber: "0140 2026 0401 0725 79",
 } as const;
 
 const MOBILE_INITIAL_VISIBLE = 6;
@@ -1411,11 +1414,18 @@ export function JackieCatalog() {
             <span>🚚</span>
             <span>{t("Puntos de entrega", "Pickup spots")}</span>
           </h3>
-          <ul className="space-y-1 text-[11px] text-slate-700">
+          <ul className="space-y-2">
             {DELIVERY_SPOTS.map((spot) => (
-              <li key={spot} className="flex items-center gap-2">
-                <span>📍</span>
-                <span>{spot}</span>
+              <li key={spot}>
+                <a
+                  href={googleMapsLink(spot)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-blue-600 hover:underline"
+                >
+                  <span className="text-red-500">📍</span>
+                  <span>{spot}</span>
+                </a>
               </li>
             ))}
           </ul>
@@ -1431,8 +1441,8 @@ export function JackieCatalog() {
 
           <p className="text-[11px] text-slate-700 leading-relaxed">
             {t(
-              "Para apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 50% del total de tu compra.",
-              "To reserve your Crocs under your name, a 50% deposit of the total purchase is required."
+              "Para Apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 100% del total de tu compra.",
+              "To reserve your pair of Crocs under your name, a 100% advance payment of the total purchase amount is required."
             )}
           </p>
 
@@ -2163,11 +2173,18 @@ export function JackieCatalog() {
                 <span>🚚</span>
                 {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
               </h3>
-              <ul className="space-y-1 text-[11px] text-slate-700">
+             <ul className="space-y-2">
                 {DELIVERY_SPOTS.map((spot) => (
-                  <li key={spot} className="flex items-center gap-2">
-                    <span>📍</span>
-                    <span>{spot}</span>
+                  <li key={spot}>
+                    <a
+                      href={googleMapsLink(spot)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-blue-600 hover:underline"
+                    >
+                      <span className="text-red-500">📍</span>
+                      <span>{spot}</span>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -2185,8 +2202,8 @@ export function JackieCatalog() {
 
               <p className="text-[11px] text-slate-700 leading-relaxed">
                 {t(
-                  "Para apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 50% del total de tu compra.",
-                  "To reserve your Crocs under your name, a 50% deposit of the total purchase is required."
+                  "Para Apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 100% del total de tu compra.",
+                  "To reserve your pair of Crocs under your name, a 100% advance payment of the total purchase amount is required."
                 )}
               </p>
 
