@@ -139,11 +139,19 @@ export default function AdminDashboardPage() {
     if (!acc[key]) {
       acc[key] = { total: 0, available: 0, reserved: 0 };
     }
-    acc[key].total += 1;
-    if (item.status === "available") acc[key].available += 1;
-    if (item.status === "reserved") acc[key].reserved += 1;
+
+    // total = available + reserved ONLY
+    if (item.status === "available") {
+      acc[key].available += 1;
+      acc[key].total += 1;
+    } else if (item.status === "reserved") {
+      acc[key].reserved += 1;
+      acc[key].total += 1;
+    }
+
     return acc;
   }, {});
+
 
   const colorsList = Object.entries(colorsMap).sort((a, b) =>
     a[0].localeCompare(b[0])
@@ -165,19 +173,23 @@ export default function AdminDashboardPage() {
     const colorKey = item.color || "no_color";
     const sizeKey = item.size || "no_size";
 
-    if (!acc[colorKey]) {
-      acc[colorKey] = {};
-    }
+    if (!acc[colorKey]) acc[colorKey] = {};
     if (!acc[colorKey][sizeKey]) {
       acc[colorKey][sizeKey] = { total: 0, available: 0, reserved: 0 };
     }
 
-    acc[colorKey][sizeKey].total += 1;
-    if (item.status === "available") acc[colorKey][sizeKey].available += 1;
-    if (item.status === "reserved") acc[colorKey][sizeKey].reserved += 1;
+    // total = available + reserved ONLY
+    if (item.status === "available") {
+      acc[colorKey][sizeKey].available += 1;
+      acc[colorKey][sizeKey].total += 1;
+    } else if (item.status === "reserved") {
+      acc[colorKey][sizeKey].reserved += 1;
+      acc[colorKey][sizeKey].total += 1;
+    }
 
     return acc;
   }, {});
+
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -343,7 +355,7 @@ export default function AdminDashboardPage() {
           {Object.entries(colorSizeMap).map(([colorKey, sizes]) => {
             const colorTotals = Object.values(sizes).reduce(
               (acc, s) => {
-                acc.total += s.total;
+                acc.total += s.available + s.reserved; // ✅ += not =
                 acc.available += s.available;
                 acc.reserved += s.reserved;
                 return acc;
@@ -574,7 +586,7 @@ export default function AdminDashboardPage() {
               {Object.entries(colorSizeMap).map(([colorKey, sizes]) => {
                 const colorTotals = Object.values(sizes).reduce(
                   (acc, s) => {
-                    acc.total += s.total;
+                    acc.total += s.available + s.reserved; // ✅ += not =
                     acc.available += s.available;
                     acc.reserved += s.reserved;
                     return acc;
