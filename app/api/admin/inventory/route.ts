@@ -10,20 +10,22 @@ function requireAdmin(req: NextRequest) {
 /**
  * GET /api/admin/inventory
  * Returns: { items: InventoryItemDTO[] }
+ * Uses size_id + sizes.label instead of the old plain text size column.
  */
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Join inventory_items with models + colors
+  // Join inventory_items with models + colors + sizes
   const { data, error } = await supabase
     .from("inventory_items")
-    .select(`
+    .select(
+      `
       id,
       model_id,
       color_id,
-      size,
+      size_id,
       price_mxn,
       status,
       customer_name,
@@ -32,7 +34,11 @@ export async function GET(req: NextRequest) {
       created_at,
       updated_at,
       models ( name ),
-      colors ( name_en )
+      colors ( name_en ),
+      sizes (
+        id,
+        label
+      )
     `
     )
     .order("created_at", { ascending: false });
@@ -51,14 +57,15 @@ export async function GET(req: NextRequest) {
       id: row.id as string,
       model_id: row.model_id as string,
       color_id: row.color_id as string,
-      model_name: row.models?.name as string,
-      color: row.colors?.name_en as string,
-      size: row.size as string,
+      model_name: row.models?.name ?? null,
+      color: row.colors?.name_en ?? null,
+      size: row.sizes?.label ?? "",      // label from sizes
+      size_id: row.size_id as string,    // fk
       price_mxn: Number(row.price_mxn),
       status: row.status as any,
-      customer_name: row.customer_name as string | null,
-      customer_whatsapp: row.customer_whatsapp as string | null,
-      notes: row.notes as string | null,
+      customer_name: (row.customer_name as string) ?? null,
+      customer_whatsapp: (row.customer_whatsapp as string) ?? null,
+      notes: (row.notes as string) ?? null,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     })) ?? [];
@@ -68,10 +75,13 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/inventory
- * Body: { model_name, color, size, price_mxn, quantity }
+ * Body: { model_name, color, size_id, price_mxn, quantity }
  * - Ensures model exists in `models`
  * - Ensures color exists in `colors`
+ * - Ensures size exists in `sizes`
  * - Inserts N inventory_items rows with those IDs
+ * - Uses size_id as source of truth, but ALSO fills legacy `size` text column
+ *   so the NOT NULL constraint is satisfied.
  */
 export async function POST(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -79,9 +89,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { model_name, color, size, price_mxn, quantity } = body;
+  const { model_name, color, size_id, price_mxn, quantity } = body;
 
-  if (!model_name || !color || !size || !price_mxn) {
+  if (!model_name || !color || !size_id || !price_mxn) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -89,6 +99,30 @@ export async function POST(req: NextRequest) {
   }
 
   const qty = Number(quantity) || 1;
+
+  // 0) Ensure size exists and get its label (for legacy `size` column)
+  const { data: sizeRow, error: sizeError } = await supabase
+    .from("sizes")
+    .select("id, label")
+    .eq("id", size_id)
+    .maybeSingle();
+
+  if (sizeError) {
+    console.error("Error selecting size:", sizeError);
+    return NextResponse.json(
+      { error: "Error checking size" },
+      { status: 500 }
+    );
+  }
+
+  if (!sizeRow) {
+    return NextResponse.json(
+      { error: "Invalid size_id" },
+      { status: 400 }
+    );
+  }
+
+  const legacySizeLabel = sizeRow.label as string;
 
   // 1) Ensure model exists (models.name)
   const normalizedModel = String(model_name).trim();
@@ -161,10 +195,12 @@ export async function POST(req: NextRequest) {
   const color_id = existingColor.id as string;
 
   // 3) Insert inventory rows (one per pair)
+  //    -> use size_id as FK + keep legacy `size` text column in sync
   const rows = Array.from({ length: qty }).map(() => ({
     model_id,
     color_id,
-    size: String(size).trim(),
+    size_id: String(size_id),
+    size: legacySizeLabel,             // 👈 keeps NOT NULL column happy
     price_mxn: Number(price_mxn),
     status: "available",
   }));

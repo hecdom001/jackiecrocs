@@ -3,7 +3,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useAdminLang } from "../adminLangContext";  // 👈 add this
+import { useAdminLang } from "../adminLangContext";
 
 type SizeOption = {
   id: string;
@@ -11,11 +11,9 @@ type SizeOption = {
 };
 
 export default function AdminNewPage() {
-  const { lang, t } = useAdminLang(); // 👈 shared lang + t
+  const { lang, t } = useAdminLang();
   const [adminPassword, setAdminPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  // ... rest of your state
-
 
   // Lookups / form state
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -24,7 +22,7 @@ export default function AdminNewPage() {
   const [newModelName, setNewModelName] = useState("");
   const [colorSelect, setColorSelect] = useState<string>("");
   const [newColorName, setNewColorName] = useState("");
-  const [size, setSize] = useState("");
+  const [sizeId, setSizeId] = useState(""); // 👈 size_id, not label
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
 
@@ -111,7 +109,7 @@ export default function AdminNewPage() {
       return;
     }
 
-    if (!size) {
+    if (!sizeId) {
       setMessage(
         t("Debes seleccionar una talla.", "You must select a size.")
       );
@@ -125,7 +123,7 @@ export default function AdminNewPage() {
         adminPassword,
         model_name: finalModel,
         color: finalColor, // stored in English in DB
-        size: size.trim(), // label from dropdown, e.g. "M5-W7"
+        size_id: sizeId,   // 👈 send size_id instead of size label
         price_mxn: Number(price),
         quantity: Number(quantity),
       }),
@@ -149,14 +147,14 @@ export default function AdminNewPage() {
     setNewModelName("");
     setColorSelect("");
     setNewColorName("");
-    setSize("");
+    setSizeId(""); // 👈 reset size_id
     setPrice("");
     setQuantity("1");
   }
 
   return (
     <div className="space-y-6">
-      {/* Top controls: language + password */}
+      {/* Top controls: password */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="w-full sm:max-w-md">
@@ -290,7 +288,7 @@ export default function AdminNewPage() {
             </div>
           </Field>
 
-          {/* Size (dropdown from DB) */}
+          {/* Size (dropdown from DB, sends size_id) */}
           <Field label={t("Talla", "Size")}>
             {sizesLoading ? (
               <div className="text-[11px] text-slate-500">
@@ -300,8 +298,8 @@ export default function AdminNewPage() {
               <div className="text-[11px] text-red-500">{sizesError}</div>
             ) : (
               <select
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
+                value={sizeId}
+                onChange={(e) => setSizeId(e.target.value)}
                 className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 required
               >
@@ -309,7 +307,7 @@ export default function AdminNewPage() {
                   {t("Selecciona una talla", "Select a size")}
                 </option>
                 {sizes.map((s) => (
-                  <option key={s.id} value={s.label}>
+                  <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
                 ))}

@@ -7,15 +7,18 @@ import { track } from "@vercel/analytics";
 
 type Lang = "es" | "en";
 type AppTab = "home" | "catalog" | "messages" | "info";
+type BuyerType = "all" | "men" | "women" | "kids" | "youth";
 
 type PublicItem = {
   id: string;
   model_name: string;
   color: string; // English (from colors.name_en)
-  size: string;
+  size: string;  // human label from sizes.label (e.g. "M10-W12", "C8", "J1")
+  size_id: string; // FK to sizes.id
   price_mxn: number;
   availableCount: number; // number of pairs for this variant
 };
+
 
 type CartLine = {
   item: PublicItem;
@@ -82,17 +85,121 @@ function colorLineClass(colorEn: string) {
   }
 }
 
-function formatSizeLabel(size: string, lang: Lang) {
-  if (lang !== "es") return size;
+// -------- SIZE HELPERS (adult / kids / youth) --------
 
-  // Expected format: M10-W12
-  const [m, w] = size.split("-");
-
-  const hombre = m?.replace("M", "");
-  const mujer = w?.replace("W", "");
-
-  return `Hombre ${hombre} / Mujer ${mujer}`;
+function inferSizeCategory(
+  size: string
+): "adult" | "kids" | "youth" | "unknown" {
+  const s = size.trim().toUpperCase();
+  if (/^M\d+-W\d+$/.test(s)) return "adult";
+  if (/^C\d+$/.test(s)) return "kids";
+  if (/^J\d+$/.test(s)) return "youth";
+  return "unknown";
 }
+
+// Sorting: kids (C) → youth (J) → adult (M/W)
+function sizeRank(size: string): number {
+  const cat = inferSizeCategory(size);
+  const s = size.trim().toUpperCase();
+
+  if (cat === "kids") {
+    const num = parseInt(s.slice(1), 10);
+    return 100 + (Number.isNaN(num) ? 0 : num);
+  }
+
+  if (cat === "youth") {
+    const num = parseInt(s.slice(1), 10);
+    return 200 + (Number.isNaN(num) ? 0 : num);
+  }
+
+  if (cat === "adult") {
+    const match = s.match(/^M(\d+)-W(\d+)$/);
+    const men = match ? parseInt(match[1], 10) : 0;
+    return 300 + (Number.isNaN(men) ? 0 : men);
+  }
+
+  return 1000;
+}
+
+function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
+  const cat = inferSizeCategory(size);
+
+  // Always show everything if "all"
+  if (buyerType === "all") return true;
+
+  // If we couldn't parse the size pattern, treat as adult/unisex
+  if (cat === "unknown") {
+    return buyerType === "men" || buyerType === "women";
+  }
+
+  if (buyerType === "men" || buyerType === "women") {
+    return cat === "adult";
+  }
+  if (buyerType === "kids") return cat === "kids";
+  if (buyerType === "youth") return cat === "youth";
+
+  return true;
+}
+
+
+// Main display formatter based on who the shoe is for
+function formatSizeLabel(
+  size: string,
+  lang: Lang,
+  buyerType: BuyerType = "all"
+) {
+  const isKids = size.startsWith("C");
+  const isYouth = size.startsWith("J");
+
+  // --- KIDS (C4, C5, ...) ---
+  if (isKids) {
+    const numeric = size.replace(/^C/i, ""); // "C8" -> "8"
+
+    if (lang === "es") {
+      // Mexico: show only the number
+      return `${numeric} (US)`;
+    }
+
+    // English: keep C prefix
+    return `${size} (US)`;
+  }
+
+  // --- YOUTH (J1, J2, ...) ---
+  if (isYouth) {
+    const numeric = size.replace(/^J/i, ""); // "J1" -> "1"
+
+    if (lang === "es") {
+      // Mexico: show number + Juvenil
+      return `${numeric} Juvenil (US)`;
+    }
+
+    // English: keep J prefix
+    return `${size} (US)`;
+  }
+
+  // --- ADULT UNISEX (M10-W12) ---
+  if (size.includes("-")) {
+    const [m, w] = size.split("-");
+    const men = m.replace(/M/i, "");
+    const women = w.replace(/W/i, "");
+
+    if (lang === "es") {
+      if (buyerType === "men") return `Hombre ${men} (US)`;
+      if (buyerType === "women") return `Mujer ${women} (US)`;
+      // default: show both
+      return `Hombre ${men} / Mujer ${women} (US)`;
+    }
+
+    // English
+    if (buyerType === "men") return `Men ${men} (US)`;
+    if (buyerType === "women") return `Women ${women} (US)`;
+    return `${size} (US)`; // M10-W12 (US)
+  }
+
+  // --- FALLBACK (anything else) ---
+  return `${size} (US)`;
+}
+
 
 
 const CROCS_PHOTOS = {
@@ -132,7 +239,7 @@ const DELIVERY_SPOTS = [
   "Macro Burger King",
   "Siglo XXI",
   "BLVD De las Americas",
-  "Zona Rio"
+  "Zona Rio",
 ];
 
 const MEX_BANK_INFO = {
@@ -176,40 +283,38 @@ function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
       Talla: ${item.size}
       Precio por par: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
-      });
+  });
 
-      const linesEn = cart.map(({ item, count }, idx) => {
-        const modelEn = translateModelLabel(item.model_name || "Classic", "en");
-        const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
-        return `• ${idx + 1}:
+  const linesEn = cart.map(({ item, count }, idx) => {
+    const modelEn = translateModelLabel(item.model_name || "Classic", "en");
+    const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
+    return `• ${idx + 1}:
       Model: ${modelEn} Crocs
       Color: ${item.color}
       Size: ${item.size}
       Price per pair: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
-      });
+  });
 
-      if (lang === "es") {
-        return `Hola 👋 Me interesan estos pares de Crocs:
+  if (lang === "es") {
+    return `Hola 👋 Me interesan estos pares de Crocs:
 
-    ${linesEs.join("\n\n")}
+${linesEs.join("\n\n")}
 
-    ¿Siguen disponibles?`;
-      }
+¿Siguen disponibles?`;
+  }
 
-      return `Hi 👋 I'm interested in these Crocs:
+  return `Hi 👋 I'm interested in these Crocs:
 
-    ${linesEn.join("\n\n")}
+${linesEn.join("\n\n")}
 
-    Are they still available?`;
+Are they still available?`;
 }
 
 function buildWhatsAppLink(cart: CartLine[], lang: Lang) {
   if (!WHATSAPP_NUMBER || !cart.length) return "#";
   const message = buildWhatsAppMessage(cart, lang);
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-    message
-  )}`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
 function buildWhatsAppSupportLink(lang: Lang) {
@@ -220,9 +325,7 @@ function buildWhatsAppSupportLink(lang: Lang) {
       ? "Hola 👋 Tengo dudas sobre tallas o colores de los Crocs."
       : "Hi 👋 I have questions about Crocs sizes or colors.";
 
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-    message
-  )}`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
 function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
@@ -262,7 +365,6 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
       setTimeout(() => setStatus("idle"), 3000);
     }
   }
-
 
   const label =
     lang === "es"
@@ -306,7 +408,6 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
           value={message}
           onChange={(e) => {
             setMessage(e.target.value);
-            // if there was a success / error message and user starts typing again, go back to idle
             if (status === "success" || status === "error") {
               setStatus("idle");
             }
@@ -320,9 +421,7 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
 
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-slate-500">
-            {lang === "es"
-              ? "Se envía de forma anónima"
-              : "Sent anonymously"}
+            {lang === "es" ? "Se envía de forma anónima" : "Sent anonymously"}
           </p>
           <button
             type="submit"
@@ -348,6 +447,154 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
   );
 }
 
+function SizeGuide({ lang }: { lang: Lang }) {
+  const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  const adultRows = [
+    { crocs: "M4-W6", mx: "22" },
+    { crocs: "M5-W7", mx: "23" },
+    { crocs: "M6-W8", mx: "24" },
+    { crocs: "M7-W9", mx: "25" },
+    { crocs: "M8-W10", mx: "26" },
+    { crocs: "M9-W11", mx: "27" },
+    { crocs: "M10-W12", mx: "28" },
+    { crocs: "M11", mx: "29" },
+    { crocs: "M12", mx: "30" },
+    { crocs: "M13", mx: "31" },
+  ];
+
+  const kidsRows = [
+    { crocs: "C2", mx: "9" },
+    { crocs: "C3", mx: "10" },
+    { crocs: "C4", mx: "11" },
+    { crocs: "C5", mx: "12" },
+    { crocs: "C6", mx: "13" },
+    { crocs: "C7", mx: "14" },
+    { crocs: "C8", mx: "15" },
+    { crocs: "C9", mx: "16" },
+    { crocs: "C10", mx: "17" },
+    { crocs: "C11", mx: "18" },
+    { crocs: "C12", mx: "19" },
+    { crocs: "C13", mx: "20" },
+    { crocs: "J1", mx: "21" },
+    { crocs: "J2", mx: "22" },
+    { crocs: "J3", mx: "23" },
+    { crocs: "J4", mx: "24" },
+    { crocs: "J5", mx: "25" },
+    { crocs: "J6", mx: "26" },
+  ];
+
+  return (
+  <section id="size-guide" className="rounded-3xl bg-white border border-slate-200 shadow-sm p-4 space-y-4">
+      <header className="space-y-1">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-900">
+          <span>📏</span>
+          <span>
+            {t("¿Cómo elegir tu talla?", "How to choose your size")}
+          </span>
+        </h3>
+        <p className="text-[11px] text-slate-600">
+          {t(
+            "Todas las tallas de nuestra página están en numeración US. Usa la talla que normalmente compras en México como referencia y, si estás entre dos tallas, te recomendamos elegir la siguiente.",
+            "All sizes on this page use US sizing. Use the size you normally buy in Mexico as a reference and if you’re between two sizes, we recommend choosing the next one up."
+          )}
+        </p>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)]">
+        {/* Adult table */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">
+            {t("Unisex adulto", "Unisex adult")}
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-rose-100 bg-rose-50">
+            <div className="grid grid-cols-2 text-[11px] font-semibold text-white bg-rose-500 px-3 py-2">
+              <span>{t("Crocs", "Crocs")}</span>
+              <span>{t("México", "Mexico size")}</span>
+            </div>
+            <div className="divide-y divide-rose-100">
+              {adultRows.map((row) => (
+                <div
+                  key={row.crocs}
+                  className="grid grid-cols-2 text-[11px] text-slate-800 px-3 py-1.5 bg-white/70"
+                >
+                  <span>{row.crocs}</span>
+                  <span>{row.mx}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Kids / Youth table */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">
+            {t("Infantil / Juvenil", "Kids / Youth")}
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50">
+            <div className="grid grid-cols-2 text-[11px] font-semibold text-white bg-emerald-500 px-3 py-2">
+              <span>{t("Crocs", "Crocs")}</span>
+              <span>{t("México", "Mexico size")}</span>
+            </div>
+            <div className="divide-y divide-emerald-100">
+              {kidsRows.map((row) => (
+                <div
+                  key={row.crocs}
+                  className="grid grid-cols-2 text-[11px] text-slate-800 px-3 py-1.5 bg-white/70"
+                >
+                  <span>{row.crocs}</span>
+                  <span>{row.mx}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ul className="space-y-1 text-[11px] text-slate-600">
+        <li>
+          •{" "}
+          {t(
+            "Al probarte tus Crocs, tus dedos no deben rozar la parte delantera y el talón debe llegar justo a la última línea de puntos de la suela.",
+            "When you try on your Crocs, your toes shouldn’t touch the front and your heel should sit right on the last line of dots on the heel."
+          )}
+        </li>
+        <li>
+          •{" "}
+          {t(
+            "En modelos unisex, la letra M se refiere a tallas de hombre y la letra W a tallas de mujer (ejemplo: M9W11).",
+            "On unisex models, M refers to men’s sizes and W to women’s sizes (example: M9W11)."
+          )}
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+function SizeGuideLink({ lang }: { lang: Lang }) {
+  const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  const scrollToGuide = () => {
+    const el = document.getElementById("size-guide");
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  return (
+    <button
+      onClick={scrollToGuide}
+      className="block text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 font-medium mb-2 flex items-center gap-1"
+    >
+      <span>📏</span>
+      <span>{t("¿Cómo elegir tu talla?", "How to choose your size?")}</span>
+    </button>
+  );
+}
+
 
 
 // ---------- Component ----------
@@ -361,6 +608,7 @@ export function JackieCatalog() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const [buyerType, setBuyerType] = useState<BuyerType>("all");
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
@@ -396,7 +644,7 @@ export function JackieCatalog() {
     window.localStorage.setItem("jackie_tab", tab);
   }, [tab]);
 
-  async function loadInventory() {
+   async function loadInventory() {
     setLoading(true);
     setErrorMsg(null);
 
@@ -404,12 +652,23 @@ export function JackieCatalog() {
       .from("inventory_items")
       .select(
         `
-        id,
-        size,
+         id,
+        size_id,
         price_mxn,
         status,
+        created_at,
         models ( name ),
-        colors ( name_en )
+        colors ( name_en ),
+        sizes (
+          id,
+          label,
+          category,
+          men_size_us,
+          women_size_us,
+          kids_code,
+          youth_code,
+          sort_order
+        )
       `
       )
       .eq("status", "available")
@@ -422,27 +681,37 @@ export function JackieCatalog() {
       return;
     }
 
-    // Group by model+color+size+price
+    // Group by model + color + size_id + price
     const variantMap = new Map<string, PublicItem>();
 
     (data ?? []).forEach((row: any) => {
       const model_name: string = row.models?.name ?? "";
       const color: string = row.colors?.name_en ?? "";
-      const size: string = row.size;
+      const size_id: string = row.size_id as string;
+      const sizeLabel: string = row.sizes?.label ?? "";
+
       const price_mxn: number = Number(row.price_mxn);
 
-      const key = `${model_name}__${color}__${size}__${price_mxn}`;
+      // If something is off, skip the row (shouldn't happen since size_id is NOT NULL)
+      if (!size_id || !sizeLabel) {
+        console.warn("Skipping inventory row without size info", row);
+        return;
+      }
+
+      // Use size_id in the key so we never confuse sizes from different categories
+      const key = `${model_name}__${color}__${size_id}__${price_mxn}`;
 
       const existing = variantMap.get(key);
       if (existing) {
         existing.availableCount += 1;
       } else {
         variantMap.set(key, {
-          id: row.id,
-          size,
-          price_mxn,
+          id: row.id as string,
           model_name,
           color,
+          size: sizeLabel,   // ← only from sizes.label
+          size_id,
+          price_mxn,
           availableCount: 1,
         });
       }
@@ -465,6 +734,7 @@ export function JackieCatalog() {
     setLastUpdated(new Date());
     setLoading(false);
   }
+
 
   // initial load
   useEffect(() => {
@@ -507,16 +777,24 @@ export function JackieCatalog() {
     setVisibleCount(pageSize);
   }, [sizeFilter, colorFilter, items.length, pageSize]);
 
-  const allSizes = Array.from(new Set(items.map((i) => i.size))).sort();
+  // when buyer type changes, reset size filter
+  useEffect(() => {
+    setSizeFilter("all");
+  }, [buyerType]);
+
+  const allSizes = Array.from(new Set(items.map((i) => i.size)))
+    .filter((sz) => sizeMatchesBuyerType(sz, buyerType))
+    .sort((a, b) => sizeRank(a) - sizeRank(b));
 
   const allColors = Array.from(new Set(items.map((i) => i.color)))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
   const filtered = items.filter((item) => {
+    const byBuyer = sizeMatchesBuyerType(item.size, buyerType);
     const bySize = sizeFilter === "all" || item.size === sizeFilter;
     const byColor = colorFilter === "all" || item.color === colorFilter;
-    return bySize && byColor;
+    return byBuyer && bySize && byColor;
   });
 
   const limited = filtered.slice(0, visibleCount);
@@ -548,18 +826,16 @@ export function JackieCatalog() {
     });
   };
 
-    const handleRemoveFromCart = (itemId: string) => {
+  const handleRemoveFromCart = (itemId: string) => {
     setQuantities((prev) => {
       const current = prev[itemId] ?? 0;
       if (current <= 1) {
-        // remove from cart completely
         const { [itemId]: _, ...rest } = prev;
         return rest;
       }
       return { ...prev, [itemId]: current - 1 };
     });
   };
-
 
   const showingCount = Math.min(visibleCount, filtered.length);
   const totalPairsFiltered = filtered.reduce(
@@ -708,6 +984,33 @@ export function JackieCatalog() {
           </p>
 
           <div className="mt-1 grid grid-cols-1 gap-2 text-[11px]">
+            {/* Buyer type selector */}
+            <select
+              value={buyerType}
+              onChange={(e) =>
+                setBuyerType(e.target.value as BuyerType)
+              }
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            >
+              <option value="all">
+                {lang === "es"
+                  ? "Todos"
+                  : "All"}
+              </option>
+              <option value="men">
+                {lang === "es" ? "Para hombre" : "For men"}
+              </option>
+              <option value="women">
+                {lang === "es" ? "Para mujer" : "For women"}
+              </option>
+              <option value="kids">
+                {lang === "es" ? "Niños" : "Kids"}
+              </option>
+              <option value="youth">
+                {lang === "es" ? "Juvenil" : "Youth"}
+              </option>
+            </select>
+
             <select
               value={sizeFilter}
               onChange={(e) => setSizeFilter(e.target.value)}
@@ -718,7 +1021,7 @@ export function JackieCatalog() {
               </option>
               {allSizes.map((sz) => (
                 <option key={sz} value={sz}>
-                  {lang === "es" ? formatSizeLabel(sz, lang) : sz}
+                  {formatSizeLabel(sz, lang, buyerType)}
                 </option>
               ))}
             </select>
@@ -741,8 +1044,8 @@ export function JackieCatalog() {
 
           <p className="mt-2 text-[10px] text-slate-500">
             {t(
-              "Puedes agregar más de un par del mismo modelo dando varios toques en Agregar.",
-              "You can add more than one pair of the same model by tapping Add multiple times."
+              "Primero elige si la talla es para hombre, mujer o niños. Luego filtra por talla y color.",
+              "First choose if the size is for men, women or kids. Then filter by size and color."
             )}
           </p>
 
@@ -753,6 +1056,35 @@ export function JackieCatalog() {
             </p>
           )}
         </div>
+
+         <button
+          type="button"
+          onClick={() => {
+            // 1) Change tab to info
+            setTab("info");
+
+            // 2) After render, scroll to the size guide
+            setTimeout(() => {
+              if (typeof document === "undefined") return;
+              const el = document.getElementById("size-guide");
+              if (el) {
+                el.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }
+            }, 120); // a small delay so the Info tab content mounts
+          }}
+          className="block text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 font-medium mb-2 flex items-center gap-1"
+        >
+          <span>📏</span>
+          <span>
+            {lang === "es"
+              ? "¿Cómo elegir tu talla?"
+              : "How to choose your size?"}
+          </span>
+        </button>
+
 
         {errorMsg ? (
           <p className="text-xs text-red-500">{errorMsg}</p>
@@ -770,7 +1102,10 @@ export function JackieCatalog() {
                 const qty = quantities[item.id] ?? 0;
                 const colorText = translateColor(item.color, lang);
                 const atMax = qty >= item.availableCount;
-                const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
+                const modelLabel = translateModelLabel(
+                  item.model_name || "Classic",
+                  lang
+                );
 
                 let buttonLabel: string;
                 if (qty === 0) {
@@ -808,7 +1143,11 @@ export function JackieCatalog() {
                           <span className="text-slate-400">·</span>
                           <span>
                             {lang === "es" ? "Talla" : "Size"}{" "}
-                            {formatSizeLabel(item.size, lang)}
+                            {formatSizeLabel(
+                              item.size,
+                              lang,
+                              buyerType
+                            )}
                           </span>
                         </p>
                       </div>
@@ -828,7 +1167,7 @@ export function JackieCatalog() {
                       </span>
                     </div>
 
-                                        {/* BUTTONS / QTY CONTROL */}
+                    {/* BUTTONS / QTY CONTROL */}
                     <div className="mt-2">
                       {qty === 0 ? (
                         <button
@@ -843,7 +1182,9 @@ export function JackieCatalog() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleRemoveFromCart(item.id)}
+                            onClick={() =>
+                              handleRemoveFromCart(item.id)
+                            }
                             className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
                           >
                             –
@@ -874,7 +1215,6 @@ export function JackieCatalog() {
                         </div>
                       )}
                     </div>
-
                   </article>
                 );
               })}
@@ -938,7 +1278,11 @@ export function JackieCatalog() {
 
           <ul className="mt-2 space-y-1 text-[11px] text-slate-600">
             <li>
-              • {t("Incluye talla (US) y color.", "Include size (US) and color.")}
+              •{" "}
+              {t(
+                "Incluye talla (US) y color.",
+                "Include size (US) and color."
+              )}
             </li>
             <li>
               •{" "}
@@ -1050,7 +1394,9 @@ export function JackieCatalog() {
 
           <div className="space-y-1 text-[11px] text-slate-800">
             <p>
-              <span className="font-medium">{t("Banco: ", "Bank: ")}</span>
+              <span className="font-medium">
+                {t("Banco: ", "Bank: ")}
+              </span>
               {MEX_BANK_INFO.bankName}
             </p>
             <p>
@@ -1066,8 +1412,10 @@ export function JackieCatalog() {
               {MEX_BANK_INFO.accountNumber}
             </p>
             <p>
-              <span className="font-medium">{t("Concepto: ", "Reference: ")}</span>
-               {t("Tu Nombre", "Your Name")}
+              <span className="font-medium">
+                {t("Concepto: ", "Reference: ")}
+              </span>
+              {t("Tu Nombre", "Your Name")}
             </p>
           </div>
 
@@ -1078,7 +1426,8 @@ export function JackieCatalog() {
             )}
           </p>
         </section>
-         {/* Feedback box */}
+        <SizeGuide lang={lang} />
+        {/* Feedback box */}
         <FeedbackBox lang={lang} context="messages_mobile" />
       </div>
     );
@@ -1093,104 +1442,122 @@ export function JackieCatalog() {
         : t("Información", "Info");
 
     return (
-  <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
-    {/* Mobile header */}
-    <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">
-            🐊
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">Jacky Crocs</p>
-            <p className="text-[10px] text-slate-500">
-              {tab === "home"
-                ? t("Inicio", "Home")
-                : tab === "catalog"
-                ? t("Catálogo", "Catalog")
-                : tab === "messages"
-                ? t("Mensajes", "Messages")
-                : t("Información", "Info")}
-            </p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
+        {/* Mobile header */}
+        <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
+          <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">
+                🐊
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold">Jacky Crocs</p>
+                <p className="text-[10px] text-slate-500">
+                  {headerSubtitle}
+                </p>
+              </div>
+            </div>
 
-        {/* language toggle */}
-        <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
-          <button
-            type="button"
-            onClick={() => setLang("es")}
-            className={`px-2 py-0.5 rounded-full ${
-              lang === "es"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            ES
-          </button>
-          <button
-            type="button"
-            onClick={() => setLang("en")}
-            className={`px-2 py-0.5 rounded-full ${
-              lang === "en"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            EN
-          </button>
-        </div>
-      </div>
-    </header>
-
-    {/* Main */}
-    <main className="mx-auto max-w-md px-4 pt-4 pb-28 space-y-4">
-      {tab === "home" && renderMobileHome()}
-      {tab === "catalog" && renderMobileCatalog()}
-      {tab === "messages" && renderMobileMessages()}
-      {tab === "info" && renderMobileInfo()}
-    </main>
-
-    <nav className="fixed inset-x-0 bottom-0 z-20 bg-white/90 backdrop-blur border-t border-slate-200">
-      <div className="mx-auto max-w-md px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2">
-        <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-[11px] shadow-lg">
-          {(
-            [
-              { id: "home", icon: "🏠", labelEs: "Inicio", labelEn: "Home" },
-              { id: "catalog", icon: "🛒", labelEs: "Catálogo", labelEn: "Catalog" },
-              { id: "messages", icon: "💬", labelEs: "Mensajes", labelEn: "Messages" },
-              { id: "info", icon: "ℹ️", labelEs: "Info", labelEn: "Info" },
-            ] as { id: AppTab; icon: string; labelEs: string; labelEn: string }[]
-          ).map(({ id, icon, labelEs, labelEn }) => {
-            const active = tab === id;
-            return (
+            {/* language toggle */}
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
               <button
-                key={id}
                 type="button"
-                onClick={() => setTab(id)}
-                className={`flex flex-1 flex-col items-center gap-0.5 ${
-                  active ? "text-emerald-600" : "text-slate-400"
+                onClick={() => setLang("es")}
+                className={`px-2 py-0.5 rounded-full ${
+                  lang === "es"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <span
-                  className={`mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base ${
-                    active ? "bg-emerald-50" : "bg-slate-100"
-                  }`}
-                >
-                  {icon}
-                </span>
-                <span className={active ? "font-medium" : ""}>
-                  {lang === "es" ? labelEs : labelEn}
-                </span>
+                ES
               </button>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
-  </div>
-);
+              <button
+                type="button"
+                onClick={() => setLang("en")}
+                className={`px-2 py-0.5 rounded-full ${
+                  lang === "en"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+        </header>
 
+        {/* Main */}
+        <main className="mx-auto max-w-md px-4 pt-4 pb-28 space-y-4">
+          {tab === "home" && renderMobileHome()}
+          {tab === "catalog" && renderMobileCatalog()}
+          {tab === "messages" && renderMobileMessages()}
+          {tab === "info" && renderMobileInfo()}
+        </main>
+
+        <nav className="fixed inset-x-0 bottom-0 z-20 bg-white/90 backdrop-blur border-t border-slate-200">
+          <div className="mx-auto max-w-md px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2">
+            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-[11px] shadow-lg">
+              {(
+                [
+                  {
+                    id: "home",
+                    icon: "🏠",
+                    labelEs: "Inicio",
+                    labelEn: "Home",
+                  },
+                  {
+                    id: "catalog",
+                    icon: "🛒",
+                    labelEs: "Catálogo",
+                    labelEn: "Catalog",
+                  },
+                  {
+                    id: "messages",
+                    icon: "💬",
+                    labelEs: "Mensajes",
+                    labelEn: "Messages",
+                  },
+                  {
+                    id: "info",
+                    icon: "ℹ️",
+                    labelEs: "Info",
+                    labelEn: "Info",
+                  },
+                ] as {
+                  id: AppTab;
+                  icon: string;
+                  labelEs: string;
+                  labelEn: string;
+                }[]
+              ).map(({ id, icon, labelEs, labelEn }) => {
+                const active = tab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    className={`flex flex-1 flex-col items-center gap-0.5 ${
+                      active ? "text-emerald-600" : "text-slate-400"
+                    }`}
+                  >
+                    <span
+                      className={`mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base ${
+                        active ? "bg-emerald-50" : "bg-slate-100"
+                      }`}
+                    >
+                      {icon}
+                    </span>
+                    <span className={active ? "font-medium" : ""}>
+                      {lang === "es" ? labelEs : labelEn}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </nav>
+      </div>
+    );
   }
 
   // ------------------------------------------------------------------
@@ -1342,7 +1709,10 @@ export function JackieCatalog() {
               <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
-                    🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
+                    🌟{" "}
+                    {lang === "es"
+                      ? "Crocs originales"
+                      : "Original Crocs"}
                   </span>
                   <p className="text-xs text-slate-500">
                     {lang === "es" ? "Desde" : "From"} $700 MXN
@@ -1357,7 +1727,7 @@ export function JackieCatalog() {
                         : "Available colors"}
                     </p>
                     <p className="text-[11px] text-slate-600">
-                       {lang === "es"
+                      {lang === "es"
                         ? "Negro · Blanco · Beige · Rojo · Lila · Rosa Pastel"
                         : "Black · White · Beige · Red · Lilac · Light Pink"}
                     </p>
@@ -1443,6 +1813,39 @@ export function JackieCatalog() {
           <div className="flex flex-col sm:flex-row gap-3 text-[11px]">
             <div className="flex-1 flex flex-col gap-1">
               <span className="text-slate-700">
+                {lang === "es"
+                  ? "¿Para quién es la talla?"
+                  : "Who is the size for?"}
+              </span>
+              <select
+                value={buyerType}
+                onChange={(e) =>
+                  setBuyerType(e.target.value as BuyerType)
+                }
+                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              >
+                <option value="all">
+                  {lang === "es"
+                    ? "Todos"
+                    : "All"}
+                </option>
+                <option value="men">
+                  {lang === "es" ? "Para hombre" : "For men"}
+                </option>
+                <option value="women">
+                  {lang === "es" ? "Para mujer" : "For women"}
+                </option>
+                <option value="kids">
+                  {lang === "es" ? "Niños" : "Kids"}
+                </option>
+                <option value="youth">
+                  {lang === "es" ? "Juvenil" : "Youth"}
+                </option>
+              </select>
+            </div>
+
+            <div className="flex-1 flex flex-col gap-1">
+              <span className="text-slate-700">
                 {lang === "es" ? "Filtrar por talla" : "Filter by size"}
               </span>
               <select
@@ -1455,8 +1858,8 @@ export function JackieCatalog() {
                 </option>
                 {allSizes.map((sz) => (
                   <option key={sz} value={sz}>
-                  {lang === "es" ? formatSizeLabel(sz, lang) : sz}
-                </option>
+                    {formatSizeLabel(sz, lang, buyerType)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1483,10 +1886,9 @@ export function JackieCatalog() {
           </div>
 
           <p className="mt-1 text-[10px] text-slate-500">
-            {t(
-              "Puedes agregar varios pares del mismo modelo haciendo clic en Agregar varias veces.",
-              "You can add multiple pairs of the same model by clicking Add several times."
-            )}
+            {lang === "es"
+              ? "Primero elige si es para hombre, mujer o niños; luego puedes filtrar por talla y color."
+              : "First choose if it's for men, women or kids; then you can filter by size and color."}
           </p>
         </section>
 
@@ -1507,16 +1909,21 @@ export function JackieCatalog() {
             </p>
           ) : (
             <div className="space-y-3">
+                <SizeGuideLink lang={lang} />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {limited.map((item) => {
                   const qty = quantities[item.id] ?? 0;
                   const colorText = translateColor(item.color, lang);
                   const atMax = qty >= item.availableCount;
-                  const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
+                  const modelLabel = translateModelLabel(
+                    item.model_name || "Classic",
+                    lang
+                  );
 
                   let buttonLabel: string;
                   if (qty === 0) {
-                    buttonLabel = lang === "es" ? "Agregar al carrito" : "Add to cart";
+                    buttonLabel =
+                      lang === "es" ? "Agregar al carrito" : "Add to cart";
                   } else if (atMax) {
                     buttonLabel =
                       (lang === "es" ? "Máximo en carrito · " : "Max in cart · ") +
@@ -1549,7 +1956,11 @@ export function JackieCatalog() {
                             <span className="text-slate-400">·</span>
                             <span>
                               {lang === "es" ? "Talla" : "Size"}{" "}
-                              {formatSizeLabel(item.size, lang)}
+                              {formatSizeLabel(
+                                item.size,
+                                lang,
+                                buyerType
+                              )}
                             </span>
                           </p>
                         </div>
@@ -1569,56 +1980,60 @@ export function JackieCatalog() {
                         </span>
                       </div>
 
-                    {/* BUTTONS / QTY CONTROL */}
-                    <div className="mt-2">
-                      {qty === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => handleAddToCart(item)}
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
-                        >
-                          <span>🛒</span>
-                          <span>{lang === "es" ? "Agregar" : "Add"}</span>
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFromCart(item.id)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
-                          >
-                            –
-                          </button>
-
-                          <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
-                            <span className="mr-1">🛒</span>
-                            <span>
-                              {lang === "es" ? "En carrito" : "In cart"} · x
-                              {qty}
-                            </span>
-                            {atMax && (
-                              <span className="ml-1 text-[10px] text-emerald-700">
-                                ({lang === "es" ? "Máximo" : "Max"})
-                              </span>
-                            )}
-                          </div>
-
+                      {/* BUTTONS / QTY CONTROL */}
+                      <div className="mt-2">
+                        {qty === 0 ? (
                           <button
                             type="button"
                             onClick={() => handleAddToCart(item)}
-                            disabled={atMax}
-                            className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
-                              atMax
-                                ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
-                                : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
-                            }`}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
                           >
-                            +
+                            <span>🛒</span>
+                            <span>{lang === "es" ? "Agregar" : "Add"}</span>
                           </button>
-                        </div>
-                      )}
-                    </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveFromCart(item.id)
+                              }
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                            >
+                              –
+                            </button>
 
+                            <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
+                              <span className="mr-1">🛒</span>
+                              <span>
+                                {lang === "es"
+                                  ? "En carrito"
+                                  : "In cart"}{" "}
+                                · x
+                                {qty}
+                              </span>
+                              {atMax && (
+                                <span className="ml-1 text-[10px] text-emerald-700">
+                                  ({lang === "es" ? "Máximo" : "Max"})
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddToCart(item)}
+                              disabled={atMax}
+                              className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
+                                atMax
+                                  ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                                  : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </article>
                   );
                 })}
@@ -1711,10 +2126,12 @@ export function JackieCatalog() {
                 <span>🛍️</span>
                 <span>{t("Apartados", "Reservations")}</span>
                 <span>-</span>
-                <span>{t("Pago por transferencia", "Pay by bank transfer")}</span>
+                <span>
+                  {t("Pago por transferencia", "Pay by bank transfer")}
+                </span>
               </h3>
 
-               <p className="text-[11px] text-slate-700 leading-relaxed">
+              <p className="text-[11px] text-slate-700 leading-relaxed">
                 {t(
                   "Para apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 50% del total de tu compra.",
                   "To reserve your Crocs under your name, a 50% deposit of the total purchase is required."
@@ -1755,6 +2172,7 @@ export function JackieCatalog() {
             </div>
           </div>
         </section>
+        <SizeGuide lang={lang} />
       </div>
 
       {/* STICKY CART BAR (desktop/tablet) */}

@@ -18,16 +18,17 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const limitParam = searchParams.get("limit");
-    const limit = Math.min(Number(limitParam) || 20,30); // cap at 30 just in case
+    const limit = Math.min(Number(limitParam) || 20, 30); // cap at 30 just in case
 
-    // 🔁 Adjust table name + fields to match your real history table
+    // ✅ Use size_id + join sizes(label). We DO NOT read inventory_items.size anymore.
     const { data, error } = await supabase
       .from("inventory_items")
-        .select(`
+      .select(
+        `
         id,
         model_id,
         color_id,
-        size,
+        size_id,
         price_mxn,
         status,
         customer_name,
@@ -36,8 +37,9 @@ export async function GET(req: Request) {
         created_at,
         updated_at,
         models ( name ),
-        colors ( name_en )
-        `
+        colors ( name_en ),
+        sizes ( label )
+      `
       )
       .order("updated_at", { ascending: false })
       .limit(limit);
@@ -50,9 +52,14 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({
-      history: data ?? [],
-    });
+    // 🔁 Flatten sizes.label into a top-level `size` field
+    // so the AdminHistoryPage keeps working without changes.
+    const history = (data ?? []).map((row: any) => ({
+      ...row,
+      size: row.sizes?.label ?? "", // this is what the UI uses as entry.size
+    }));
+
+    return NextResponse.json({ history });
   } catch (err) {
     console.error("Unexpected error in /api/admin/history:", err);
     return NextResponse.json(

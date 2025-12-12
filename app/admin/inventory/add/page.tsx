@@ -114,7 +114,7 @@ function AddInventorySection({
 }) {
   const [modelName, setModelName] = useState("");
   const [color, setColor] = useState<string>("");
-  const [size, setSize] = useState("");
+  const [sizeId, setSizeId] = useState("");
   const [price, setPrice] = useState("0");
   const [quantity, setQuantity] = useState("0");
 
@@ -187,7 +187,7 @@ function AddInventorySection({
     e.preventDefault();
     setMessage(null);
 
-    if (!modelName.trim() || !color.trim() || !size.trim() || !price.trim()) {
+    if (!modelName.trim() || !color.trim() || !sizeId.trim() || !price.trim()) {
       setMessage(
         t(
           "Completa todos los campos antes de guardar.",
@@ -198,6 +198,7 @@ function AddInventorySection({
     }
 
     setSubmitting(true);
+
     try {
       const res = await fetch("/api/admin/inventory", {
         method: "POST",
@@ -205,7 +206,7 @@ function AddInventorySection({
         body: JSON.stringify({
           model_name: modelName.trim(),
           color: color.trim(),
-          size: size.trim(),
+          size_id: sizeId, // use FK id only, API derives label
           price_mxn: Number(price),
           quantity: Number(quantity) || 1,
         }),
@@ -233,7 +234,8 @@ function AddInventorySection({
         )
       );
 
-      setSize("");
+      // reset size + quantity; keep model/color to speed up bulk entry
+      setSizeId("");
       setQuantity("1");
       onAdded();
     } catch (err) {
@@ -330,8 +332,8 @@ function AddInventorySection({
             <div className="text-[11px] text-rose-600">{sizesError}</div>
           ) : (
             <select
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
+              value={sizeId}
+              onChange={(e) => setSizeId(e.target.value)}
               className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
               required
             >
@@ -339,7 +341,7 @@ function AddInventorySection({
                 {t("Selecciona una talla", "Select a size")}
               </option>
               {sizes.map((s) => (
-                <option key={s.id} value={s.label}>
+                <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
               ))}

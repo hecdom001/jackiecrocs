@@ -56,7 +56,7 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   if (lang === "en") return modelEn;
   const key = modelEn.trim().toLowerCase();
   switch (key) {
-   case "classic":
+    case "classic":
       return "Clásico";
     case "classic platform":
       return "Plataforma Clásica";
@@ -92,7 +92,7 @@ export default function AdminInventoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
     "all"
   );
-  const [sizeFilter, setSizeFilter] = useState<string>("all");
+  const [sizeFilter, setSizeFilter] = useState<string>("all"); // stores size_id or "all"
   const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
 
@@ -164,16 +164,30 @@ export default function AdminInventoryPage() {
   }, [statusFilter, sizeFilter, colorFilter, customerQuery]);
 
   // Filter options
-  const sizeOptions = Array.from(new Set(items.map((i) => i.size))).sort();
+  // Build unique sizes by size_id, but show label
+  const sizeFilterOptions = Array.from(
+    new Map(
+      items
+        .filter((i) => i.size_id && i.size)
+        .map((i) => [i.size_id as string, i.size as string])
+    ).entries()
+  )
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
-  const colorFilterOptions = Array.from(new Set(items.map((i) => i.color)))
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+    const colorFilterOptions = Array.from(
+      new Set(
+        items
+          .map((i) => i.color)
+          .filter((c): c is string => !!c) 
+      )
+    ).sort((a, b) => a.localeCompare(b));
 
   const filteredItems = items.filter((item) => {
     const matchesStatus =
       statusFilter === "all" || item.status === statusFilter;
-    const matchesSize = sizeFilter === "all" || item.size === sizeFilter;
+    const matchesSize =
+      sizeFilter === "all" || item.size_id === sizeFilter;
     const matchesColor =
       colorFilter === "all" || item.color === colorFilter;
     const query = customerQuery.trim().toLowerCase();
@@ -300,8 +314,6 @@ export default function AdminInventoryPage() {
         )}
       </section>
 
-
-
       {/* INVENTORY + FILTERS */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-4">
         {/* Top summary + filters toggle (mobile) */}
@@ -366,7 +378,7 @@ export default function AdminInventoryPage() {
               </select>
             </div>
 
-            {/* size */}
+            {/* size (uses size_id internally) */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-700">
                 {t("Talla", "Size")}
@@ -377,9 +389,9 @@ export default function AdminInventoryPage() {
                 className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
               >
                 <option value="all">{t("Todas", "All")}</option>
-                {sizeOptions.map((sz) => (
-                  <option key={sz} value={sz}>
-                    {sz}
+                {sizeFilterOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -478,9 +490,9 @@ export default function AdminInventoryPage() {
                   className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 >
                   <option value="all">{t("Todas", "All")}</option>
-                  {sizeOptions.map((sz) => (
-                    <option key={sz} value={sz}>
-                      {sz}
+                  {sizeFilterOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -831,7 +843,7 @@ function InventoryRow({
         </span>
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
-        {item.model_name}
+        {translateModelLabel(item.model_name, lang)}
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {translateColorLabel(item.color, lang)}
