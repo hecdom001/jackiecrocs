@@ -46,6 +46,8 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Rojo";
     case "lilac":
       return "Lila";
+    case "arctic":
+      return "Azul Ártico";
     default:
       return colorEn;
   }
