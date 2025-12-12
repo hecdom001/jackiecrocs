@@ -46,6 +46,8 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Lila";
     case "arctic":
       return "Azul Ártico";
+    case "camo":
+      return "Camuflaje";
     default:
       return colorEn;
   }
@@ -1075,6 +1077,55 @@ export function JackieCatalog() {
           </span>
         </button>
 
+        {/* Sticky cart CTA (only if cart has items) */}
+        {totalCartPairs > 0 && (
+          <div className="fixed inset-x-0 bottom-[76px] z-30">
+            <div className="mx-auto max-w-md px-4">
+              <a
+                href={waLinkForCart || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  if (!WHATSAPP_NUMBER || !cartLines.length) return;
+                  track("whatsapp_click_multi", {
+                    count: totalCartPairs,
+                    lang,
+                    location: "catalog_mobile_sticky",
+                  });
+                }}
+                className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 shadow-lg border transition ${
+                  WHATSAPP_NUMBER && cartLines.length
+                    ? "bg-emerald-500 text-white border-emerald-400 hover:bg-emerald-400"
+                    : "bg-slate-200 text-slate-500 border-slate-200 cursor-not-allowed"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📲</span>
+                  <div className="leading-tight">
+                    <p className="text-sm font-semibold">
+                      {t("Enviar carrito", "Send cart")}
+                    </p>
+                    <p className="text-[11px] opacity-90">
+                      {lang === "es"
+                        ? `${totalCartPairs} ${
+                            totalCartPairs === 1 ? "par" : "pares"
+                          } · WhatsApp`
+                        : `${totalCartPairs} ${
+                            totalCartPairs === 1 ? "pair" : "pairs"
+                          } · WhatsApp`}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-sm font-semibold">
+                  {t("Enviar", "Send")} →
+                </span>
+              </a>
+            </div>
+          </div>
+        )}
+
+
 
         {errorMsg ? (
           <p className="text-xs text-red-500">{errorMsg}</p>
@@ -1232,6 +1283,8 @@ export function JackieCatalog() {
             </div>
           </>
         )}
+        {/* Spacer so the fixed WhatsApp bar doesn’t cover the last cards */}
+        {totalCartPairs > 0 && <div className="h-28" />}
       </div>
     );
 
@@ -1526,18 +1579,19 @@ export function JackieCatalog() {
                     key={id}
                     type="button"
                     onClick={() => setTab(id)}
-                    className={`flex flex-1 flex-col items-center gap-0.5 ${
+                    className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1 ${
                       active ? "text-emerald-600" : "text-slate-400"
                     }`}
                   >
                     <span
-                      className={`mb-0.5 flex h-7 w-7 items-center justify-center rounded-full text-base ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-base ${
                         active ? "bg-emerald-50" : "bg-slate-100"
                       }`}
                     >
                       {icon}
                     </span>
-                    <span className={active ? "font-medium" : ""}>
+
+                    <span className={`text-[10px] leading-none ${active ? "font-medium" : ""}`}>
                       {lang === "es" ? labelEs : labelEn}
                     </span>
                   </button>

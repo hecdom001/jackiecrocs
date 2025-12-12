@@ -23,7 +23,7 @@ function translateColorLabel(
 
   const key = colorEn.trim().toLowerCase();
   switch (key) {
-    case "black":
+   case "black":
       return "Negro";
     case "white":
       return "Blanco";
@@ -39,6 +39,8 @@ function translateColorLabel(
       return "Lila";
     case "arctic":
       return "Azul Ártico";
+    case "camo":
+      return "Camuflaje";
     default:
       return colorEn;
   }
