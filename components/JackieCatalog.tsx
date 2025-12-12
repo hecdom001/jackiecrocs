@@ -44,6 +44,8 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Rojo";
     case "lilac":
       return "Lila";
+    case "arctic":
+      return "Azul Ártico";
     default:
       return colorEn;
   }
@@ -80,6 +82,8 @@ function colorLineClass(colorEn: string) {
       return "bg-red-500";
     case "lilac":
       return "bg-violet-200";
+    case "artic":
+      return "bh-sky-100";
     default:
       return "bg-slate-300";
   }
