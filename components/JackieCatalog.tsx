@@ -75,7 +75,7 @@ function colorLineClass(colorEn: string) {
     case "white":
       return "bg-slate-200";
     case "beige":
-      return "bg-yellow-100";
+       return "bg-yellow-100";
     case "pink":
     case "baby pink":
     case "rosa pastel":
@@ -83,9 +83,13 @@ function colorLineClass(colorEn: string) {
     case "red":
       return "bg-red-500";
     case "lilac":
+    case "lila":
       return "bg-violet-200";
-    case "artic":
-      return "bh-sky-100";
+    case "arctic":
+      return "bg-sky-100";
+    case "camo":
+    case "camuflaje":
+      return "bg-emerald-200";
     default:
       return "bg-slate-300";
   }
@@ -615,6 +619,13 @@ export function JackieCatalog() {
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
+  const photoList = Object.values(CROCS_PHOTOS);
+  const [mobilePhotoIndex, setMobilePhotoIndex] = useState(0);
+
+  const mobileCanPrev = mobilePhotoIndex > 0;
+  const mobileCanNext = mobilePhotoIndex < photoList.length - 1;
+
+
   // item.id -> how many pairs user wants of that variant
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
@@ -911,25 +922,51 @@ export function JackieCatalog() {
               {t("Fotos reales del producto", "Real product photos")}
             </p>
             <p className="text-[10px] text-slate-500">
-              {t("Tomadas por nosotros.", "Taken by us.")}
+              {mobilePhotoIndex + 1} / {photoList.length}
             </p>
           </div>
-          <div className="flex gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
-            {Object.values(CROCS_PHOTOS).map((photo) => (
-              <div
-                key={photo.src}
-                className="snap-start min-w-[58%] sm:min-w-[30%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.src}
-                  alt={photo.label}
-                  className="h-40 sm:h-48 w-full object-cover"
-                />
-              </div>
-            ))}
+
+          <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoList[mobilePhotoIndex].src}
+              alt={photoList[mobilePhotoIndex].label}
+              className="h-60 w-full object-cover"
+              loading="lazy"
+            />
+
+            {/* Prev */}
+            <button
+              type="button"
+              disabled={!mobileCanPrev}
+              onClick={() =>
+                setMobilePhotoIndex((i) => Math.max(0, i - 1))
+              }
+              className={`absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
+                !mobileCanPrev ? "opacity-30" : "hover:bg-white"
+              }`}
+            >
+              ‹
+            </button>
+
+            {/* Next */}
+            <button
+              type="button"
+              disabled={!mobileCanNext}
+              onClick={() =>
+                setMobilePhotoIndex((i) =>
+                  Math.min(photoList.length - 1, i + 1)
+                )
+              }
+              className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
+                !mobileCanNext ? "opacity-30" : "hover:bg-white"
+              }`}
+            >
+              ›
+            </button>
           </div>
         </section>
+
 
         {/* how it works */}
         <section className="rounded-3xl bg-white/95 border border-slate-100 p-4 space-y-2">
@@ -1825,17 +1862,18 @@ export function JackieCatalog() {
             </p>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {Object.values(CROCS_PHOTOS).map((photo) => (
               <div
                 key={photo.src}
-                className="snap-start min-w-[58%] sm:min-w-[30%] rounded-xl overflow-hidden bg-slate-50 border border-slate-100"
+                className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.src}
                   alt={photo.label}
-                  className="h-40 sm:h-48 w-full object-cover"
+                  className="h-36 w-full object-cover"
+                  loading="lazy"
                 />
               </div>
             ))}
