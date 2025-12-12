@@ -219,6 +219,14 @@ const CROCS_PHOTOS = {
     src: "/images/crocs-red.png",
     label: "Crocs rojos",
   },
+   arctic: {
+    src: "/images/crocs-arctic.png",
+    label: "Crocs Azul Ártico",
+    },
+    camo: {
+      src: "/images/crocs-camo.png",
+      label: "Crocs Camuflaje",
+    },
 } as const;
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
