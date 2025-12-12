@@ -153,26 +153,12 @@ function formatSizeLabel(
 
   // --- KIDS (C4, C5, ...) ---
   if (isKids) {
-    const numeric = size.replace(/^C/i, ""); // "C8" -> "8"
-
-    if (lang === "es") {
-      // Mexico: show only the number
-      return `${numeric} (US)`;
-    }
-
     // English: keep C prefix
     return `${size} (US)`;
   }
 
   // --- YOUTH (J1, J2, ...) ---
   if (isYouth) {
-    const numeric = size.replace(/^J/i, ""); // "J1" -> "1"
-
-    if (lang === "es") {
-      // Mexico: show number + Juvenil
-      return `${numeric} Juvenil (US)`;
-    }
-
     // English: keep J prefix
     return `${size} (US)`;
   }
