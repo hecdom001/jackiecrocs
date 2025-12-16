@@ -1,26 +1,24 @@
 // app/api/admin/history/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 
-// Optional: if you already have an admin auth helper, import + reuse it here
-// import { requireAdmin } from "@/lib/adminAuth";
+// Same helper as inventory route
+function requireAdmin(req: NextRequest) {
+  const session = req.cookies.get("admin_session")?.value;
+  return !!session;
+}
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    // ✅ If you have admin auth, enforce it here (copy from inventory route)
-    // const authResult = await requireAdmin(req);
-    // if (!authResult.ok) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized" },
-    //     { status: 401 }
-    //   );
-    // }
+    if (!requireAdmin(req)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { searchParams } = new URL(req.url);
     const limitParam = searchParams.get("limit");
-    const limit = Math.min(Number(limitParam) || 20, 30); // cap at 30 just in case
+    const limit = Math.min(Number(limitParam) || 20, 30);
 
-    // ✅ Use size_id + join sizes(label). We DO NOT read inventory_items.size anymore.
+    // ✅ include location_id + join locations
     const { data, error } = await supabase
       .from("inventory_items")
       .select(
@@ -29,6 +27,7 @@ export async function GET(req: Request) {
         model_id,
         color_id,
         size_id,
+        location_id,
         price_mxn,
         status,
         customer_name,
@@ -38,7 +37,8 @@ export async function GET(req: Request) {
         updated_at,
         models ( name ),
         colors ( name_en ),
-        sizes ( label )
+        sizes ( label ),
+        locations ( id, slug, name )
       `
       )
       .order("updated_at", { ascending: false })
@@ -46,25 +46,20 @@ export async function GET(req: Request) {
 
     if (error) {
       console.error("Error fetching history:", error);
-      return NextResponse.json(
-        { error: "Error fetching history" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Error fetching history" }, { status: 500 });
     }
 
-    // 🔁 Flatten sizes.label into a top-level `size` field
-    // so the AdminHistoryPage keeps working without changes.
     const history = (data ?? []).map((row: any) => ({
       ...row,
-      size: row.sizes?.label ?? "", // this is what the UI uses as entry.size
+      size: row.sizes?.label ?? "", // UI uses entry.size
+      location_id: row.location_id ?? null,
+      // keep as `locations` for your UI normalizer (it supports row.locations)
+      locations: row.locations ?? null,
     }));
 
     return NextResponse.json({ history });
   } catch (err) {
     console.error("Unexpected error in /api/admin/history:", err);
-    return NextResponse.json(
-      { error: "Unexpected error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }
 }

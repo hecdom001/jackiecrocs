@@ -1,7 +1,7 @@
 // app/admin/history/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang, type Lang } from "../adminLangContext";
 import type { InventoryStatus } from "@/types/inventory";
@@ -31,9 +31,13 @@ type HistoryEntry = {
   customer_whatsapp: string | null;
   notes: string | null;
   updated_at: string;
+
+  // ✅ NEW (for locations)
+  location_id?: string | null;
+  location?: { id: string; slug: string; name: string } | null;
 };
 
-/* ---------- Shared helpers (same logic as inventory page) ---------- */
+/* ---------- Shared helpers ---------- */
 
 function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
   if (!colorEn) return "";
@@ -98,6 +102,23 @@ function statusBadgeClass(status: InventoryStatus) {
     : "bg-rose-50 text-rose-700 border-rose-200";
 }
 
+function getLocationName(entry: HistoryEntry) {
+  if (entry.location?.name) return entry.location.name;
+  if (entry.location?.slug) {
+    const s = entry.location.slug;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  return "—";
+}
+
+function LocationChip({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+      📍 {name}
+    </span>
+  );
+}
+
 /* ---------- Page ---------- */
 
 export default function AdminHistoryPage() {
@@ -111,7 +132,10 @@ export default function AdminHistoryPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [visibleCount, setVisibleCount] = useState<number>(0);
 
-  // Mobile detection (same pattern as inventory page)
+  // ✅ NEW: location filter (location_id or "all")
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+
+  // Mobile detection
   useEffect(() => {
     const checkIsMobile = () => {
       if (typeof window === "undefined") return;
@@ -137,7 +161,6 @@ export default function AdminHistoryPage() {
     setErrorMsg(null);
 
     try {
-      // Ask backend for up to MAX_HISTORY latest rows
       const res = await fetch(`/api/admin/history?limit=${MAX_HISTORY}`);
       if (handleMaybeUnauthorized(res)) return;
 
@@ -145,14 +168,12 @@ export default function AdminHistoryPage() {
 
       if (!res.ok) {
         setErrorMsg(
-          data.error ||
-            "Error cargando historial / Error loading history"
+          data.error || "Error cargando historial / Error loading history"
         );
         setEntries([]);
         return;
       }
 
-      // Support either { items: [...] } or { history: [...] }
       const raw: any[] = data.items || data.history || [];
 
       const normalized: HistoryEntry[] = raw.slice(0, MAX_HISTORY).map((row) => ({
@@ -160,20 +181,30 @@ export default function AdminHistoryPage() {
         model_name: row.model_name ?? row.models?.name ?? null,
         color: row.color ?? row.colors?.name_en ?? null,
         size: row.size,
-        price_mxn: row.price_mxn,
+        price_mxn: Number(row.price_mxn),
         status: row.status as InventoryStatus,
         customer_name: row.customer_name ?? null,
         customer_whatsapp: row.customer_whatsapp ?? null,
         notes: row.notes ?? null,
         updated_at: row.updated_at,
+
+        // ✅ NEW normalize location
+        location_id: row.location_id ?? null,
+        location: row.location
+          ? row.location
+          : row.locations
+          ? {
+              id: row.locations.id,
+              slug: row.locations.slug,
+              name: row.locations.name,
+            }
+          : null,
       }));
 
       setEntries(normalized);
     } catch (err) {
       console.error("Error loading history", err);
-      setErrorMsg(
-        "Error cargando historial / Error loading history"
-      );
+      setErrorMsg("Error cargando historial / Error loading history");
       setEntries([]);
     } finally {
       setLoading(false);
@@ -185,23 +216,44 @@ export default function AdminHistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When entries OR layout (mobile/desktop) changes,
-  // set the initial visible count: 10 on mobile, 20 on desktop
-  useEffect(() => {
-    if (entries.length === 0) return;
-    setVisibleCount(
-      Math.min(pageSize, entries.length, MAX_HISTORY)
-    );
-  }, [pageSize, entries.length]);
+  // ✅ NEW: location options from data
+  const locationOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const e of entries) {
+      const id = e.location_id || e.location?.id;
+      if (!id) continue;
+      map.set(id, { id, name: getLocationName(e) });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries]);
 
-  const totalEntries = entries.length;
-  const visibleEntries = entries.slice(0, Math.min(visibleCount, totalEntries));
+  // ✅ NEW: filtered entries
+  const filteredEntries = useMemo(() => {
+    if (locationFilter === "all") return entries;
+    return entries.filter((e) => {
+      const id = e.location_id || e.location?.id || "";
+      return id === locationFilter;
+    });
+  }, [entries, locationFilter]);
+
+  // When entries OR layout changes, reset visibleCount
+  useEffect(() => {
+    if (filteredEntries.length === 0) {
+      setVisibleCount(0);
+      return;
+    }
+    setVisibleCount(Math.min(pageSize, filteredEntries.length, MAX_HISTORY));
+  }, [pageSize, filteredEntries.length]);
+
+  const totalEntries = filteredEntries.length;
+  const visibleEntries = filteredEntries.slice(
+    0,
+    Math.min(visibleCount, totalEntries)
+  );
   const canLoadMore = visibleCount < Math.min(totalEntries, MAX_HISTORY);
 
   function handleLoadMore() {
-    setVisibleCount((prev) =>
-      Math.min(prev + pageSize, totalEntries, MAX_HISTORY)
-    );
+    setVisibleCount((prev) => Math.min(prev + pageSize, totalEntries, MAX_HISTORY));
   }
 
   return (
@@ -209,16 +261,12 @@ export default function AdminHistoryPage() {
       {/* HEADER */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left: title + subtitle */}
           <div>
             <h1 className="text-base font-semibold text-slate-900">
               {t("Historial", "History")}
             </h1>
             <p className="text-xs text-slate-500">
-              {t(
-                "Últimos pares actualizados por fecha.",
-                "Latest updated pairs by date."
-              )}
+              {t("Últimos pares actualizados por fecha.", "Latest updated pairs by date.")}
             </p>
             <p className="mt-0.5 text-[11px] text-slate-500">
               {t(
@@ -228,7 +276,6 @@ export default function AdminHistoryPage() {
             </p>
           </div>
 
-          {/* Right: refresh */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -236,16 +283,34 @@ export default function AdminHistoryPage() {
               disabled={loading}
               className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
-              {loading
-                ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar datos", "Refresh data")}
+              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
         </div>
 
-        {errorMsg && (
-          <p className="text-[11px] text-rose-600">{errorMsg}</p>
-        )}
+        {/* ✅ NEW: Location filter (simple, always visible) */}
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="text-[11px] text-slate-600">
+            {t("Filtrar por ubicación", "Filter by location")}
+          </div>
+
+          <div className="sm:w-[260px]">
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-2 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            >
+              <option value="all">{t("Todas", "All")}</option>
+              {locationOptions.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {errorMsg && <p className="text-[11px] text-rose-600">{errorMsg}</p>}
       </section>
 
       {/* LIST */}
@@ -271,8 +336,8 @@ export default function AdminHistoryPage() {
         {!loading && totalEntries === 0 && !errorMsg && (
           <p className="text-xs text-slate-500">
             {t(
-              "Todavía no hay pares con historial reciente.",
-              "No recent history entries yet."
+              "Todavía no hay pares con historial reciente para estos filtros.",
+              "No recent history entries for these filters yet."
             )}
           </p>
         )}
@@ -282,11 +347,7 @@ export default function AdminHistoryPage() {
             {/* Mobile cards */}
             <div className="space-y-3 sm:hidden">
               {visibleEntries.map((entry) => (
-                <HistoryCardMobile
-                  key={entry.id}
-                  entry={entry}
-                  lang={lang}
-                />
+                <HistoryCardMobile key={entry.id} entry={entry} lang={lang} />
               ))}
             </div>
 
@@ -308,6 +369,12 @@ export default function AdminHistoryPage() {
                       <th className="text-left px-3 py-2 font-semibold text-slate-600">
                         {t("Talla", "Size")}
                       </th>
+
+                      {/* ✅ NEW */}
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Ubicación", "Location")}
+                      </th>
+
                       <th className="text-right px-3 py-2 font-semibold text-slate-600">
                         {t("Precio", "Price")}
                       </th>
@@ -356,6 +423,8 @@ export default function AdminHistoryPage() {
 /* ---------- Desktop row ---------- */
 
 function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
+  const locName = getLocationName(entry);
+
   return (
     <tr className="hover:bg-slate-50/70">
       <td className="px-3 py-2 align-top text-slate-500 whitespace-nowrap">
@@ -367,9 +436,13 @@ function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {translateColorLabel(entry.color, lang)}
       </td>
+      <td className="px-3 py-2 align-top text-slate-900 text-xs">{entry.size}</td>
+
+      {/* ✅ NEW */}
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
-        {entry.size}
+        <LocationChip name={locName} />
       </td>
+
       <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
         ${entry.price_mxn.toFixed(0)} MXN
       </td>
@@ -397,29 +470,28 @@ function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
 
 /* ---------- Mobile card ---------- */
 
-function HistoryCardMobile({
-  entry,
-  lang,
-}: {
-  entry: HistoryEntry;
-  lang: Lang;
-}) {
+function HistoryCardMobile({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
   const tt = (es: string, en: string) => (lang === "es" ? es : en);
+  const locName = getLocationName(entry);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-slate-500">
-            {formatDate(entry.updated_at, lang)}
-          </p>
+          <p className="text-xs text-slate-500">{formatDate(entry.updated_at, lang)}</p>
           <p className="mt-0.5 text-sm font-semibold text-slate-900">
             {translateModelLabel(entry.model_name, lang)} · {entry.size}
           </p>
           <p className="text-[11px] text-slate-500">
             {translateColorLabel(entry.color, lang)}
           </p>
+
+          {/* ✅ NEW */}
+          <div className="mt-1">
+            <LocationChip name={locName} />
+          </div>
         </div>
+
         <div className="text-right">
           <p className="text-sm font-semibold text-slate-900">
             ${entry.price_mxn.toFixed(0)} MXN
@@ -436,9 +508,7 @@ function HistoryCardMobile({
 
       {entry.customer_name && (
         <p className="text-[11px] text-slate-700">
-          <span className="font-medium">
-            {tt("Cliente: ", "Customer: ")}
-          </span>
+          <span className="font-medium">{tt("Cliente: ", "Customer: ")}</span>
           {entry.customer_name}
         </p>
       )}

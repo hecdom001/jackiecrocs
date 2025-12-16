@@ -5,24 +5,27 @@ import { useEffect, useState, FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAdminLang } from "../adminLangContext";
 
-type SizeOption = {
-  id: string;
-  label: string;
-};
+type SizeOption = { id: string; label: string };
+type LocationOption = { id: string; name: string; slug: string };
 
 export default function AdminNewPage() {
   const { lang, t } = useAdminLang();
-  const [adminPassword, setAdminPassword] = useState("");
+
   const [message, setMessage] = useState<string | null>(null);
 
   // Lookups / form state
-  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
-  const [colors, setColors] = useState<{ id: string; name_en: string }[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+
   const [modelSelect, setModelSelect] = useState<string>("");
   const [newModelName, setNewModelName] = useState("");
   const [colorSelect, setColorSelect] = useState<string>("");
   const [newColorName, setNewColorName] = useState("");
-  const [sizeId, setSizeId] = useState(""); // 👈 size_id, not label
+
+  const [locationId, setLocationId] = useState<string>(""); // ✅ NEW
+
+  const [sizeId, setSizeId] = useState(""); // size_id, not label
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
 
@@ -31,27 +34,54 @@ export default function AdminNewPage() {
   const [sizesLoading, setSizesLoading] = useState(true);
   const [sizesError, setSizesError] = useState<string | null>(null);
 
-  async function loadLookups() {
-    if (!adminPassword) return;
+  // Lookup loading
+  const [lookupsLoading, setLookupsLoading] = useState(true);
+  const [lookupsError, setLookupsError] = useState<string | null>(null);
 
-    const [modelsRes, colorsRes] = await Promise.all([
-      fetch(`/api/admin/models?password=${adminPassword}`).then((r) => r.json()),
-      fetch(`/api/admin/colors?password=${adminPassword}`).then((r) => r.json()),
-    ]);
-
-    setModels(modelsRes.models || []);
-    setColors(colorsRes.colors || []);
-  }
-
-  // Load models/colors when password changes
   useEffect(() => {
-    if (adminPassword) {
-      loadLookups();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminPassword]);
+    async function loadAllLookups() {
+      setLookupsLoading(true);
+      setLookupsError(null);
 
-  // Load sizes from Supabase (public read)
+      try {
+        const [modelsRes, colorsRes, locationsRes] = await Promise.all([
+          supabase.from("models").select("name").order("name"),
+          supabase.from("colors").select("name_en").order("name_en"),
+          supabase.from("locations").select("id, name, slug").order("name"),
+        ]);
+
+        if (modelsRes.error) throw modelsRes.error;
+        if (colorsRes.error) throw colorsRes.error;
+        if (locationsRes.error) throw locationsRes.error;
+
+        setModels((modelsRes.data ?? []).map((m: any) => String(m.name)));
+        setColors((colorsRes.data ?? []).map((c: any) => String(c.name_en)));
+        setLocations(
+          (locationsRes.data ?? []).map((l: any) => ({
+            id: String(l.id),
+            name: String(l.name),
+            slug: String(l.slug),
+          }))
+        );
+
+        // Optional: default to Tijuana if present
+        const tijuana = (locationsRes.data ?? []).find(
+          (l: any) => String(l.slug).toLowerCase() === "tijuana"
+        );
+        if (tijuana && !locationId) setLocationId(String(tijuana.id));
+      } catch (err) {
+        console.error("Error loading lookups:", err);
+        setLookupsError("Error loading lookups");
+      } finally {
+        setLookupsLoading(false);
+      }
+    }
+
+    loadAllLookups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load sizes
   useEffect(() => {
     async function loadSizes() {
       setSizesLoading(true);
@@ -76,12 +106,8 @@ export default function AdminNewPage() {
     loadSizes();
   }, []);
 
-  const modelOptions = models.map((m) => m.name);
-  const colorOptions = colors.map((c) => c.name_en);
-
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
-    if (!adminPassword) return;
     setMessage(null);
 
     const finalModel =
@@ -110,8 +136,13 @@ export default function AdminNewPage() {
     }
 
     if (!sizeId) {
+      setMessage(t("Debes seleccionar una talla.", "You must select a size."));
+      return;
+    }
+
+    if (!locationId) {
       setMessage(
-        t("Debes seleccionar una talla.", "You must select a size.")
+        t("Debes seleccionar una ubicación.", "You must select a location.")
       );
       return;
     }
@@ -120,10 +151,10 @@ export default function AdminNewPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        adminPassword,
         model_name: finalModel,
-        color: finalColor, // stored in English in DB
-        size_id: sizeId,   // 👈 send size_id instead of size label
+        color: finalColor,
+        size_id: sizeId,
+        location_id: locationId, // ✅ NEW
         price_mxn: Number(price),
         quantity: Number(quantity),
       }),
@@ -136,10 +167,7 @@ export default function AdminNewPage() {
     }
 
     setMessage(
-      t(
-        "Inventario agregado correctamente ✅",
-        "Inventory added successfully ✅"
-      )
+      t("Inventario agregado correctamente ✅", "Inventory added successfully ✅")
     );
 
     // reset form
@@ -147,37 +175,14 @@ export default function AdminNewPage() {
     setNewModelName("");
     setColorSelect("");
     setNewColorName("");
-    setSizeId(""); // 👈 reset size_id
+    setSizeId("");
     setPrice("");
     setQuantity("1");
+    // keep location as-is for speed
   }
 
   return (
     <div className="space-y-6">
-      {/* Top controls: password */}
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="w-full sm:max-w-md">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              {t("Contraseña admin", "Admin password")}
-            </label>
-            <input
-              type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              placeholder="••••••••"
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              {t(
-                "Solo tú y Jackie deben tener esta contraseña.",
-                "Only you and Jackie should have this password."
-              )}
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* Add inventory form */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
         <div className="flex items-center justify-between gap-2">
@@ -194,34 +199,58 @@ export default function AdminNewPage() {
           </div>
         </div>
 
+        {lookupsError && (
+          <p className="text-[11px] text-rose-600">{lookupsError}</p>
+        )}
+
         <form
           onSubmit={handleAdd}
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {/* Model select + other */}
+          {/* Location ✅ */}
+          <Field label={t("Ubicación", "Location")}>
+            {lookupsLoading ? (
+              <div className="text-[11px] text-slate-500">
+                {t("Cargando ubicaciones…", "Loading locations…")}
+              </div>
+            ) : (
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                required
+              >
+                <option value="" disabled>
+                  {t("Selecciona una ubicación", "Select a location")}
+                </option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          {/* Model */}
           <Field label={t("Modelo", "Model")}>
             <div className="space-y-1">
               <select
                 value={modelSelect}
                 onChange={(e) => {
                   setModelSelect(e.target.value);
-                  if (e.target.value !== "other") {
-                    setNewModelName("");
-                  }
+                  if (e.target.value !== "other") setNewModelName("");
                 }}
                 className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 required
-                disabled={!adminPassword}
               >
                 <option value="" disabled>
                   {t("Selecciona un modelo", "Select a model")}
                 </option>
-
                 <option value="other">
                   {t("Otro (nuevo modelo)", "Other (new model)")}
                 </option>
-
-                {modelOptions.map((m) => (
+                {models.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
@@ -243,30 +272,25 @@ export default function AdminNewPage() {
             </div>
           </Field>
 
-          {/* Color select + other */}
+          {/* Color */}
           <Field label={t("Color (inglés)", "Color (English)")}>
             <div className="space-y-1">
               <select
                 value={colorSelect}
                 onChange={(e) => {
                   setColorSelect(e.target.value);
-                  if (e.target.value !== "other") {
-                    setNewColorName("");
-                  }
+                  if (e.target.value !== "other") setNewColorName("");
                 }}
                 className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 required
-                disabled={!adminPassword}
               >
                 <option value="" disabled>
                   {t("Selecciona un color", "Select a color")}
                 </option>
-
                 <option value="other">
                   {t("Otro (nuevo color)", "Other (new color)")}
                 </option>
-
-                {colorOptions.map((c) => (
+                {colors.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -288,7 +312,7 @@ export default function AdminNewPage() {
             </div>
           </Field>
 
-          {/* Size (dropdown from DB, sends size_id) */}
+          {/* Size */}
           <Field label={t("Talla", "Size")}>
             {sizesLoading ? (
               <div className="text-[11px] text-slate-500">
@@ -341,7 +365,7 @@ export default function AdminNewPage() {
           <div className="sm:col-span-2 lg:col-span-3 flex justify-end items-center">
             <button
               type="submit"
-              disabled={!adminPassword}
+              disabled={lookupsLoading || sizesLoading}
               className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
               {t("Agregar pares", "Add pairs")}

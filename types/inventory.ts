@@ -1,4 +1,11 @@
 // types/inventory.ts
+
+export type InventoryLocation = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
 export type InventoryStatus =
   | "available"
   | "reserved"
@@ -21,4 +28,6 @@ export type InventoryItem = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  location_id: string; // ✅ NEW
+  location?: InventoryLocation | null; // ✅ NEW (joined)
 };

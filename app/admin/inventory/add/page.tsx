@@ -13,6 +13,12 @@ type SizeOption = {
   label: string;
 };
 
+type LocationOption = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
 type Lang = "es" | "en";
 
 function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
@@ -120,7 +126,13 @@ function AddInventorySection({
   const [color, setColor] = useState<string>("");
   const [sizeId, setSizeId] = useState("");
   const [price, setPrice] = useState("0");
-  const [quantity, setQuantity] = useState("0");
+  const [quantity, setQuantity] = useState("1");
+
+  // NEW: locations
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState<string | null>(null);
+  const [locationId, setLocationId] = useState(""); // selected location_id
 
   const [models, setModels] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
@@ -131,7 +143,7 @@ function AddInventorySection({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Load sizes, models, colors from DB
+  // Load sizes, models, colors, locations from DB
   useEffect(() => {
     async function loadSizes() {
       setSizesLoading(true);
@@ -148,7 +160,7 @@ function AddInventorySection({
         return;
       }
 
-      setSizes(data ?? []);
+      setSizes((data ?? []) as SizeOption[]);
       setSizesLoading(false);
     }
 
@@ -182,16 +194,49 @@ function AddInventorySection({
       setModels(modelNames);
     }
 
+    async function loadLocations() {
+      setLocationsLoading(true);
+      setLocationsError(null);
+
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, slug, name")
+        .order("name");
+
+      if (error) {
+        console.error("Error loading locations:", error);
+        setLocationsError("Error loading locations");
+        setLocationsLoading(false);
+        return;
+      }
+
+      const list = (data ?? []) as LocationOption[];
+      setLocations(list);
+
+      // Default to Tijuana if present; else first location
+      const tijuana = list.find((l) => l.slug?.toLowerCase() === "tijuana");
+      setLocationId(tijuana?.id || list[0]?.id || "");
+
+      setLocationsLoading(false);
+    }
+
     loadSizes();
     loadColors();
     loadModels();
+    loadLocations();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
 
-    if (!modelName.trim() || !color.trim() || !sizeId.trim() || !price.trim()) {
+    if (
+      !modelName.trim() ||
+      !color.trim() ||
+      !sizeId.trim() ||
+      !price.trim() ||
+      !locationId.trim()
+    ) {
       setMessage(
         t(
           "Completa todos los campos antes de guardar.",
@@ -213,6 +258,7 @@ function AddInventorySection({
           size_id: sizeId, // use FK id only, API derives label
           price_mxn: Number(price),
           quantity: Number(quantity) || 1,
+          location_id: locationId, // ✅ NEW
         }),
       });
 
@@ -231,22 +277,15 @@ function AddInventorySection({
         return;
       }
 
-      setMessage(
-        t(
-          "Pares agregados correctamente ✅",
-          "Pairs added successfully ✅"
-        )
-      );
+      setMessage(t("Pares agregados correctamente ✅", "Pairs added successfully ✅"));
 
-      // reset size + quantity; keep model/color to speed up bulk entry
+      // reset size + quantity; keep model/color/location to speed up bulk entry
       setSizeId("");
       setQuantity("1");
       onAdded();
     } catch (err) {
       console.error(err);
-      setMessage(
-        t("Error al agregar inventario.", "Error adding inventory.")
-      );
+      setMessage(t("Error al agregar inventario.", "Error adding inventory."));
     } finally {
       setSubmitting(false);
     }
@@ -272,6 +311,44 @@ function AddInventorySection({
         onSubmit={handleSubmit}
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       >
+        {/* Location (NEW) */}
+        <div className="space-y-1">
+          <label className="block text-[11px] font-medium text-slate-700">
+            {t("Ubicación", "Location")}
+          </label>
+
+          {locationsLoading ? (
+            <div className="text-[11px] text-slate-500">
+              {t("Cargando ubicaciones…", "Loading locations…")}
+            </div>
+          ) : locationsError ? (
+            <div className="text-[11px] text-rose-600">{locationsError}</div>
+          ) : (
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              required
+            >
+              <option value="" disabled>
+                {t("Selecciona una ubicación", "Select a location")}
+              </option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <p className="text-[10px] text-slate-500">
+            {t(
+              "Esto define en qué ciudad está físicamente este par.",
+              "This defines which city this pair is physically in."
+            )}
+          </p>
+        </div>
+
         {/* Model */}
         <div className="space-y-1">
           <label className="block text-[11px] font-medium text-slate-700">

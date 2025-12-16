@@ -1,7 +1,7 @@
 // app/admin/inventory/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { InventoryItem, InventoryStatus } from "@/types/inventory";
 import { useAdminLang, type Lang } from "../adminLangContext";
@@ -69,6 +69,26 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   }
 }
 
+// ✅ NEW helpers
+function getLocationName(item: InventoryItem) {
+  // preferred: joined location object
+  const name = (item as any)?.location?.name as string | undefined;
+  if (name) return name;
+
+  // fallback: if you ever only have slug
+  const slug = (item as any)?.location?.slug as string | undefined;
+  if (slug) return slug.charAt(0).toUpperCase() + slug.slice(1);
+
+  // final fallback
+  return "—";
+}
+
+function getLocationSlug(item: InventoryItem) {
+  const slug = (item as any)?.location?.slug as string | undefined;
+  if (slug) return slug.toLowerCase();
+  return "";
+}
+
 export default function AdminInventoryPage() {
   const router = useRouter();
   const { lang, t } = useAdminLang(); // shared lang + t
@@ -99,6 +119,7 @@ export default function AdminInventoryPage() {
   const [sizeFilter, setSizeFilter] = useState<string>("all"); // stores size_id or "all"
   const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState<string>("all"); // ✅ NEW (location_id or "all")
 
   // Filters panel (mobile)
   const [showFilters, setShowFilters] = useState(false);
@@ -123,8 +144,7 @@ export default function AdminInventoryPage() {
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(
-          data.error ||
-            "Error cargando inventario / Error loading inventory"
+          data.error || "Error cargando inventario / Error loading inventory"
         );
         setItems([]);
         return;
@@ -133,9 +153,7 @@ export default function AdminInventoryPage() {
       setPage(1);
     } catch (err) {
       console.error(err);
-      setErrorMsg(
-        "Error cargando inventario / Error loading inventory"
-      );
+      setErrorMsg("Error cargando inventario / Error loading inventory");
     } finally {
       setLoading(false);
     }
@@ -165,10 +183,9 @@ export default function AdminInventoryPage() {
   // Reset page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, sizeFilter, colorFilter, customerQuery]);
+  }, [statusFilter, sizeFilter, colorFilter, customerQuery, locationFilter]); // ✅ NEW
 
   // Filter options
-  // Build unique sizes by size_id, but show label
   const sizeFilterOptions = Array.from(
     new Map(
       items
@@ -179,31 +196,53 @@ export default function AdminInventoryPage() {
     .map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
-    const colorFilterOptions = Array.from(
-      new Set(
-        items
-          .map((i) => i.color)
-          .filter((c): c is string => !!c) 
-      )
-    ).sort((a, b) => a.localeCompare(b));
+  const colorFilterOptions = Array.from(
+    new Set(items.map((i) => i.color).filter((c): c is string => !!c))
+  ).sort((a, b) => a.localeCompare(b));
+
+  // ✅ NEW: location filter options
+  const locationFilterOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; slug?: string }>();
+
+    for (const it of items) {
+      const locId = (it as any).location_id as string | undefined;
+      if (!locId) continue;
+
+      const name = getLocationName(it);
+      const slug = getLocationSlug(it);
+      if (!map.has(locId)) map.set(locId, { id: locId, name, slug });
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
 
   const filteredItems = items.filter((item) => {
     const matchesStatus =
       statusFilter === "all" || item.status === statusFilter;
-    const matchesSize =
-      sizeFilter === "all" || item.size_id === sizeFilter;
-    const matchesColor =
-      colorFilter === "all" || item.color === colorFilter;
+    const matchesSize = sizeFilter === "all" || item.size_id === sizeFilter;
+    const matchesColor = colorFilter === "all" || item.color === colorFilter;
+
+    // ✅ NEW: location filter
+    const itemLocId = (item as any).location_id as string | undefined;
+    const matchesLocation =
+      locationFilter === "all" || itemLocId === locationFilter;
+
     const query = customerQuery.trim().toLowerCase();
     const matchesCustomer =
       !query ||
       (item.customer_name || "").toLowerCase().includes(query) ||
       (item.customer_whatsapp || "").toLowerCase().includes(query);
 
-    return matchesStatus && matchesCustomer && matchesSize && matchesColor;
+    return (
+      matchesStatus &&
+      matchesCustomer &&
+      matchesSize &&
+      matchesColor &&
+      matchesLocation
+    );
   });
 
-  // Status counts
+  // Status counts (based on filteredItems)
   const countsByStatus: Record<InventoryStatus, number> = {
     available: filteredItems.filter((i) => i.status === "available").length,
     reserved: filteredItems.filter((i) => i.status === "reserved").length,
@@ -218,12 +257,14 @@ export default function AdminInventoryPage() {
     statusFilter !== "all" ||
     sizeFilter !== "all" ||
     colorFilter !== "all" ||
+    locationFilter !== "all" || // ✅ NEW
     customerQuery.trim() !== "";
 
   function clearFilters() {
     setStatusFilter("all");
     setSizeFilter("all");
     setColorFilter("all");
+    setLocationFilter("all"); // ✅ NEW
     setCustomerQuery("");
   }
 
@@ -244,20 +285,15 @@ export default function AdminInventoryPage() {
       {/* HEADER */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left: title + subtitle */}
           <div>
             <h1 className="text-base font-semibold text-slate-900">
               {t("Inventario", "Inventory")}
             </h1>
             <p className="text-xs text-slate-500">
-              {t(
-                "Gestiona pares desde el teléfono.",
-                "Manage pairs from your phone."
-              )}
+              {t("Gestiona pares desde el teléfono.", "Manage pairs from your phone.")}
             </p>
           </div>
 
-          {/* Right (desktop): refresh button */}
           <div className="hidden sm:flex">
             <button
               type="button"
@@ -265,16 +301,13 @@ export default function AdminInventoryPage() {
               disabled={loading}
               className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
-              {loading
-                ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar datos", "Refresh data")}
+              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
         </div>
 
         {/* Mobile: refresh + normal/fast in one bar */}
         <div className="sm:hidden flex gap-2 text-[11px]">
-          {/* Normal */}
           <button
             type="button"
             onClick={() => setMobileFastMode("normal")}
@@ -287,7 +320,6 @@ export default function AdminInventoryPage() {
             {t("Normal", "Normal")}
           </button>
 
-          {/* Rápido */}
           <button
             type="button"
             onClick={() => setMobileFastMode("fast")}
@@ -300,37 +332,28 @@ export default function AdminInventoryPage() {
             {t("Rápido", "Fast")}
           </button>
 
-          {/* Refresh */}
           <button
             type="button"
             onClick={loadItems}
             disabled={loading}
             className="flex-1 inline-flex justify-center items-center rounded-full bg-emerald-500 text-white font-semibold px-3 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
           >
-            {loading
-              ? t("Actualizando…", "Refreshing…")
-              : t("Actualizar datos", "Refresh data")}
+            {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
           </button>
         </div>
 
-        {errorMsg && (
-          <p className="text-[11px] text-rose-600">{errorMsg}</p>
-        )}
+        {errorMsg && <p className="text-[11px] text-rose-600">{errorMsg}</p>}
       </section>
 
       {/* INVENTORY + FILTERS */}
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-4">
-        {/* Top summary + filters toggle (mobile) */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm sm:text-base font-semibold text-slate-900">
               {t("Buscar", "Search")}
             </h2>
             <p className="text-[11px] text-slate-500">
-              {t(
-                `${items.length} pares en total`,
-                `${items.length} pairs total`
-              )}
+              {t(`${items.length} pares en total`, `${items.length} pairs total`)}
             </p>
             {filteredItems.length !== items.length && (
               <p className="text-[11px] text-emerald-600 mt-0.5">
@@ -342,26 +365,21 @@ export default function AdminInventoryPage() {
             )}
           </div>
 
-          {/* Mobile: show filters button; Desktop: show full filters bar */}
           <div className="sm:hidden">
             <button
               type="button"
               onClick={() => setShowFilters((prev) => !prev)}
               className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 shadow-sm"
             >
-              {showFilters
-                ? t("Ocultar filtros", "Hide filters")
-                : t("Mostrar filtros", "Show filters")}
+              {showFilters ? t("Ocultar filtros", "Hide filters") : t("Mostrar filtros", "Show filters")}
             </button>
           </div>
 
           {/* Desktop filter bar */}
-          <div className="hidden sm:grid sm:grid-cols-5 gap-2 w-full sm:w-auto sm:min-w-[650px] text-[11px]">
+          <div className="hidden sm:grid sm:grid-cols-6 gap-2 w-full sm:w-auto sm:min-w-[800px] text-[11px]">
             {/* status */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Estatus", "Status")}
-              </span>
+              <span className="text-slate-700">{t("Estatus", "Status")}</span>
               <select
                 value={statusFilter}
                 onChange={(e) =>
@@ -382,11 +400,26 @@ export default function AdminInventoryPage() {
               </select>
             </div>
 
-            {/* size (uses size_id internally) */}
+            {/* location ✅ NEW */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Talla", "Size")}
-              </span>
+              <span className="text-slate-700">{t("Ubicación", "Location")}</span>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                <option value="all">{t("Todas", "All")}</option>
+                {locationFilterOptions.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* size */}
+            <div className="flex flex-col gap-1">
+              <span className="text-slate-700">{t("Talla", "Size")}</span>
               <select
                 value={sizeFilter}
                 onChange={(e) => setSizeFilter(e.target.value)}
@@ -403,9 +436,7 @@ export default function AdminInventoryPage() {
 
             {/* color */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Color", "Color")}
-              </span>
+              <span className="text-slate-700">{t("Color", "Color")}</span>
               <select
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
@@ -422,26 +453,18 @@ export default function AdminInventoryPage() {
 
             {/* customer search */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Cliente / WhatsApp", "Customer / WhatsApp")}
-              </span>
+              <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
               <input
                 value={customerQuery}
                 onChange={(e) => setCustomerQuery(e.target.value)}
                 className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                placeholder={
-                  lang === "es"
-                    ? "Buscar nombre o +52..."
-                    : "Search name or +52..."
-                }
+                placeholder={lang === "es" ? "Buscar nombre o +52..." : "Search name or +52..."}
               />
             </div>
 
-            {/* clear filters */}
+            {/* clear */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Filtros", "Filters")}
-              </span>
+              <span className="text-slate-700">{t("Filtros", "Filters")}</span>
               <button
                 type="button"
                 onClick={clearFilters}
@@ -460,9 +483,7 @@ export default function AdminInventoryPage() {
             <div className="grid grid-cols-1 gap-2">
               {/* status */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">
-                  {t("Estatus", "Status")}
-                </span>
+                <span className="text-slate-700">{t("Estatus", "Status")}</span>
                 <select
                   value={statusFilter}
                   onChange={(e) =>
@@ -483,11 +504,26 @@ export default function AdminInventoryPage() {
                 </select>
               </div>
 
+              {/* location ✅ NEW */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">{t("Ubicación", "Location")}</span>
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="all">{t("Todas", "All")}</option>
+                  {locationFilterOptions.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* size */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">
-                  {t("Talla", "Size")}
-                </span>
+                <span className="text-slate-700">{t("Talla", "Size")}</span>
                 <select
                   value={sizeFilter}
                   onChange={(e) => setSizeFilter(e.target.value)}
@@ -504,9 +540,7 @@ export default function AdminInventoryPage() {
 
               {/* color */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">
-                  {t("Color", "Color")}
-                </span>
+                <span className="text-slate-700">{t("Color", "Color")}</span>
                 <select
                   value={colorFilter}
                   onChange={(e) => setColorFilter(e.target.value)}
@@ -523,18 +557,12 @@ export default function AdminInventoryPage() {
 
               {/* customer search */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">
-                  {t("Cliente / WhatsApp", "Customer / WhatsApp")}
-                </span>
+                <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
                 <input
                   value={customerQuery}
                   onChange={(e) => setCustomerQuery(e.target.value)}
                   className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                  placeholder={
-                    lang === "es"
-                      ? "Buscar nombre o +52..."
-                      : "Search name or +52..."
-                  }
+                  placeholder={lang === "es" ? "Buscar nombre o +52..." : "Search name or +52..."}
                 />
               </div>
             </div>
@@ -596,10 +624,7 @@ export default function AdminInventoryPage() {
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-xs text-slate-500">
-            {t(
-              "No hay resultados con estos filtros.",
-              "No results with these filters."
-            )}
+            {t("No hay resultados con estos filtros.", "No results with these filters.")}
           </p>
         ) : (
           <>
@@ -630,36 +655,17 @@ export default function AdminInventoryPage() {
                 <table className="min-w-full text-[11px]">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        ID
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Modelo", "Model")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Color", "Color")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Talla", "Size")}
-                      </th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
-                        {t("Precio", "Price")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Estatus", "Status")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Cliente", "Customer")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        WhatsApp
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Notas", "Notes")}
-                      </th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
-                        {t("Acciones", "Actions")}
-                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">ID</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Modelo", "Model")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Color", "Color")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Talla", "Size")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Ubicación", "Location")}</th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Precio", "Price")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Estatus", "Status")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Cliente", "Customer")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">WhatsApp</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Notas", "Notes")}</th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Acciones", "Actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -687,9 +693,7 @@ export default function AdminInventoryPage() {
                   <div className="inline-flex gap-1">
                     <button
                       type="button"
-                      onClick={() =>
-                        setPage((p) => Math.max(1, p - 1))
-                      }
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -697,9 +701,7 @@ export default function AdminInventoryPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        setPage((p) => Math.min(totalPages, p + 1))
-                      }
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -719,27 +721,18 @@ export default function AdminInventoryPage() {
                   <div className="inline-flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setPage((p) => Math.max(1, p - 1))
-                      }
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
                     >
                       {t("Anterior", "Previous")}
                     </button>
                     <span>
-                      {t(
-                        `Página ${currentPage} de ${totalPages}`,
-                        `Page ${currentPage} of ${totalPages}`
-                      )}
+                      {t(`Página ${currentPage} de ${totalPages}`, `Page ${currentPage} of ${totalPages}`)}
                     </span>
                     <button
                       type="button"
-                      onClick={() =>
-                        setPage((p) =>
-                          Math.min(totalPages, p + 1)
-                        )
-                      }
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1.5 rounded-full border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:border-emerald-400 hover:text-emerald-700 transition"
                     >
@@ -770,13 +763,19 @@ function StatusChip({
   emoji: string;
 }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}>
       <span>{emoji}</span>
       <span className="font-medium">
         {label}: {value}
       </span>
+    </span>
+  );
+}
+
+function LocationChip({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+      📍 {name}
     </span>
   );
 }
@@ -791,12 +790,8 @@ function InventoryRow({
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(
-    item.customer_name || ""
-  );
-  const [localWhatsapp, setLocalWhatsapp] = useState(
-    item.customer_whatsapp || ""
-  );
+  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
+  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [saving, setSaving] = useState(false);
 
@@ -839,12 +834,12 @@ function InventoryRow({
       ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
+  const locName = getLocationName(item);
+
   return (
     <tr className="hover:bg-slate-50/70">
       <td className="px-3 py-2 align-top text-slate-500">
-        <span className="font-mono text-[10px]">
-          {item.id.slice(0, 8)}…
-        </span>
+        <span className="font-mono text-[10px]">{item.id.slice(0, 8)}…</span>
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {translateModelLabel(item.model_name, lang)}
@@ -852,9 +847,13 @@ function InventoryRow({
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {translateColorLabel(item.color, lang)}
       </td>
+      <td className="px-3 py-2 align-top text-slate-900 text-xs">{item.size}</td>
+
+      {/* ✅ NEW location column */}
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
-        {item.size}
+        <LocationChip name={locName} />
       </td>
+
       <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
         ${item.price_mxn.toFixed(0)} MXN
       </td>
@@ -862,9 +861,7 @@ function InventoryRow({
         <div className="space-y-1">
           <select
             value={localStatus}
-            onChange={(e) =>
-              setLocalStatus(e.target.value as InventoryStatus)
-            }
+            onChange={(e) => setLocalStatus(e.target.value as InventoryStatus)}
             className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
           >
             {statusOptions.map((st) => (
@@ -910,11 +907,7 @@ function InventoryRow({
           disabled={!hasChanges || saving}
           className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
         >
-          {saving
-            ? t("Guardando…", "Saving…")
-            : hasChanges
-            ? t("Guardar", "Save")
-            : t("OK", "OK")}
+          {saving ? t("Guardando…", "Saving…") : hasChanges ? t("Guardar", "Save") : t("OK", "OK")}
         </button>
       </td>
     </tr>
@@ -933,18 +926,12 @@ function InventoryCardMobile({
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(
-    item.customer_name || ""
-  );
-  const [localWhatsapp, setLocalWhatsapp] = useState(
-    item.customer_whatsapp || ""
-  );
+  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
+  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [saving, setSaving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
-    null
-  );
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -960,7 +947,6 @@ function InventoryCardMobile({
     localWhatsapp !== (item.customer_whatsapp || "") ||
     localNotes !== (item.notes || "");
 
-  // save helper
   async function saveWithStatus(newStatus: InventoryStatus) {
     setSaving(true);
     setLocalStatus(newStatus);
@@ -976,7 +962,6 @@ function InventoryCardMobile({
     setSaving(false);
   }
 
-  // every status change opens the confirmation popup
   function handleStatusClick(newStatus: InventoryStatus) {
     if (newStatus === localStatus) return;
     setPendingStatus(newStatus);
@@ -1006,17 +991,25 @@ function InventoryCardMobile({
       ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
+  const locName = getLocationName(item);
+
   return (
     <>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-base font-semibold text-slate-900">
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-slate-900 truncate">
               {translateModelLabel(item.model_name, lang)} · {item.size}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               {translateColorLabel(item.color, lang)}
             </p>
+
+            {/* ✅ NEW location chip */}
+            <div className="mt-1">
+              <LocationChip name={locName} />
+            </div>
+
             <p className="mt-1 text-[11px] text-slate-400 font-mono">
               ID: {item.id.slice(0, 8)}…
             </p>
@@ -1033,7 +1026,6 @@ function InventoryCardMobile({
           </div>
         </div>
 
-        {/* big status buttons */}
         <div className="flex gap-2">
           <button
             type="button"
@@ -1061,16 +1053,13 @@ function InventoryCardMobile({
           </button>
         </div>
 
-        {/* details toggle */}
         <button
           type="button"
           onClick={() => setShowDetails((prev) => !prev)}
           className="flex w-full items-center justify-between rounded-full bg-slate-100 px-3 py-1.5 text-[11px] text-slate-700"
         >
           <span>
-            {showDetails
-              ? t("Ocultar detalles", "Hide details")
-              : t("Ver / editar detalles", "View / edit details")}
+            {showDetails ? t("Ocultar detalles", "Hide details") : t("Ver / editar detalles", "View / edit details")}
           </span>
           <span className="text-xs">{showDetails ? "▲" : "▼"}</span>
         </button>
@@ -1090,9 +1079,7 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                WhatsApp
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">WhatsApp</label>
               <input
                 value={localWhatsapp}
                 onChange={(e) => setLocalWhatsapp(e.target.value)}
@@ -1102,9 +1089,7 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                {t("Notas", "Notes")}
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">{t("Notas", "Notes")}</label>
               <textarea
                 value={localNotes}
                 onChange={(e) => setLocalNotes(e.target.value)}
@@ -1119,29 +1104,19 @@ function InventoryCardMobile({
                 disabled={!hasChanges || saving}
                 className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
               >
-                {saving
-                  ? t("Guardando…", "Saving…")
-                  : hasChanges
-                  ? t("Guardar detalles", "Save details")
-                  : t("Sin cambios", "No changes")}
+                {saving ? t("Guardando…", "Saving…") : hasChanges ? t("Guardar detalles", "Save details") : t("Sin cambios", "No changes")}
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* confirm popup (NORMAL mode) */}
+      {/* confirm popup */}
       {pendingStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
             <p className="text-sm font-semibold text-slate-900">
               {t("Cambiar estatus del par", "Change pair status")}
-            </p>
-            <p className="text-xs text-slate-600">
-              {t(
-                "Estás a punto de cambiar el estatus:",
-                "You are about to change the status:"
-              )}
             </p>
 
             <div className="flex items-center justify-center gap-2 text-xs font-semibold">
@@ -1192,10 +1167,8 @@ function InventoryFastRowMobile({
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
 }) {
   const [saving, setSaving] = useState(false);
-  const [localStatus, setLocalStatus] =
-    useState<InventoryStatus>(item.status);
-  const [pendingStatus, setPendingStatus] =
-    useState<InventoryStatus | null>(null);
+  const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -1205,7 +1178,6 @@ function InventoryFastRowMobile({
 
   async function saveStatus(newStatus: InventoryStatus) {
     if (newStatus === localStatus) return;
-
     setSaving(true);
     setLocalStatus(newStatus);
     await onUpdate({ id: item.id, status: newStatus });
@@ -1214,9 +1186,10 @@ function InventoryFastRowMobile({
 
   function handleStatusClick(newStatus: InventoryStatus) {
     if (newStatus === localStatus) return;
-    // Open popup
     setPendingStatus(newStatus);
   }
+
+  const locName = getLocationName(item);
 
   return (
     <>
@@ -1226,9 +1199,12 @@ function InventoryFastRowMobile({
             <p className="text-sm font-semibold text-slate-900 truncate">
               {translateModelLabel(item.model_name, lang)} · {item.size}
             </p>
-            <p className="text-[11px] text-slate-500 truncate">
-              {translateColorLabel(item.color, lang)}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-slate-500 truncate">
+                {translateColorLabel(item.color, lang)}
+              </p>
+              <LocationChip name={locName} />
+            </div>
           </div>
           <p className="text-sm font-semibold text-slate-900 whitespace-nowrap">
             ${item.price_mxn.toFixed(0)} MXN
@@ -1241,9 +1217,7 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("available")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "available"
-                ? "bg-emerald-500 text-white"
-                : "bg-emerald-50 text-emerald-700"
+              localStatus === "available" ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Disponible", "Available")}
@@ -1253,9 +1227,7 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("reserved")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "reserved"
-                ? "bg-amber-400 text-slate-900"
-                : "bg-amber-50 text-amber-700"
+              localStatus === "reserved" ? "bg-amber-400 text-slate-900" : "bg-amber-50 text-amber-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Apartado", "Reserved")}
@@ -1265,9 +1237,7 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("paid_complete")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "paid_complete"
-                ? "bg-sky-500 text-white"
-                : "bg-sky-50 text-sky-700"
+              localStatus === "paid_complete" ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Pagado", "Paid")}
@@ -1275,19 +1245,10 @@ function InventoryFastRowMobile({
         </div>
       </div>
 
-      {/* confirmation popup (FAST mode) */}
       {pendingStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
-            <p className="text-sm font-semibold text-slate-900">
-              {t("Cambiar estatus", "Change status")}
-            </p>
-            <p className="text-xs text-slate-600">
-              {t(
-                "Estás a punto de cambiar el estatus:",
-                "You are about to change the status:"
-              )}
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{t("Cambiar estatus", "Change status")}</p>
 
             <div className="flex items-center justify-center gap-2 text-xs font-semibold">
               <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">

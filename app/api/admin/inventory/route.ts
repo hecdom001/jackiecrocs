@@ -1,3 +1,4 @@
+// app/api/admin/inventory/route.tsx
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient"; // <- same client you already use
 
@@ -10,14 +11,15 @@ function requireAdmin(req: NextRequest) {
 /**
  * GET /api/admin/inventory
  * Returns: { items: InventoryItemDTO[] }
- * Uses size_id + sizes.label instead of the old plain text size column.
+ * Uses size_id + sizes.label
+ * NOW includes location info.
  */
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Join inventory_items with models + colors + sizes
+  // Join inventory_items with models + colors + sizes + locations
   const { data, error } = await supabase
     .from("inventory_items")
     .select(
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
       model_id,
       color_id,
       size_id,
+      location_id,
       price_mxn,
       status,
       customer_name,
@@ -38,6 +41,11 @@ export async function GET(req: NextRequest) {
       sizes (
         id,
         label
+      ),
+      locations (
+        id,
+        slug,
+        name
       )
     `
     )
@@ -57,10 +65,23 @@ export async function GET(req: NextRequest) {
       id: row.id as string,
       model_id: row.model_id as string,
       color_id: row.color_id as string,
+
       model_name: row.models?.name ?? null,
       color: row.colors?.name_en ?? null,
-      size: row.sizes?.label ?? "",      // label from sizes
-      size_id: row.size_id as string,    // fk
+
+      size: row.sizes?.label ?? "",
+      size_id: row.size_id as string,
+
+      // ✅ NEW
+      location_id: row.location_id as string,
+      location: row.locations
+        ? {
+            id: row.locations.id as string,
+            slug: row.locations.slug as string,
+            name: row.locations.name as string,
+          }
+        : null,
+
       price_mxn: Number(row.price_mxn),
       status: row.status as any,
       customer_name: (row.customer_name as string) ?? null,
@@ -75,10 +96,11 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/inventory
- * Body: { model_name, color, size_id, price_mxn, quantity }
+ * Body: { model_name, color, size_id, price_mxn, quantity, location_id }
  * - Ensures model exists in `models`
  * - Ensures color exists in `colors`
  * - Ensures size exists in `sizes`
+ * - Ensures location exists in `locations`
  * - Inserts N inventory_items rows with those IDs
  * - Uses size_id as source of truth, but ALSO fills legacy `size` text column
  *   so the NOT NULL constraint is satisfied.
@@ -89,9 +111,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { model_name, color, size_id, price_mxn, quantity } = body;
+  const { model_name, color, size_id, price_mxn, quantity, location_id } = body;
 
-  if (!model_name || !color || !size_id || !price_mxn) {
+  if (!model_name || !color || !size_id || !price_mxn || !location_id) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -109,20 +131,37 @@ export async function POST(req: NextRequest) {
 
   if (sizeError) {
     console.error("Error selecting size:", sizeError);
+    return NextResponse.json({ error: "Error checking size" }, { status: 500 });
+  }
+
+  if (!sizeRow) {
+    return NextResponse.json({ error: "Invalid size_id" }, { status: 400 });
+  }
+
+  const legacySizeLabel = sizeRow.label as string;
+
+  // ✅ 0b) Ensure location exists
+  const normalizedLocationId = String(location_id).trim();
+  const { data: locationRow, error: locationError } = await supabase
+    .from("locations")
+    .select("id")
+    .eq("id", normalizedLocationId)
+    .maybeSingle();
+
+  if (locationError) {
+    console.error("Error selecting location:", locationError);
     return NextResponse.json(
-      { error: "Error checking size" },
+      { error: "Error checking location" },
       { status: 500 }
     );
   }
 
-  if (!sizeRow) {
+  if (!locationRow) {
     return NextResponse.json(
-      { error: "Invalid size_id" },
+      { error: "Invalid location_id" },
       { status: 400 }
     );
   }
-
-  const legacySizeLabel = sizeRow.label as string;
 
   // 1) Ensure model exists (models.name)
   const normalizedModel = String(model_name).trim();
@@ -134,10 +173,7 @@ export async function POST(req: NextRequest) {
 
   if (modelSelectError) {
     console.error("Error selecting model:", modelSelectError);
-    return NextResponse.json(
-      { error: "Error checking model" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error checking model" }, { status: 500 });
   }
 
   if (!existingModel) {
@@ -149,10 +185,7 @@ export async function POST(req: NextRequest) {
 
     if (modelInsertError || !newModel) {
       console.error("Error inserting model:", modelInsertError);
-      return NextResponse.json(
-        { error: "Error creating model" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Error creating model" }, { status: 500 });
     }
     existingModel = newModel;
   }
@@ -169,10 +202,7 @@ export async function POST(req: NextRequest) {
 
   if (colorSelectError) {
     console.error("Error selecting color:", colorSelectError);
-    return NextResponse.json(
-      { error: "Error checking color" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error checking color" }, { status: 500 });
   }
 
   if (!existingColor) {
@@ -184,10 +214,7 @@ export async function POST(req: NextRequest) {
 
     if (colorInsertError || !newColor) {
       console.error("Error inserting color:", colorInsertError);
-      return NextResponse.json(
-        { error: "Error creating color" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Error creating color" }, { status: 500 });
     }
     existingColor = newColor;
   }
@@ -196,11 +223,13 @@ export async function POST(req: NextRequest) {
 
   // 3) Insert inventory rows (one per pair)
   //    -> use size_id as FK + keep legacy `size` text column in sync
+  //    -> ✅ include location_id
   const rows = Array.from({ length: qty }).map(() => ({
     model_id,
     color_id,
     size_id: String(size_id),
-    size: legacySizeLabel,             // 👈 keeps NOT NULL column happy
+    size: legacySizeLabel, // keeps NOT NULL column happy
+    location_id: normalizedLocationId, // ✅ NEW
     price_mxn: Number(price_mxn),
     status: "available",
   }));
@@ -224,6 +253,7 @@ export async function POST(req: NextRequest) {
  * PATCH /api/admin/inventory
  * Body: { id, ...fieldsToUpdate }
  * Only used for status / customer data / notes
+ * NOW optionally allows location_id too (useful for corrections).
  */
 export async function PATCH(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -234,10 +264,7 @@ export async function PATCH(req: NextRequest) {
   const { id, ...rest } = body;
 
   if (!id) {
-    return NextResponse.json(
-      { error: "Missing item id" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing item id" }, { status: 400 });
   }
 
   // Only allow certain fields to be updated from the admin UI
@@ -246,6 +273,7 @@ export async function PATCH(req: NextRequest) {
     "customer_name",
     "customer_whatsapp",
     "notes",
+    "location_id", // ✅ NEW (optional)
   ] as const;
 
   const payload: Record<string, any> = {};
@@ -256,10 +284,28 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (Object.keys(payload).length === 0) {
-    return NextResponse.json(
-      { error: "No valid fields to update" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
+  // If location_id is being updated, validate it exists
+  if (payload.location_id) {
+    const { data: loc, error: locErr } = await supabase
+      .from("locations")
+      .select("id")
+      .eq("id", String(payload.location_id))
+      .maybeSingle();
+
+    if (locErr) {
+      console.error("Error checking location:", locErr);
+      return NextResponse.json(
+        { error: "Error checking location" },
+        { status: 500 }
+      );
+    }
+
+    if (!loc) {
+      return NextResponse.json({ error: "Invalid location_id" }, { status: 400 });
+    }
   }
 
   const { error } = await supabase
@@ -269,10 +315,7 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     console.error("Error updating inventory item:", error);
-    return NextResponse.json(
-      { error: "Error updating item" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error updating item" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
