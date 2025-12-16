@@ -332,60 +332,6 @@ export default function AdminDashboardPage() {
 
       {/* ---------- MOBILE LAYOUT ---------- */}
       <section className="space-y-3 sm:hidden">
-        {/* ✅ Summary by location (mobile) */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-2">
-          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <span>📍</span>
-            {t("Resumen por ubicación", "Summary by location")}
-          </h3>
-
-          {byLocationList.length === 0 ? (
-            <p className="text-[11px] text-slate-500">{t("Sin datos todavía.", "No data yet.")}</p>
-          ) : (
-            <div className="space-y-2">
-              {byLocationList.map(([locId, s]) => (
-                <div
-                  key={locId}
-                  className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-slate-900">{s.name}</p>
-                    <p className="text-[11px] text-slate-700">
-                      {t("Total", "Total")}: {s.total}
-                    </p>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {t("Disp.", "Avail.")}: {s.available}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      {t("Apart.", "Resv.")}: {s.reserved}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">
-                      {t("Pagado", "Paid")}: {s.paid_complete}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                      {t("Ingresos", "Revenue")}: ${s.revenue_paid.toFixed(0)} MXN
-                    </span>
-                  </div>
-
-                  {locId !== "no_location" && (
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setLocationFilter(locId)}
-                        className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
-                      >
-                        {t("Ver solo aquí", "View only")}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Stats: 2 columns on mobile */}
         <div className="grid grid-cols-2 gap-2">
           <StatCard
@@ -438,6 +384,60 @@ export default function AdminDashboardPage() {
           <p className="text-2xl font-semibold text-slate-900 mt-1">
             ${totalRevenuePaid.toLocaleString("es-MX")} MXN
           </p>
+        </div>
+
+        {/* ✅ Summary by location (mobile) */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <span>📍</span>
+            {t("Resumen por ubicación", "Summary by location")}
+          </h3>
+
+          {byLocationList.length === 0 ? (
+            <p className="text-[11px] text-slate-500">{t("Sin datos todavía.", "No data yet.")}</p>
+          ) : (
+            <div className="space-y-2">
+              {byLocationList.map(([locId, s]) => (
+                <div
+                  key={locId}
+                  className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-slate-900">{s.name}</p>
+                    <p className="text-[11px] text-slate-700">
+                      {t("Total", "Total")}: {s.total}
+                    </p>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      {t("Disp.", "Avail.")}: {s.available}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      {t("Apart.", "Resv.")}: {s.reserved}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">
+                      {t("Pagado", "Paid")}: {s.paid_complete}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                      {t("Ingresos", "Revenue")}: ${s.revenue_paid.toFixed(0)} MXN
+                    </span>
+                  </div>
+
+                  {locId !== "no_location" && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setLocationFilter(locId)}
+                        className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        {t("Ver solo aquí", "View only")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Color summary as a vertical list */}
