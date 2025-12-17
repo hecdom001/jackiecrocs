@@ -63,6 +63,8 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang): st
       return "Azul Ártico";
     case "camo":
       return "Camuflaje";
+    case "light pink shimmer":
+      return "Rosa Claro con Brillo";
     default:
       return colorEn;
   }
