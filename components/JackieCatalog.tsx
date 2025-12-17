@@ -826,14 +826,12 @@ export function JackieCatalog() {
   }, []);
 
   // auto-refresh every 60s
-  useEffect(() => {
-    const id = setInterval(() => {
-      loadInventory();
-    }, 60_000);
+    useEffect(() => {
+    if (tab !== "catalog") return;
 
+    const id = setInterval(() => loadInventory(), 3 * 60_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tab]);
 
   // reset visible items when filters or inventory change
   useEffect(() => {
@@ -1652,7 +1650,7 @@ export function JackieCatalog() {
             <div className="leading-tight">
               <p className="text-sm font-semibold">Jacky Shop</p>
               <p className="text-[11px] text-slate-500">
-                {t("Crocs · Ubicación", "Crocs · Location")}: {selectedLocationName}
+                {t("Calzado · Ubicación", "Footwear · Location")}: {selectedLocationName}
               </p>
             </div>
           </div>

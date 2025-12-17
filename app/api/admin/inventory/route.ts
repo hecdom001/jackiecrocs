@@ -1,4 +1,4 @@
-// app/api/admin/inventory/route.tsx
+// app/api/admin/inventory/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient"; // <- same client you already use
 
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
       size_id: row.size_id as string,
 
       // ✅ NEW
-      location_id: row.location_id as string,
+      location_id: row.location_id ? String(row.location_id) : null,
       location: row.locations
         ? {
             id: row.locations.id as string,

@@ -69,31 +69,26 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   }
 }
 
-// ✅ NEW helpers
+// location helpers (read-only display)
 function getLocationName(item: InventoryItem) {
-  // preferred: joined location object
   const name = (item as any)?.location?.name as string | undefined;
   if (name) return name;
 
-  // fallback: if you ever only have slug
   const slug = (item as any)?.location?.slug as string | undefined;
   if (slug) return slug.charAt(0).toUpperCase() + slug.slice(1);
 
-  // final fallback
   return "—";
 }
 
-function getLocationSlug(item: InventoryItem) {
-  const slug = (item as any)?.location?.slug as string | undefined;
-  if (slug) return slug.toLowerCase();
-  return "";
-}
+type LocationOption = { id: string; slug: string; name: string };
 
 export default function AdminInventoryPage() {
   const router = useRouter();
-  const { lang, t } = useAdminLang(); // shared lang + t
+  const { lang, t } = useAdminLang();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -116,10 +111,10 @@ export default function AdminInventoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
     "all"
   );
-  const [sizeFilter, setSizeFilter] = useState<string>("all"); // stores size_id or "all"
+  const [sizeFilter, setSizeFilter] = useState<string>("all"); // size_id or "all"
   const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState<string>("all"); // ✅ NEW (location_id or "all")
+  const [locationFilter, setLocationFilter] = useState<string>("all"); // location_id or "all"
 
   // Filters panel (mobile)
   const [showFilters, setShowFilters] = useState(false);
@@ -135,12 +130,38 @@ export default function AdminInventoryPage() {
     return false;
   }
 
+  async function loadLocations() {
+    try {
+      const res = await fetch("/api/admin/locations");
+      if (handleMaybeUnauthorized(res)) return;
+
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Failed to load locations", data?.error);
+        setLocations([]);
+        return;
+      }
+
+      setLocations(
+        (data.locations || []).map((l: any) => ({
+          id: String(l.id),
+          slug: String(l.slug),
+          name: String(l.name),
+        }))
+      );
+    } catch (e) {
+      console.error(e);
+      setLocations([]);
+    }
+  }
+
   async function loadItems() {
     setLoading(true);
     setErrorMsg(null);
     try {
       const res = await fetch("/api/admin/inventory");
       if (handleMaybeUnauthorized(res)) return;
+
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(
@@ -176,6 +197,7 @@ export default function AdminInventoryPage() {
   }
 
   useEffect(() => {
+    loadLocations();
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -183,7 +205,7 @@ export default function AdminInventoryPage() {
   // Reset page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, sizeFilter, colorFilter, customerQuery, locationFilter]); // ✅ NEW
+  }, [statusFilter, sizeFilter, colorFilter, customerQuery, locationFilter]);
 
   // Filter options
   const sizeFilterOptions = Array.from(
@@ -200,21 +222,19 @@ export default function AdminInventoryPage() {
     new Set(items.map((i) => i.color).filter((c): c is string => !!c))
   ).sort((a, b) => a.localeCompare(b));
 
-  // ✅ NEW: location filter options
+  // Location filter options: prefer global locations list; fallback to items-derived
   const locationFilterOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; slug?: string }>();
+    if (locations.length > 0) return locations;
 
+    const map = new Map<string, LocationOption>();
     for (const it of items) {
       const locId = (it as any).location_id as string | undefined;
       if (!locId) continue;
-
       const name = getLocationName(it);
-      const slug = getLocationSlug(it);
-      if (!map.has(locId)) map.set(locId, { id: locId, name, slug });
+      map.set(locId, { id: locId, name, slug: "" });
     }
-
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [items]);
+  }, [items, locations]);
 
   const filteredItems = items.filter((item) => {
     const matchesStatus =
@@ -222,7 +242,6 @@ export default function AdminInventoryPage() {
     const matchesSize = sizeFilter === "all" || item.size_id === sizeFilter;
     const matchesColor = colorFilter === "all" || item.color === colorFilter;
 
-    // ✅ NEW: location filter
     const itemLocId = (item as any).location_id as string | undefined;
     const matchesLocation =
       locationFilter === "all" || itemLocId === locationFilter;
@@ -257,14 +276,14 @@ export default function AdminInventoryPage() {
     statusFilter !== "all" ||
     sizeFilter !== "all" ||
     colorFilter !== "all" ||
-    locationFilter !== "all" || // ✅ NEW
+    locationFilter !== "all" ||
     customerQuery.trim() !== "";
 
   function clearFilters() {
     setStatusFilter("all");
     setSizeFilter("all");
     setColorFilter("all");
-    setLocationFilter("all"); // ✅ NEW
+    setLocationFilter("all");
     setCustomerQuery("");
   }
 
@@ -290,7 +309,10 @@ export default function AdminInventoryPage() {
               {t("Inventario", "Inventory")}
             </h1>
             <p className="text-xs text-slate-500">
-              {t("Gestiona pares desde el teléfono.", "Manage pairs from your phone.")}
+              {t(
+                "Gestiona pares desde el teléfono.",
+                "Manage pairs from your phone."
+              )}
             </p>
           </div>
 
@@ -301,7 +323,9 @@ export default function AdminInventoryPage() {
               disabled={loading}
               className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
-              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
+              {loading
+                ? t("Actualizando…", "Refreshing…")
+                : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
         </div>
@@ -338,7 +362,9 @@ export default function AdminInventoryPage() {
             disabled={loading}
             className="flex-1 inline-flex justify-center items-center rounded-full bg-emerald-500 text-white font-semibold px-3 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
           >
-            {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
+            {loading
+              ? t("Actualizando…", "Refreshing…")
+              : t("Actualizar datos", "Refresh data")}
           </button>
         </div>
 
@@ -371,7 +397,9 @@ export default function AdminInventoryPage() {
               onClick={() => setShowFilters((prev) => !prev)}
               className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 shadow-sm"
             >
-              {showFilters ? t("Ocultar filtros", "Hide filters") : t("Mostrar filtros", "Show filters")}
+              {showFilters
+                ? t("Ocultar filtros", "Hide filters")
+                : t("Mostrar filtros", "Show filters")}
             </button>
           </div>
 
@@ -400,7 +428,7 @@ export default function AdminInventoryPage() {
               </select>
             </div>
 
-            {/* location ✅ NEW */}
+            {/* location filter */}
             <div className="flex flex-col gap-1">
               <span className="text-slate-700">{t("Ubicación", "Location")}</span>
               <select
@@ -453,7 +481,9 @@ export default function AdminInventoryPage() {
 
             {/* customer search */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
+              <span className="text-slate-700">
+                {t("Cliente / WhatsApp", "Customer / WhatsApp")}
+              </span>
               <input
                 value={customerQuery}
                 onChange={(e) => setCustomerQuery(e.target.value)}
@@ -504,7 +534,7 @@ export default function AdminInventoryPage() {
                 </select>
               </div>
 
-              {/* location ✅ NEW */}
+              {/* location */}
               <div className="flex flex-col gap-1">
                 <span className="text-slate-700">{t("Ubicación", "Location")}</span>
                 <select
@@ -557,7 +587,9 @@ export default function AdminInventoryPage() {
 
               {/* customer search */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
+                <span className="text-slate-700">
+                  {t("Cliente / WhatsApp", "Customer / WhatsApp")}
+                </span>
                 <input
                   value={customerQuery}
                   onChange={(e) => setCustomerQuery(e.target.value)}
@@ -624,7 +656,10 @@ export default function AdminInventoryPage() {
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-xs text-slate-500">
-            {t("No hay resultados con estos filtros.", "No results with these filters.")}
+            {t(
+              "No hay resultados con estos filtros.",
+              "No results with these filters."
+            )}
           </p>
         ) : (
           <>
@@ -637,6 +672,7 @@ export default function AdminInventoryPage() {
                     item={item}
                     lang={lang}
                     onUpdate={updateItem}
+                    locations={locations}
                   />
                 ) : (
                   <InventoryCardMobile
@@ -644,6 +680,7 @@ export default function AdminInventoryPage() {
                     item={item}
                     lang={lang}
                     onUpdate={updateItem}
+                    locations={locations}
                   />
                 )
               )}
@@ -655,17 +692,39 @@ export default function AdminInventoryPage() {
                 <table className="min-w-full text-[11px]">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">ID</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Modelo", "Model")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Color", "Color")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Talla", "Size")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Ubicación", "Location")}</th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Precio", "Price")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Estatus", "Status")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Cliente", "Customer")}</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">WhatsApp</th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Notas", "Notes")}</th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Acciones", "Actions")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        ID
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Modelo", "Model")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Color", "Color")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Talla", "Size")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Ubicación", "Location")}
+                      </th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
+                        {t("Precio", "Price")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Estatus", "Status")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Cliente", "Customer")}
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        WhatsApp
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                        {t("Notas", "Notes")}
+                      </th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
+                        {t("Acciones", "Actions")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -675,6 +734,7 @@ export default function AdminInventoryPage() {
                         item={item}
                         lang={lang}
                         onUpdate={updateItem}
+                        locations={locations}
                       />
                     ))}
                   </tbody>
@@ -728,7 +788,10 @@ export default function AdminInventoryPage() {
                       {t("Anterior", "Previous")}
                     </button>
                     <span>
-                      {t(`Página ${currentPage} de ${totalPages}`, `Page ${currentPage} of ${totalPages}`)}
+                      {t(
+                        `Página ${currentPage} de ${totalPages}`,
+                        `Page ${currentPage} of ${totalPages}`
+                      )}
                     </span>
                     <button
                       type="button"
@@ -763,7 +826,9 @@ function StatusChip({
   emoji: string;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}
+    >
       <span>{emoji}</span>
       <span className="font-medium">
         {label}: {value}
@@ -772,27 +837,29 @@ function StatusChip({
   );
 }
 
-function LocationChip({ name }: { name: string }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-      📍 {name}
-    </span>
-  );
-}
-
 function InventoryRow({
   item,
   lang,
   onUpdate,
+  locations,
 }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
+  locations: LocationOption[];
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
-  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
+  const [localCustomerName, setLocalCustomerName] = useState(
+    item.customer_name || ""
+  );
+  const [localWhatsapp, setLocalWhatsapp] = useState(
+    item.customer_whatsapp || ""
+  );
   const [localNotes, setLocalNotes] = useState(item.notes || "");
+  const [localLocationId, setLocalLocationId] = useState<string>(
+    (((item as any).location_id as string) || "") as string
+  );
+
   const [saving, setSaving] = useState(false);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
@@ -802,13 +869,15 @@ function InventoryRow({
     setLocalCustomerName(item.customer_name || "");
     setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
+    setLocalLocationId(((item as any).location_id as string) || "");
   }, [item]);
 
   const hasChanges =
     localStatus !== item.status ||
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
-    localNotes !== (item.notes || "");
+    localNotes !== (item.notes || "") ||
+    localLocationId !== (((item as any).location_id as string) || "");
 
   async function handleSave() {
     if (!hasChanges) return;
@@ -816,6 +885,7 @@ function InventoryRow({
     await onUpdate({
       id: item.id,
       status: localStatus,
+      location_id: localLocationId || undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -834,8 +904,6 @@ function InventoryRow({
       ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
-  const locName = getLocationName(item);
-
   return (
     <tr className="hover:bg-slate-50/70">
       <td className="px-3 py-2 align-top text-slate-500">
@@ -849,9 +917,21 @@ function InventoryRow({
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">{item.size}</td>
 
-      {/* ✅ NEW location column */}
+      {/* editable location */}
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
-        <LocationChip name={locName} />
+        <select
+          value={localLocationId}
+          onChange={(e) => setLocalLocationId(e.target.value)}
+          className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+        >
+          <option value="">{t("Sin ubicación", "No location")}</option>
+          {locations.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[10px] text-slate-500">📍 {getLocationName(item)}</p>
       </td>
 
       <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
@@ -907,7 +987,11 @@ function InventoryRow({
           disabled={!hasChanges || saving}
           className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
         >
-          {saving ? t("Guardando…", "Saving…") : hasChanges ? t("Guardar", "Save") : t("OK", "OK")}
+          {saving
+            ? t("Guardando…", "Saving…")
+            : hasChanges
+            ? t("Guardar", "Save")
+            : t("OK", "OK")}
         </button>
       </td>
     </tr>
@@ -920,18 +1004,30 @@ function InventoryCardMobile({
   item,
   lang,
   onUpdate,
+  locations,
 }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
+  locations: LocationOption[];
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
-  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
+  const [localCustomerName, setLocalCustomerName] = useState(
+    item.customer_name || ""
+  );
+  const [localWhatsapp, setLocalWhatsapp] = useState(
+    item.customer_whatsapp || ""
+  );
   const [localNotes, setLocalNotes] = useState(item.notes || "");
+  const [localLocationId, setLocalLocationId] = useState<string>(
+    ((item as any).location_id as string) || ""
+  );
+
   const [saving, setSaving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
+    null
+  );
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -940,12 +1036,14 @@ function InventoryCardMobile({
     setLocalCustomerName(item.customer_name || "");
     setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
+    setLocalLocationId(((item as any).location_id as string) || "");
   }, [item]);
 
   const hasChanges =
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
-    localNotes !== (item.notes || "");
+    localNotes !== (item.notes || "") ||
+    localLocationId !== (((item as any).location_id as string) || "");
 
   async function saveWithStatus(newStatus: InventoryStatus) {
     setSaving(true);
@@ -954,6 +1052,7 @@ function InventoryCardMobile({
     await onUpdate({
       id: item.id,
       status: newStatus,
+      location_id: localLocationId || undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -973,6 +1072,7 @@ function InventoryCardMobile({
     await onUpdate({
       id: item.id,
       status: localStatus,
+      location_id: localLocationId || undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -991,8 +1091,6 @@ function InventoryCardMobile({
       ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
-  const locName = getLocationName(item);
-
   return (
     <>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
@@ -1005,10 +1103,9 @@ function InventoryCardMobile({
               {translateColorLabel(item.color, lang)}
             </p>
 
-            {/* ✅ NEW location chip */}
-            <div className="mt-1">
-              <LocationChip name={locName} />
-            </div>
+            <p className="mt-1 text-[11px] text-slate-600">
+              📍 {getLocationName(item)}
+            </p>
 
             <p className="mt-1 text-[11px] text-slate-400 font-mono">
               ID: {item.id.slice(0, 8)}…
@@ -1059,13 +1156,34 @@ function InventoryCardMobile({
           className="flex w-full items-center justify-between rounded-full bg-slate-100 px-3 py-1.5 text-[11px] text-slate-700"
         >
           <span>
-            {showDetails ? t("Ocultar detalles", "Hide details") : t("Ver / editar detalles", "View / edit details")}
+            {showDetails
+              ? t("Ocultar detalles", "Hide details")
+              : t("Ver / editar detalles", "View / edit details")}
           </span>
           <span className="text-xs">{showDetails ? "▲" : "▼"}</span>
         </button>
 
         {showDetails && (
           <div className="space-y-2 pt-1 border-t border-slate-200 mt-1">
+            {/* location select */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-700">
+                {t("Ubicación", "Location")}
+              </label>
+              <select
+                value={localLocationId}
+                onChange={(e) => setLocalLocationId(e.target.value)}
+                className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                <option value="">{t("Sin ubicación", "No location")}</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[11px] font-medium text-slate-700">
                 {t("Cliente", "Customer")}
@@ -1079,7 +1197,9 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">WhatsApp</label>
+              <label className="text-[11px] font-medium text-slate-700">
+                WhatsApp
+              </label>
               <input
                 value={localWhatsapp}
                 onChange={(e) => setLocalWhatsapp(e.target.value)}
@@ -1089,7 +1209,9 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">{t("Notas", "Notes")}</label>
+              <label className="text-[11px] font-medium text-slate-700">
+                {t("Notas", "Notes")}
+              </label>
               <textarea
                 value={localNotes}
                 onChange={(e) => setLocalNotes(e.target.value)}
@@ -1104,7 +1226,11 @@ function InventoryCardMobile({
                 disabled={!hasChanges || saving}
                 className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
               >
-                {saving ? t("Guardando…", "Saving…") : hasChanges ? t("Guardar detalles", "Save details") : t("Sin cambios", "No changes")}
+                {saving
+                  ? t("Guardando…", "Saving…")
+                  : hasChanges
+                  ? t("Guardar detalles", "Save details")
+                  : t("Sin cambios", "No changes")}
               </button>
             </div>
           </div>
@@ -1161,19 +1287,27 @@ function InventoryFastRowMobile({
   item,
   lang,
   onUpdate,
+  locations,
 }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
+  locations: LocationOption[];
 }) {
   const [saving, setSaving] = useState(false);
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
+    null
+  );
+  const [localLocationId, setLocalLocationId] = useState<string>(
+    ((item as any).location_id as string) || ""
+  );
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
   useEffect(() => {
     setLocalStatus(item.status);
+    setLocalLocationId(((item as any).location_id as string) || "");
   }, [item]);
 
   async function saveStatus(newStatus: InventoryStatus) {
@@ -1184,12 +1318,17 @@ function InventoryFastRowMobile({
     setSaving(false);
   }
 
+  async function saveLocation(nextId: string) {
+    setSaving(true);
+    setLocalLocationId(nextId);
+    await onUpdate({ id: item.id, location_id: nextId || undefined });
+    setSaving(false);
+  }
+
   function handleStatusClick(newStatus: InventoryStatus) {
     if (newStatus === localStatus) return;
     setPendingStatus(newStatus);
   }
-
-  const locName = getLocationName(item);
 
   return (
     <>
@@ -1199,17 +1338,29 @@ function InventoryFastRowMobile({
             <p className="text-sm font-semibold text-slate-900 truncate">
               {translateModelLabel(item.model_name, lang)} · {item.size}
             </p>
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-slate-500 truncate">
-                {translateColorLabel(item.color, lang)}
-              </p>
-              <LocationChip name={locName} />
-            </div>
+            <p className="text-[11px] text-slate-500 truncate">
+              {translateColorLabel(item.color, lang)} · 📍 {getLocationName(item)}
+            </p>
           </div>
           <p className="text-sm font-semibold text-slate-900 whitespace-nowrap">
             ${item.price_mxn.toFixed(0)} MXN
           </p>
         </div>
+
+        {/* quick location change */}
+        <select
+          value={localLocationId}
+          onChange={(e) => saveLocation(e.target.value)}
+          disabled={saving}
+          className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] text-slate-900 disabled:opacity-40"
+        >
+          <option value="">{t("Sin ubicación", "No location")}</option>
+          {locations.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
 
         <div className="flex gap-2">
           <button
@@ -1217,7 +1368,9 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("available")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "available" ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700"
+              localStatus === "available"
+                ? "bg-emerald-500 text-white"
+                : "bg-emerald-50 text-emerald-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Disponible", "Available")}
@@ -1227,7 +1380,9 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("reserved")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "reserved" ? "bg-amber-400 text-slate-900" : "bg-amber-50 text-amber-700"
+              localStatus === "reserved"
+                ? "bg-amber-400 text-slate-900"
+                : "bg-amber-50 text-amber-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Apartado", "Reserved")}
@@ -1237,7 +1392,9 @@ function InventoryFastRowMobile({
             onClick={() => handleStatusClick("paid_complete")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "paid_complete" ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-700"
+              localStatus === "paid_complete"
+                ? "bg-sky-500 text-white"
+                : "bg-sky-50 text-sky-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t("Pagado", "Paid")}
@@ -1248,7 +1405,9 @@ function InventoryFastRowMobile({
       {pendingStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
-            <p className="text-sm font-semibold text-slate-900">{t("Cambiar estatus", "Change status")}</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {t("Cambiar estatus", "Change status")}
+            </p>
 
             <div className="flex items-center justify-center gap-2 text-xs font-semibold">
               <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
