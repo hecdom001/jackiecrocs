@@ -4,6 +4,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { track } from "@vercel/analytics";
+import Image from "next/image";
 
 type Lang = "es" | "en";
 type AppTab = "home" | "catalog" | "messages" | "info";
@@ -192,37 +193,40 @@ function formatSizeLabel(size: string, lang: Lang, buyerType: BuyerType = "all")
   return `${size} (US)`;
 }
 
+const SUPABASE_IMAGE_BASE =
+  "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
+
 const CROCS_PHOTOS = {
   black: {
-    src: "/images/crocs-black.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-black.png`,
     label: "Crocs negros",
   },
   beige: {
-    src: "/images/crocs-beige.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-beige.png`,
     label: "Crocs beige",
   },
   white: {
-    src: "/images/crocs-white.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-white.png`,
     label: "Crocs blancos",
   },
   lila: {
-    src: "/images/crocs-lila.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-lila.png`,
     label: "Crocs lila",
   },
   light_pink: {
-    src: "/images/crocs-light-pink.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-light-pink.png`,
     label: "Crocs rosa pastel",
   },
   red: {
-    src: "/images/crocs-red.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-red.png`,
     label: "Crocs rojos",
   },
   arctic: {
-    src: "/images/crocs-arctic.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-arctic.png`,
     label: "Crocs Azul Ártico",
   },
   camo: {
-    src: "/images/crocs-camo.png",
+    src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`,
     label: "Crocs Camuflaje",
   },
 } as const;
@@ -1011,11 +1015,13 @@ export function JackieCatalog() {
 
           <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={photoList[mobilePhotoIndex].src}
               alt={photoList[mobilePhotoIndex].label}
+              width={900}
+              height={900}
               className="h-60 w-full object-cover"
-              loading="lazy"
+              priority={false}
             />
 
             {/* Prev */}
@@ -1797,7 +1803,14 @@ export function JackieCatalog() {
             {Object.values(CROCS_PHOTOS).map((photo) => (
               <div key={photo.src} className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.src} alt={photo.label} className="h-36 w-full object-cover" loading="lazy" />
+                <Image
+                  src={photo.src}
+                  alt={photo.label}
+                  width={600}
+                  height={600}
+                  className="h-36 w-full object-cover"
+                  priority={false}
+                />
               </div>
             ))}
           </div>
