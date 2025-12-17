@@ -60,6 +60,8 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Azul Ártico";
     case "camo":
       return "Camuflaje";
+    case "light pink shimmer":
+      return "Rosa Claro con Brillo";
     default:
       return colorEn;
   }
@@ -75,6 +77,8 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
       return "Clásico";
     case "classic platform":
       return "Plataforma Clásica";
+    case "classic shimmer gemstone":
+      return "Clásico Shimmer Gemstone";
     default:
       return modelEn;
   }
@@ -102,6 +106,10 @@ function colorLineClass(colorEn: string) {
     case "camo":
     case "camuflaje":
       return "bg-emerald-200";
+    case "light pink shimmer":
+    case "pink shimmer":
+    case "shimmer pink":
+      return "bg-rose-200";
     default:
       return "bg-slate-300";
   }
@@ -228,6 +236,10 @@ const CROCS_PHOTOS = {
   camo: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`,
     label: "Crocs Camuflaje",
+  }, 
+  gem: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`,
+    label: "Rosa Claro con Brillo"
   },
 } as const;
 

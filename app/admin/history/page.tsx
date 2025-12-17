@@ -62,6 +62,8 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Azul Ártico";
     case "camo":
       return "Camuflaje";
+    case "light pink shimmer":
+      return "Rosa Claro con Brillo";
     default:
       return colorEn;
   }
@@ -76,6 +78,8 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
       return "Clásico";
     case "classic platform":
       return "Plataforma Clásica";
+    case "classic shimmer gemstone":
+      return "Clásico Shimmer Gemstone";
     default:
       return modelEn;
   }
