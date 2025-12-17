@@ -70,24 +70,48 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang): st
 
 /* ---------- Size sorting helper ---------- */
 
-function compareSizeKey(a: string, b: string) {
-  if (a === "no_size" && b === "no_size") return 0;
-  if (a === "no_size") return 1;
-  if (b === "no_size") return -1;
+function parseSizeKey(raw: string) {
+  const s = (raw || "").trim().toUpperCase();
 
-  const numA = (() => {
-    const m = a.match(/(\d+(\.\d+)?)/);
-    return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
-  })();
+  // Special buckets
+  if (!s || s === "NO_SIZE") {
+    return { rank: 99, n: Number.POSITIVE_INFINITY, text: s };
+  }
 
-  const numB = (() => {
-    const m = b.match(/(\d+(\.\d+)?)/);
-    return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
-  })();
+  // Kids: C6, C7, C8...
+  let m = s.match(/^C(\d+(\.\d+)?)$/);
+  if (m) return { rank: 0, n: parseFloat(m[1]), text: s };
 
-  if (numA !== numB) return numA - numB;
-  return a.localeCompare(b);
+  // Youth: J1, J2, J3...
+  m = s.match(/^J(\d+(\.\d+)?)$/);
+  if (m) return { rank: 1, n: parseFloat(m[1]), text: s };
+
+  // Adult combo: M4-W6, M10-W12, etc. (sort by M number)
+  m = s.match(/^M(\d+(\.\d+)?)(?:-W(\d+(\.\d+)?))?$/);
+  if (m) return { rank: 2, n: parseFloat(m[1]), text: s };
+
+  // Plain numeric (rare)
+  m = s.match(/^(\d+(\.\d+)?)$/);
+  if (m) return { rank: 3, n: parseFloat(m[1]), text: s };
+
+  // Anything else goes last, but stable
+  const anyNum = s.match(/(\d+(\.\d+)?)/);
+  return {
+    rank: 4,
+    n: anyNum ? parseFloat(anyNum[1]) : Number.POSITIVE_INFINITY,
+    text: s,
+  };
 }
+
+function compareSizeKey(a: string, b: string) {
+  const A = parseSizeKey(a);
+  const B = parseSizeKey(b);
+
+  if (A.rank !== B.rank) return A.rank - B.rank;
+  if (A.n !== B.n) return A.n - B.n;
+  return A.text.localeCompare(B.text);
+}
+
 
 export default function AdminDashboardPage() {
   const router = useRouter();
