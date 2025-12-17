@@ -69,7 +69,7 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   }
 }
 
-// location helpers (read-only display)
+// Location helpers (read-only display)
 function getLocationName(item: InventoryItem) {
   const name = (item as any)?.location?.name as string | undefined;
   if (name) return name;
@@ -87,8 +87,6 @@ export default function AdminInventoryPage() {
   const { lang, t } = useAdminLang();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [locations, setLocations] = useState<LocationOption[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -130,31 +128,6 @@ export default function AdminInventoryPage() {
     return false;
   }
 
-  async function loadLocations() {
-    try {
-      const res = await fetch("/api/admin/locations");
-      if (handleMaybeUnauthorized(res)) return;
-
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Failed to load locations", data?.error);
-        setLocations([]);
-        return;
-      }
-
-      setLocations(
-        (data.locations || []).map((l: any) => ({
-          id: String(l.id),
-          slug: String(l.slug),
-          name: String(l.name),
-        }))
-      );
-    } catch (e) {
-      console.error(e);
-      setLocations([]);
-    }
-  }
-
   async function loadItems() {
     setLoading(true);
     setErrorMsg(null);
@@ -190,14 +163,20 @@ export default function AdminInventoryPage() {
     if (handleMaybeUnauthorized(res)) return;
 
     if (!res.ok) {
-      console.error("Failed to update item");
+      let msg = "Failed to update item";
+      try {
+        const data = await res.json();
+        msg = data?.error || msg;
+      } catch {
+        // ignore
+      }
+      console.error(msg);
       return;
     }
     loadItems();
   }
 
   useEffect(() => {
-    loadLocations();
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -206,6 +185,30 @@ export default function AdminInventoryPage() {
   useEffect(() => {
     setPage(1);
   }, [statusFilter, sizeFilter, colorFilter, customerQuery, locationFilter]);
+
+  // Build locations list from items (NO /api/admin/locations needed)
+  const locationOptions = useMemo<LocationOption[]>(() => {
+    const map = new Map<string, LocationOption>();
+
+    for (const it of items) {
+      const loc = (it as any)?.location as
+        | { id?: string; slug?: string; name?: string }
+        | null
+        | undefined;
+
+      if (!loc?.id) continue;
+
+      map.set(String(loc.id), {
+        id: String(loc.id),
+        slug: String(loc.slug || ""),
+        name: String(loc.name || ""),
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [items]);
 
   // Filter options
   const sizeFilterOptions = Array.from(
@@ -222,19 +225,7 @@ export default function AdminInventoryPage() {
     new Set(items.map((i) => i.color).filter((c): c is string => !!c))
   ).sort((a, b) => a.localeCompare(b));
 
-  // Location filter options: prefer global locations list; fallback to items-derived
-  const locationFilterOptions = useMemo(() => {
-    if (locations.length > 0) return locations;
-
-    const map = new Map<string, LocationOption>();
-    for (const it of items) {
-      const locId = (it as any).location_id as string | undefined;
-      if (!locId) continue;
-      const name = getLocationName(it);
-      map.set(locId, { id: locId, name, slug: "" });
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, locations]);
+  const locationFilterOptions = locationOptions;
 
   const filteredItems = items.filter((item) => {
     const matchesStatus =
@@ -242,7 +233,10 @@ export default function AdminInventoryPage() {
     const matchesSize = sizeFilter === "all" || item.size_id === sizeFilter;
     const matchesColor = colorFilter === "all" || item.color === colorFilter;
 
-    const itemLocId = (item as any).location_id as string | undefined;
+    const itemLocId = (item as any)?.location?.id
+      ? String((item as any).location.id)
+      : ((item as any).location_id as string | undefined);
+
     const matchesLocation =
       locationFilter === "all" || itemLocId === locationFilter;
 
@@ -309,10 +303,7 @@ export default function AdminInventoryPage() {
               {t("Inventario", "Inventory")}
             </h1>
             <p className="text-xs text-slate-500">
-              {t(
-                "Gestiona pares desde el teléfono.",
-                "Manage pairs from your phone."
-              )}
+              {t("Gestiona pares desde el teléfono.", "Manage pairs from your phone.")}
             </p>
           </div>
 
@@ -323,9 +314,7 @@ export default function AdminInventoryPage() {
               disabled={loading}
               className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
-              {loading
-                ? t("Actualizando…", "Refreshing…")
-                : t("Actualizar datos", "Refresh data")}
+              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
         </div>
@@ -362,9 +351,7 @@ export default function AdminInventoryPage() {
             disabled={loading}
             className="flex-1 inline-flex justify-center items-center rounded-full bg-emerald-500 text-white font-semibold px-3 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
           >
-            {loading
-              ? t("Actualizando…", "Refreshing…")
-              : t("Actualizar datos", "Refresh data")}
+            {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
           </button>
         </div>
 
@@ -397,9 +384,7 @@ export default function AdminInventoryPage() {
               onClick={() => setShowFilters((prev) => !prev)}
               className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700 shadow-sm"
             >
-              {showFilters
-                ? t("Ocultar filtros", "Hide filters")
-                : t("Mostrar filtros", "Show filters")}
+              {showFilters ? t("Ocultar filtros", "Hide filters") : t("Mostrar filtros", "Show filters")}
             </button>
           </div>
 
@@ -412,9 +397,7 @@ export default function AdminInventoryPage() {
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(
-                    e.target.value === "all"
-                      ? "all"
-                      : (e.target.value as InventoryStatus)
+                    e.target.value === "all" ? "all" : (e.target.value as InventoryStatus)
                   )
                 }
                 className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
@@ -481,9 +464,7 @@ export default function AdminInventoryPage() {
 
             {/* customer search */}
             <div className="flex flex-col gap-1">
-              <span className="text-slate-700">
-                {t("Cliente / WhatsApp", "Customer / WhatsApp")}
-              </span>
+              <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
               <input
                 value={customerQuery}
                 onChange={(e) => setCustomerQuery(e.target.value)}
@@ -518,9 +499,7 @@ export default function AdminInventoryPage() {
                   value={statusFilter}
                   onChange={(e) =>
                     setStatusFilter(
-                      e.target.value === "all"
-                        ? "all"
-                        : (e.target.value as InventoryStatus)
+                      e.target.value === "all" ? "all" : (e.target.value as InventoryStatus)
                     )
                   }
                   className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
@@ -587,9 +566,7 @@ export default function AdminInventoryPage() {
 
               {/* customer search */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">
-                  {t("Cliente / WhatsApp", "Customer / WhatsApp")}
-                </span>
+                <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
                 <input
                   value={customerQuery}
                   onChange={(e) => setCustomerQuery(e.target.value)}
@@ -649,17 +626,11 @@ export default function AdminInventoryPage() {
         {/* LIST / TABLE */}
         {items.length === 0 ? (
           <p className="text-xs text-slate-500">
-            {t(
-              "No hay pares cargados todavía o la sesión no ha cargado.",
-              "No pairs loaded yet, or session not loaded."
-            )}
+            {t("No hay pares cargados todavía o la sesión no ha cargado.", "No pairs loaded yet, or session not loaded.")}
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-xs text-slate-500">
-            {t(
-              "No hay resultados con estos filtros.",
-              "No results with these filters."
-            )}
+            {t("No hay resultados con estos filtros.", "No results with these filters.")}
           </p>
         ) : (
           <>
@@ -672,7 +643,6 @@ export default function AdminInventoryPage() {
                     item={item}
                     lang={lang}
                     onUpdate={updateItem}
-                    locations={locations}
                   />
                 ) : (
                   <InventoryCardMobile
@@ -680,7 +650,7 @@ export default function AdminInventoryPage() {
                     item={item}
                     lang={lang}
                     onUpdate={updateItem}
-                    locations={locations}
+                    locations={locationOptions}
                   />
                 )
               )}
@@ -692,39 +662,17 @@ export default function AdminInventoryPage() {
                 <table className="min-w-full text-[11px]">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        ID
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Modelo", "Model")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Color", "Color")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Talla", "Size")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Ubicación", "Location")}
-                      </th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
-                        {t("Precio", "Price")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Estatus", "Status")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Cliente", "Customer")}
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        WhatsApp
-                      </th>
-                      <th className="text-left px-3 py-2 font-semibold text-slate-600">
-                        {t("Notas", "Notes")}
-                      </th>
-                      <th className="text-right px-3 py-2 font-semibold text-slate-600">
-                        {t("Acciones", "Actions")}
-                      </th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">ID</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Modelo", "Model")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Color", "Color")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Talla", "Size")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Ubicación", "Location")}</th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Precio", "Price")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Estatus", "Status")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Cliente", "Customer")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">WhatsApp</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Notas", "Notes")}</th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Acciones", "Actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -734,7 +682,7 @@ export default function AdminInventoryPage() {
                         item={item}
                         lang={lang}
                         onUpdate={updateItem}
-                        locations={locations}
+                        locations={locationOptions}
                       />
                     ))}
                   </tbody>
@@ -788,10 +736,7 @@ export default function AdminInventoryPage() {
                       {t("Anterior", "Previous")}
                     </button>
                     <span>
-                      {t(
-                        `Página ${currentPage} de ${totalPages}`,
-                        `Page ${currentPage} of ${totalPages}`
-                      )}
+                      {t(`Página ${currentPage} de ${totalPages}`, `Page ${currentPage} of ${totalPages}`)}
                     </span>
                     <button
                       type="button"
@@ -826,9 +771,7 @@ function StatusChip({
   emoji: string;
 }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${colorClass}`}>
       <span>{emoji}</span>
       <span className="font-medium">
         {label}: {value}
@@ -849,35 +792,32 @@ function InventoryRow({
   locations: LocationOption[];
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(
-    item.customer_name || ""
-  );
-  const [localWhatsapp, setLocalWhatsapp] = useState(
-    item.customer_whatsapp || ""
-  );
+  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
+  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [localLocationId, setLocalLocationId] = useState<string>(
-    (((item as any).location_id as string) || "") as string
+    String((item as any)?.location?.id || (item as any).location_id || "")
   );
-
   const [saving, setSaving] = useState(false);
 
-  const t = (es: string, en: string) => (lang === "es" ? es : en);
+  const tt = (es: string, en: string) => (lang === "es" ? es : en);
 
   useEffect(() => {
     setLocalStatus(item.status);
     setLocalCustomerName(item.customer_name || "");
     setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
-    setLocalLocationId(((item as any).location_id as string) || "");
+    setLocalLocationId(String((item as any)?.location?.id || (item as any).location_id || ""));
   }, [item]);
+
+  const originalLocId = String((item as any)?.location?.id || (item as any).location_id || "");
 
   const hasChanges =
     localStatus !== item.status ||
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
     localNotes !== (item.notes || "") ||
-    localLocationId !== (((item as any).location_id as string) || "");
+    localLocationId !== originalLocId;
 
   async function handleSave() {
     if (!hasChanges) return;
@@ -885,7 +825,8 @@ function InventoryRow({
     await onUpdate({
       id: item.id,
       status: localStatus,
-      location_id: localLocationId || undefined,
+      // IMPORTANT: undefined means "don't send"; string means update.
+      location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -924,7 +865,7 @@ function InventoryRow({
           onChange={(e) => setLocalLocationId(e.target.value)}
           className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
         >
-          <option value="">{t("Sin ubicación", "No location")}</option>
+          <option value="">{tt("Sin ubicación", "No location")}</option>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
@@ -937,6 +878,7 @@ function InventoryRow({
       <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
         ${item.price_mxn.toFixed(0)} MXN
       </td>
+
       <td className="px-3 py-2 align-top">
         <div className="space-y-1">
           <select
@@ -950,21 +892,21 @@ function InventoryRow({
               </option>
             ))}
           </select>
-          <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}
-          >
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}>
             {statusLabel[localStatus][lang]}
           </span>
         </div>
       </td>
+
       <td className="px-3 py-2 align-top">
         <input
           value={localCustomerName}
           onChange={(e) => setLocalCustomerName(e.target.value)}
           className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-          placeholder={t("Nombre", "Name")}
+          placeholder={tt("Nombre", "Name")}
         />
       </td>
+
       <td className="px-3 py-2 align-top">
         <input
           value={localWhatsapp}
@@ -973,6 +915,7 @@ function InventoryRow({
           placeholder="+52..."
         />
       </td>
+
       <td className="px-3 py-2 align-top">
         <textarea
           value={localNotes}
@@ -980,6 +923,7 @@ function InventoryRow({
           className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[40px]"
         />
       </td>
+
       <td className="px-3 py-2 align-top text-right">
         <button
           type="button"
@@ -987,11 +931,7 @@ function InventoryRow({
           disabled={!hasChanges || saving}
           className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
         >
-          {saving
-            ? t("Guardando…", "Saving…")
-            : hasChanges
-            ? t("Guardar", "Save")
-            : t("OK", "OK")}
+          {saving ? tt("Guardando…", "Saving…") : hasChanges ? tt("Guardar", "Save") : tt("OK", "OK")}
         </button>
       </td>
     </tr>
@@ -1012,38 +952,34 @@ function InventoryCardMobile({
   locations: LocationOption[];
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [localCustomerName, setLocalCustomerName] = useState(
-    item.customer_name || ""
-  );
-  const [localWhatsapp, setLocalWhatsapp] = useState(
-    item.customer_whatsapp || ""
-  );
+  const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
+  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [localLocationId, setLocalLocationId] = useState<string>(
-    ((item as any).location_id as string) || ""
+    String((item as any)?.location?.id || (item as any).location_id || "")
   );
 
   const [saving, setSaving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
-    null
-  );
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
 
-  const t = (es: string, en: string) => (lang === "es" ? es : en);
+  const tt = (es: string, en: string) => (lang === "es" ? es : en);
 
   useEffect(() => {
     setLocalStatus(item.status);
     setLocalCustomerName(item.customer_name || "");
     setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
-    setLocalLocationId(((item as any).location_id as string) || "");
+    setLocalLocationId(String((item as any)?.location?.id || (item as any).location_id || ""));
   }, [item]);
+
+  const originalLocId = String((item as any)?.location?.id || (item as any).location_id || "");
 
   const hasChanges =
     localCustomerName !== (item.customer_name || "") ||
     localWhatsapp !== (item.customer_whatsapp || "") ||
     localNotes !== (item.notes || "") ||
-    localLocationId !== (((item as any).location_id as string) || "");
+    localLocationId !== originalLocId;
 
   async function saveWithStatus(newStatus: InventoryStatus) {
     setSaving(true);
@@ -1052,7 +988,7 @@ function InventoryCardMobile({
     await onUpdate({
       id: item.id,
       status: newStatus,
-      location_id: localLocationId || undefined,
+      location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -1072,7 +1008,7 @@ function InventoryCardMobile({
     await onUpdate({
       id: item.id,
       status: localStatus,
-      location_id: localLocationId || undefined,
+      location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
       customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
@@ -1103,21 +1039,16 @@ function InventoryCardMobile({
               {translateColorLabel(item.color, lang)}
             </p>
 
-            <p className="mt-1 text-[11px] text-slate-600">
-              📍 {getLocationName(item)}
-            </p>
+            <p className="mt-1 text-[11px] text-slate-600">📍 {getLocationName(item)}</p>
 
-            <p className="mt-1 text-[11px] text-slate-400 font-mono">
-              ID: {item.id.slice(0, 8)}…
-            </p>
+            <p className="mt-1 text-[11px] text-slate-400 font-mono">ID: {item.id.slice(0, 8)}…</p>
           </div>
+
           <div className="text-right">
             <p className="text-base font-semibold text-slate-900">
               ${item.price_mxn.toFixed(0)} MXN
             </p>
-            <span
-              className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}
-            >
+            <span className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}>
               {statusLabel[localStatus][lang]}
             </span>
           </div>
@@ -1130,7 +1061,7 @@ function InventoryCardMobile({
             disabled={saving}
             className="flex-1 rounded-full bg-emerald-500 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {t("Disponible", "Available")}
+            {tt("Disponible", "Available")}
           </button>
           <button
             type="button"
@@ -1138,7 +1069,7 @@ function InventoryCardMobile({
             disabled={saving}
             className="flex-1 rounded-full bg-amber-400 px-3 py-2.5 text-xs font-semibold text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {t("Apartado", "Reserved")}
+            {tt("Apartado", "Reserved")}
           </button>
           <button
             type="button"
@@ -1146,7 +1077,7 @@ function InventoryCardMobile({
             disabled={saving}
             className="flex-1 rounded-full bg-sky-500 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {t("Pagado", "Paid")}
+            {tt("Pagado", "Paid")}
           </button>
         </div>
 
@@ -1155,27 +1086,21 @@ function InventoryCardMobile({
           onClick={() => setShowDetails((prev) => !prev)}
           className="flex w-full items-center justify-between rounded-full bg-slate-100 px-3 py-1.5 text-[11px] text-slate-700"
         >
-          <span>
-            {showDetails
-              ? t("Ocultar detalles", "Hide details")
-              : t("Ver / editar detalles", "View / edit details")}
-          </span>
+          <span>{showDetails ? tt("Ocultar detalles", "Hide details") : tt("Ver / editar detalles", "View / edit details")}</span>
           <span className="text-xs">{showDetails ? "▲" : "▼"}</span>
         </button>
 
         {showDetails && (
           <div className="space-y-2 pt-1 border-t border-slate-200 mt-1">
-            {/* location select */}
+            {/* location select (NORMAL MODE ONLY) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                {t("Ubicación", "Location")}
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">{tt("Ubicación", "Location")}</label>
               <select
                 value={localLocationId}
                 onChange={(e) => setLocalLocationId(e.target.value)}
                 className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
               >
-                <option value="">{t("Sin ubicación", "No location")}</option>
+                <option value="">{tt("Sin ubicación", "No location")}</option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
@@ -1185,21 +1110,17 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                {t("Cliente", "Customer")}
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">{tt("Cliente", "Customer")}</label>
               <input
                 value={localCustomerName}
                 onChange={(e) => setLocalCustomerName(e.target.value)}
                 className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                placeholder={t("Nombre", "Name")}
+                placeholder={tt("Nombre", "Name")}
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                WhatsApp
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">WhatsApp</label>
               <input
                 value={localWhatsapp}
                 onChange={(e) => setLocalWhatsapp(e.target.value)}
@@ -1209,9 +1130,7 @@ function InventoryCardMobile({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-700">
-                {t("Notas", "Notes")}
-              </label>
+              <label className="text-[11px] font-medium text-slate-700">{tt("Notas", "Notes")}</label>
               <textarea
                 value={localNotes}
                 onChange={(e) => setLocalNotes(e.target.value)}
@@ -1226,11 +1145,7 @@ function InventoryCardMobile({
                 disabled={!hasChanges || saving}
                 className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
               >
-                {saving
-                  ? t("Guardando…", "Saving…")
-                  : hasChanges
-                  ? t("Guardar detalles", "Save details")
-                  : t("Sin cambios", "No changes")}
+                {saving ? tt("Guardando…", "Saving…") : hasChanges ? tt("Guardar detalles", "Save details") : tt("Sin cambios", "No changes")}
               </button>
             </div>
           </div>
@@ -1241,9 +1156,7 @@ function InventoryCardMobile({
       {pendingStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
-            <p className="text-sm font-semibold text-slate-900">
-              {t("Cambiar estatus del par", "Change pair status")}
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{tt("Cambiar estatus del par", "Change pair status")}</p>
 
             <div className="flex items-center justify-center gap-2 text-xs font-semibold">
               <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
@@ -1261,7 +1174,7 @@ function InventoryCardMobile({
                 onClick={() => setPendingStatus(null)}
                 className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700"
               >
-                {t("Cancelar", "Cancel")}
+                {tt("Cancelar", "Cancel")}
               </button>
               <button
                 type="button"
@@ -1273,7 +1186,7 @@ function InventoryCardMobile({
                 }}
                 className="rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {t("Confirmar", "Confirm")}
+                {tt("Confirmar", "Confirm")}
               </button>
             </div>
           </div>
@@ -1287,27 +1200,19 @@ function InventoryFastRowMobile({
   item,
   lang,
   onUpdate,
-  locations,
 }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
-  locations: LocationOption[];
 }) {
   const [saving, setSaving] = useState(false);
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
-  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(
-    null
-  );
-  const [localLocationId, setLocalLocationId] = useState<string>(
-    ((item as any).location_id as string) || ""
-  );
+  const [pendingStatus, setPendingStatus] = useState<InventoryStatus | null>(null);
 
-  const t = (es: string, en: string) => (lang === "es" ? es : en);
+  const tt = (es: string, en: string) => (lang === "es" ? es : en);
 
   useEffect(() => {
     setLocalStatus(item.status);
-    setLocalLocationId(((item as any).location_id as string) || "");
   }, [item]);
 
   async function saveStatus(newStatus: InventoryStatus) {
@@ -1315,13 +1220,6 @@ function InventoryFastRowMobile({
     setSaving(true);
     setLocalStatus(newStatus);
     await onUpdate({ id: item.id, status: newStatus });
-    setSaving(false);
-  }
-
-  async function saveLocation(nextId: string) {
-    setSaving(true);
-    setLocalLocationId(nextId);
-    await onUpdate({ id: item.id, location_id: nextId || undefined });
     setSaving(false);
   }
 
@@ -1341,63 +1239,46 @@ function InventoryFastRowMobile({
             <p className="text-[11px] text-slate-500 truncate">
               {translateColorLabel(item.color, lang)} · 📍 {getLocationName(item)}
             </p>
+            <p className="text-[11px] text-slate-500 truncate">
+              {item.customer_name} · {item.notes}
+            </p>
           </div>
           <p className="text-sm font-semibold text-slate-900 whitespace-nowrap">
             ${item.price_mxn.toFixed(0)} MXN
           </p>
         </div>
 
-        {/* quick location change */}
-        <select
-          value={localLocationId}
-          onChange={(e) => saveLocation(e.target.value)}
-          disabled={saving}
-          className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] text-slate-900 disabled:opacity-40"
-        >
-          <option value="">{t("Sin ubicación", "No location")}</option>
-          {locations.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-
+        {/* FAST MODE: status only (NO location editing) */}
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => handleStatusClick("available")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "available"
-                ? "bg-emerald-500 text-white"
-                : "bg-emerald-50 text-emerald-700"
+              localStatus === "available" ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
-            {t("Disponible", "Available")}
+            {tt("Disponible", "Available")}
           </button>
           <button
             type="button"
             onClick={() => handleStatusClick("reserved")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "reserved"
-                ? "bg-amber-400 text-slate-900"
-                : "bg-amber-50 text-amber-700"
+              localStatus === "reserved" ? "bg-amber-400 text-slate-900" : "bg-amber-50 text-amber-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
-            {t("Apartado", "Reserved")}
+            {tt("Apartado", "Reserved")}
           </button>
           <button
             type="button"
             onClick={() => handleStatusClick("paid_complete")}
             disabled={saving}
             className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-              localStatus === "paid_complete"
-                ? "bg-sky-500 text-white"
-                : "bg-sky-50 text-sky-700"
+              localStatus === "paid_complete" ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-700"
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
-            {t("Pagado", "Paid")}
+            {tt("Pagado", "Paid")}
           </button>
         </div>
       </div>
@@ -1405,9 +1286,7 @@ function InventoryFastRowMobile({
       {pendingStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
-            <p className="text-sm font-semibold text-slate-900">
-              {t("Cambiar estatus", "Change status")}
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{tt("Cambiar estatus", "Change status")}</p>
 
             <div className="flex items-center justify-center gap-2 text-xs font-semibold">
               <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
@@ -1425,7 +1304,7 @@ function InventoryFastRowMobile({
                 onClick={() => setPendingStatus(null)}
                 className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] text-slate-700"
               >
-                {t("Cancelar", "Cancel")}
+                {tt("Cancelar", "Cancel")}
               </button>
               <button
                 type="button"
@@ -1437,7 +1316,7 @@ function InventoryFastRowMobile({
                 }}
                 className="rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {t("Confirmar", "Confirm")}
+                {tt("Confirmar", "Confirm")}
               </button>
             </div>
           </div>
