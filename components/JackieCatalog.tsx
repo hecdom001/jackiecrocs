@@ -170,16 +170,27 @@ function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
   return true;
 }
 
-// Main display formatter based on who the shoe is for
-function formatSizeLabel(size: string, lang: Lang, buyerType: BuyerType = "all") {
+function formatSizeLabel(
+  size: string,
+  lang: Lang,
+  buyerType: BuyerType = "all"
+) {
   const isKids = size.startsWith("C");
   const isYouth = size.startsWith("J");
 
   // --- KIDS (C4, C5, ...) ---
-  if (isKids) return `${size} (US)`;
+  if (isKids) {
+    return lang === "es"
+      ? `Niños ${size} (US)`
+      : `Kids ${size} (US)`;
+  }
 
-  // --- YOUTH (J1, J2, ...) ---
-  if (isYouth) return `${size} (US)`;
+  // --- YOUTH / JUNIOR (J1, J2, ...) ---
+  if (isYouth) {
+    return lang === "es"
+      ? `Juvenil ${size} (US)`
+      : `Junior ${size} (US)`;
+  }
 
   // --- ADULT UNISEX (M10-W12) ---
   if (size.includes("-")) {
@@ -200,6 +211,7 @@ function formatSizeLabel(size: string, lang: Lang, buyerType: BuyerType = "all")
 
   return `${size} (US)`;
 }
+
 
 const SUPABASE_IMAGE_BASE =
   "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
