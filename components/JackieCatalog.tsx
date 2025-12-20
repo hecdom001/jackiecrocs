@@ -24,7 +24,7 @@ type PublicItem = {
   size: string; // human label from sizes.label (e.g. "M10-W12", "C8", "J1")
   size_id: string; // FK to sizes.id
 
-  // ✅ New
+  // ✅ location
   location_slug: string; // from locations.slug (e.g. "tijuana")
   location_name: string; // from locations.name (e.g. "Tijuana")
 
@@ -156,7 +156,6 @@ function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
 
   if (buyerType === "all") return true;
 
-  // If we couldn't parse the size pattern, treat as adult/unisex
   if (cat === "unknown") {
     return buyerType === "men" || buyerType === "women";
   }
@@ -178,21 +177,14 @@ function formatSizeLabel(
   const isKids = size.startsWith("C");
   const isYouth = size.startsWith("J");
 
-  // --- KIDS (C4, C5, ...) ---
   if (isKids) {
-    return lang === "es"
-      ? `Niños ${size} (US)`
-      : `Kids ${size} (US)`;
+    return lang === "es" ? `Niños ${size} (US)` : `Kids ${size} (US)`;
   }
 
-  // --- YOUTH / JUNIOR (J1, J2, ...) ---
   if (isYouth) {
-    return lang === "es"
-      ? `Juvenil ${size} (US)`
-      : `Junior ${size} (US)`;
+    return lang === "es" ? `Juvenil ${size} (US)` : `Junior ${size} (US)`;
   }
 
-  // --- ADULT UNISEX (M10-W12) ---
   if (size.includes("-")) {
     const [m, w] = size.split("-");
     const men = m.replace(/M/i, "");
@@ -211,7 +203,6 @@ function formatSizeLabel(
 
   return `${size} (US)`;
 }
-
 
 const SUPABASE_IMAGE_BASE =
   "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
@@ -248,16 +239,21 @@ const CROCS_PHOTOS = {
   camo: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`,
     label: "Crocs Camuflaje",
-  }, 
+  },
   gem: {
     src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`,
-    label: "Rosa Claro con Brillo"
+    label: "Rosa Claro con Brillo",
   },
 } as const;
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "";
+/** WhatsApp numbers */
+const WHATSAPP_NUMBER_TIJUANA =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_TIJUANA || "";
 
-// ✅ Delivery spots per location (add Mexicali spots later if you want)
+const WHATSAPP_NUMBER_MEXICALI =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_MEXICALI || "";
+
+// Delivery spots per location
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   tijuana: [
     "Privada Pizaro - BLVD De las Americas",
@@ -284,7 +280,52 @@ const MEX_BANK_INFO = {
 const MOBILE_INITIAL_VISIBLE = 6;
 const DESKTOP_INITIAL_VISIBLE = 12;
 
-// ---------- Helpers ----------
+// ---------- WhatsApp helper functions ----------
+
+function getWhatsAppNumberForLocationSlug(slug: string | "all") {
+  if (slug === "mexicali") {
+    return WHATSAPP_NUMBER_MEXICALI || WHATSAPP_NUMBER_TIJUANA;
+  }
+
+  if (slug === "tijuana" || slug === "all") {
+    return WHATSAPP_NUMBER_TIJUANA || WHATSAPP_NUMBER_MEXICALI;
+  }
+
+  return WHATSAPP_NUMBER_TIJUANA || WHATSAPP_NUMBER_MEXICALI;
+}
+
+type CartLocationState = "empty" | "single" | "mixed";
+
+function getCartLocationInfo(cart: CartLine[]): {
+  state: CartLocationState;
+  slug: string | null;
+} {
+  if (!cart.length) return { state: "empty", slug: null };
+
+  const slugs = new Set(
+    cart.map((line) => line.item.location_slug || "unknown")
+  );
+
+  if (slugs.size === 1) {
+    const [slug] = Array.from(slugs);
+    return { state: "single", slug };
+  }
+
+  return { state: "mixed", slug: null };
+}
+
+// Support WA link by selected location
+function buildWhatsAppSupportLink(lang: Lang, locationSlug: string | "all") {
+  const phone = getWhatsAppNumberForLocationSlug(locationSlug);
+  if (!phone) return "#";
+
+  const message =
+    lang === "es"
+      ? "Hola 👋 Tengo dudas sobre tallas o colores de los Crocs."
+      : "Hi 👋 I have questions about Crocs sizes or colors.";
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
 
 function availabilityText(count: number, lang: Lang) {
   if (lang === "es") {
@@ -352,22 +393,19 @@ ${linesEn.join("\n\n")}
 Are they still available?`;
 }
 
+/** ✅ Use cart’s location; if mixed, return "#" */
 function buildWhatsAppLink(cart: CartLine[], lang: Lang) {
-  if (!WHATSAPP_NUMBER || !cart.length) return "#";
+  const { state, slug } = getCartLocationInfo(cart);
+  if (state !== "single" || !slug) return "#";
+
+  const phone = getWhatsAppNumberForLocationSlug(slug);
+  if (!phone) return "#";
+
   const message = buildWhatsAppMessage(cart, lang);
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-function buildWhatsAppSupportLink(lang: Lang) {
-  if (!WHATSAPP_NUMBER) return "#";
-
-  const message =
-    lang === "es"
-      ? "Hola 👋 Tengo dudas sobre tallas o colores de los Crocs."
-      : "Hi 👋 I have questions about Crocs sizes or colors.";
-
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-}
+// ---------- Feedback ----------
 
 function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
   const [message, setMessage] = useState("");
@@ -486,6 +524,8 @@ function FeedbackBox({ lang, context }: { lang: Lang; context: string }) {
   );
 }
 
+// ---------- Size Guide ----------
+
 function SizeGuide({ lang }: { lang: Lang }) {
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -542,7 +582,6 @@ function SizeGuide({ lang }: { lang: Lang }) {
       </header>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)]">
-        {/* Adult table */}
         <div className="space-y-2">
           <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">
             {t("Unisex adulto", "Unisex adult")}
@@ -566,7 +605,6 @@ function SizeGuide({ lang }: { lang: Lang }) {
           </div>
         </div>
 
-        {/* Kids / Youth table */}
         <div className="space-y-2">
           <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">
             {t("Infantil / Juvenil", "Kids / Youth")}
@@ -650,9 +688,8 @@ export function JackieCatalog() {
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
-  // ✅ Location filter
   const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [locationFilter, setLocationFilter] = useState<string>("all"); // "all" or locations.slug
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const photoList = Object.values(CROCS_PHOTOS);
   const [mobilePhotoIndex, setMobilePhotoIndex] = useState(0);
@@ -660,11 +697,11 @@ export function JackieCatalog() {
   const mobileCanPrev = mobilePhotoIndex > 0;
   const mobileCanNext = mobilePhotoIndex < photoList.length - 1;
 
-  // item.id -> how many pairs user wants of that variant
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
-  const [visibleCount, setVisibleCount] = useState<number>(MOBILE_INITIAL_VISIBLE);
+  const [visibleCount, setVisibleCount] =
+    useState<number>(MOBILE_INITIAL_VISIBLE);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -674,7 +711,6 @@ export function JackieCatalog() {
     locationFilter === "all"
       ? t("Todas", "All")
       : locations.find((l) => l.slug === locationFilter)?.name ||
-        // fallback: title-case slug
         locationFilter.charAt(0).toUpperCase() + locationFilter.slice(1);
 
   const selectedCityForMaps =
@@ -682,17 +718,20 @@ export function JackieCatalog() {
       ? locations.find((l) => l.slug === locationFilter)?.name || "Tijuana"
       : "Tijuana";
 
-  // Restore last tab from localStorage (so refresh stays on same tab)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const saved = window.localStorage.getItem("jackie_tab");
-    if (saved === "home" || saved === "catalog" || saved === "messages" || saved === "info") {
+    if (
+      saved === "home" ||
+      saved === "catalog" ||
+      saved === "messages" ||
+      saved === "info"
+    ) {
       setTab(saved as AppTab);
     }
   }, []);
 
-  // Save tab to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("jackie_tab", tab);
@@ -706,7 +745,6 @@ export function JackieCatalog() {
 
     if (error) {
       console.error("Error loading locations:", error);
-      // don’t block the app if locations fail
       return;
     }
 
@@ -716,7 +754,6 @@ export function JackieCatalog() {
 
     setLocations(list);
 
-    // If current locationFilter is not valid anymore, reset
     setLocationFilter((prev) => {
       if (prev === "all") return prev;
       const ok = list.some((l) => l.slug === prev);
@@ -763,28 +800,22 @@ export function JackieCatalog() {
       return;
     }
 
-    // Group by model + color + size_id + price + location
     const variantMap = new Map<string, PublicItem>();
 
     (data ?? []).forEach((row: any) => {
       const model_name: string = row.models?.name ?? "";
       const color: string = row.colors?.name_en ?? "";
-
       const size_id: string = row.size_id as string;
       const sizeLabel: string = row.sizes?.label ?? "";
-
       const locSlug: string = row.locations?.slug ?? "unknown";
       const locName: string = row.locations?.name ?? "";
-
       const price_mxn: number = Number(row.price_mxn);
 
-      // If something is off, skip the row (shouldn't happen since size_id/location_id are NOT NULL in your setup)
       if (!size_id || !sizeLabel) {
         console.warn("Skipping inventory row without size info", row);
         return;
       }
 
-      // ✅ include location in key so counts stay correct per city
       const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
 
       const existing = variantMap.get(key);
@@ -809,7 +840,6 @@ export function JackieCatalog() {
 
     setItems(mapped);
 
-    // Clean up quantities for items that no longer exist
     setQuantities((prev) => {
       const next: Record<string, number> = {};
       for (const item of mapped) {
@@ -823,14 +853,11 @@ export function JackieCatalog() {
     setLoading(false);
   }
 
-  // initial load
   useEffect(() => {
     loadLocations();
     loadInventory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // detect mobile vs desktop & set page size
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -839,7 +866,8 @@ export function JackieCatalog() {
       const mobile = width < 768;
       setIsMobile(mobile);
 
-      const nextPageSize = width >= 1024 ? DESKTOP_INITIAL_VISIBLE : MOBILE_INITIAL_VISIBLE;
+      const nextPageSize =
+        width >= 1024 ? DESKTOP_INITIAL_VISIBLE : MOBILE_INITIAL_VISIBLE;
       setPageSize(nextPageSize);
       setVisibleCount(nextPageSize);
     };
@@ -849,32 +877,29 @@ export function JackieCatalog() {
     return () => window.removeEventListener("resize", compute);
   }, []);
 
-  // auto-refresh every 60s
-    useEffect(() => {
+  useEffect(() => {
     if (tab !== "catalog") return;
 
     const id = setInterval(() => loadInventory(), 3 * 60_000);
     return () => clearInterval(id);
   }, [tab]);
 
-  // reset visible items when filters or inventory change
   useEffect(() => {
     setVisibleCount(pageSize);
   }, [sizeFilter, colorFilter, locationFilter, items.length, pageSize]);
 
-  // when buyer type changes, reset size filter
   useEffect(() => {
     setSizeFilter("all");
   }, [buyerType]);
 
-  // ✅ when location changes, reset size/color so user doesn't land on empty results
   useEffect(() => {
     setSizeFilter("all");
     setColorFilter("all");
   }, [locationFilter]);
 
   const scopedForOptions = items.filter((i) => {
-    const byLoc = locationFilter === "all" || i.location_slug === locationFilter;
+    const byLoc =
+      locationFilter === "all" || i.location_slug === locationFilter;
     const byBuyer = sizeMatchesBuyerType(i.size, buyerType);
     return byLoc && byBuyer;
   });
@@ -888,7 +913,8 @@ export function JackieCatalog() {
     .sort((a, b) => a.localeCompare(b));
 
   const filtered = items.filter((item) => {
-    const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
+    const byLoc =
+      locationFilter === "all" || item.location_slug === locationFilter;
     const byBuyer = sizeMatchesBuyerType(item.size, buyerType);
     const bySize = sizeFilter === "all" || item.size === sizeFilter;
     const byColor = colorFilter === "all" || item.color === colorFilter;
@@ -904,8 +930,14 @@ export function JackieCatalog() {
     }))
     .filter((line) => line.count > 0);
 
+  const cartLocationInfo = getCartLocationInfo(cartLines);
+  const isMixedCart = cartLocationInfo.state === "mixed";
+
   const waLinkForCart = buildWhatsAppLink(cartLines, lang);
-  const supportWaLink = buildWhatsAppSupportLink(lang);
+  const supportWaLink = buildWhatsAppSupportLink(lang, locationFilter);
+  const hasCartWhatsApp =
+    !isMixedCart && waLinkForCart !== "#" && cartLines.length > 0;
+  const hasSupportWhatsApp = supportWaLink !== "#";
 
   const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
@@ -936,7 +968,10 @@ export function JackieCatalog() {
   };
 
   const showingCount = Math.min(visibleCount, filtered.length);
-  const totalPairsFiltered = filtered.reduce((sum, item) => sum + item.availableCount, 0);
+  const totalPairsFiltered = filtered.reduce(
+    (sum, item) => sum + item.availableCount,
+    0
+  );
 
   // ------------------------------------------------------------------
   // MOBILE VIEW
@@ -955,7 +990,9 @@ export function JackieCatalog() {
           onChange={(e) => setLocationFilter(e.target.value)}
           className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
         >
-          <option value="all">{t("Todas las ubicaciones", "All locations")}</option>
+          <option value="all">
+            {t("Todas las ubicaciones", "All locations")}
+          </option>
           {locations.map((l) => (
             <option key={l.slug} value={l.slug}>
               {l.name}
@@ -976,7 +1013,6 @@ export function JackieCatalog() {
 
     const renderMobileHome = () => (
       <div className="space-y-4">
-        {/* Hero card */}
         <section className="rounded-3xl bg-white/95 border border-emerald-100 shadow-sm p-4 space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
             <span>🛍️</span>
@@ -1023,20 +1059,19 @@ export function JackieCatalog() {
           )}
         </section>
 
-        {/* Location picker */}
         {renderLocationPicker("home")}
 
-        {/* Photos strip */}
         <section className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2">
           <div className="flex items-center justify-between text-[12px]">
-            <p className="font-medium">{t("Fotos reales del producto", "Real product photos")}</p>
+            <p className="font-medium">
+              {t("Fotos reales del producto", "Real product photos")}
+            </p>
             <p className="text-[10px] text-slate-500">
               {mobilePhotoIndex + 1} / {photoList.length}
             </p>
           </div>
 
           <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <Image
               src={photoList[mobilePhotoIndex].src}
               alt={photoList[mobilePhotoIndex].label}
@@ -1046,7 +1081,6 @@ export function JackieCatalog() {
               priority={false}
             />
 
-            {/* Prev */}
             <button
               type="button"
               disabled={!mobileCanPrev}
@@ -1058,11 +1092,12 @@ export function JackieCatalog() {
               ‹
             </button>
 
-            {/* Next */}
             <button
               type="button"
               disabled={!mobileCanNext}
-              onClick={() => setMobilePhotoIndex((i) => Math.min(photoList.length - 1, i + 1))}
+              onClick={() =>
+                setMobilePhotoIndex((i) => Math.min(photoList.length - 1, i + 1))
+              }
               className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
                 !mobileCanNext ? "opacity-30" : "hover:bg-white"
               }`}
@@ -1072,11 +1107,17 @@ export function JackieCatalog() {
           </div>
         </section>
 
-        {/* how it works */}
         <section className="rounded-3xl bg-white/95 border border-slate-100 p-4 space-y-2">
-          <h2 className="text-sm font-semibold">{t("¿Cómo funciona?", "How it works")}</h2>
+          <h2 className="text-sm font-semibold">
+            {t("¿Cómo funciona?", "How it works")}
+          </h2>
           <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
-            <li>{t("Elige tus pares y agrégalos al carrito.", "Choose your pairs and add them to the cart.")}</li>
+            <li>
+              {t(
+                "Elige tus pares y agrégalos al carrito.",
+                "Choose your pairs and add them to the cart."
+              )}
+            </li>
             <li>
               {t(
                 "Envíanos tu carrito por WhatsApp para confirmar disponibilidad.",
@@ -1096,7 +1137,6 @@ export function JackieCatalog() {
 
     const renderMobileCatalog = () => (
       <div className="space-y-4">
-        {/* Location picker */}
         {renderLocationPicker("catalog")}
 
         <div className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2 shadow-sm">
@@ -1116,11 +1156,13 @@ export function JackieCatalog() {
           <p className="text-[11px] text-slate-500">
             {loading
               ? t("Cargando inventario…", "Loading inventory…")
-              : t(`${totalPairsFiltered} pares disponibles`, `${totalPairsFiltered} pairs available`)}
+              : t(
+                  `${totalPairsFiltered} pares disponibles`,
+                  `${totalPairsFiltered} pairs available`
+                )}
           </p>
 
           <div className="mt-1 grid grid-cols-1 gap-2 text-[11px]">
-            {/* Buyer type selector */}
             <select
               value={buyerType}
               onChange={(e) => setBuyerType(e.target.value as BuyerType)}
@@ -1128,7 +1170,9 @@ export function JackieCatalog() {
             >
               <option value="all">{lang === "es" ? "Todos" : "All"}</option>
               <option value="men">{lang === "es" ? "Para hombre" : "For men"}</option>
-              <option value="women">{lang === "es" ? "Para mujer" : "For women"}</option>
+              <option value="women">
+                {lang === "es" ? "Para mujer" : "For women"}
+              </option>
               <option value="kids">{lang === "es" ? "Niños" : "Kids"}</option>
               <option value="youth">{lang === "es" ? "Juvenil" : "Youth"}</option>
             </select>
@@ -1138,7 +1182,9 @@ export function JackieCatalog() {
               onChange={(e) => setSizeFilter(e.target.value)}
               className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
             >
-              <option value="all">{lang === "es" ? "Todas las tallas" : "All sizes"}</option>
+              <option value="all">
+                {lang === "es" ? "Todas las tallas" : "All sizes"}
+              </option>
               {allSizes.map((sz) => (
                 <option key={sz} value={sz}>
                   {formatSizeLabel(sz, lang, buyerType)}
@@ -1151,7 +1197,9 @@ export function JackieCatalog() {
               onChange={(e) => setColorFilter(e.target.value)}
               className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
             >
-              <option value="all">{lang === "es" ? "Todos los colores" : "All colors"}</option>
+              <option value="all">
+                {lang === "es" ? "Todos los colores" : "All colors"}
+              </option>
               {allColors.map((color) => (
                 <option key={color} value={color}>
                   {translateColor(color, lang)}
@@ -1192,19 +1240,31 @@ export function JackieCatalog() {
           className="block text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 font-medium mb-2 flex items-center gap-1"
         >
           <span>📏</span>
-          <span>{lang === "es" ? "¿Cómo elegir tu talla?" : "How to choose your size?"}</span>
+          <span>
+            {lang === "es" ? "¿Cómo elegir tu talla?" : "How to choose your size?"}
+          </span>
         </button>
 
-        {/* Sticky cart CTA (only if cart has items) */}
         {totalCartPairs > 0 && (
           <div className="fixed inset-x-0 bottom-[76px] z-30">
             <div className="mx-auto max-w-md px-4">
+              {isMixedCart && (
+                <p className="mb-1 text-[10px] text-red-500 bg-white/90 rounded-2xl px-3 py-1 shadow">
+                  {t(
+                    "Tu carrito tiene pares de Tijuana y Mexicali. Por favor haz un pedido por ciudad.",
+                    "Your cart has pairs from Tijuana and Mexicali. Please create one order per city."
+                  )}
+                </p>
+              )}
               <a
-                href={waLinkForCart || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  if (!WHATSAPP_NUMBER || !cartLines.length) return;
+                href={hasCartWhatsApp ? waLinkForCart : "#"}
+                target={hasCartWhatsApp ? "_blank" : undefined}
+                rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
+                onClick={(e) => {
+                  if (!hasCartWhatsApp) {
+                    e.preventDefault();
+                    return;
+                  }
                   track("whatsapp_click_multi", {
                     count: totalCartPairs,
                     lang,
@@ -1212,7 +1272,7 @@ export function JackieCatalog() {
                   });
                 }}
                 className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 shadow-lg border transition ${
-                  WHATSAPP_NUMBER && cartLines.length
+                  hasCartWhatsApp
                     ? "bg-emerald-500 text-white border-emerald-400 hover:bg-emerald-400"
                     : "bg-slate-200 text-slate-500 border-slate-200 cursor-not-allowed"
                 }`}
@@ -1220,16 +1280,24 @@ export function JackieCatalog() {
                 <div className="flex items-center gap-2">
                   <span className="text-base">📲</span>
                   <div className="leading-tight">
-                    <p className="text-sm font-semibold">{t("Enviar carrito", "Send cart")}</p>
+                    <p className="text-sm font-semibold">
+                      {t("Enviar carrito", "Send cart")}
+                    </p>
                     <p className="text-[11px] opacity-90">
                       {lang === "es"
-                        ? `${totalCartPairs} ${totalCartPairs === 1 ? "par" : "pares"} · WhatsApp`
-                        : `${totalCartPairs} ${totalCartPairs === 1 ? "pair" : "pairs"} · WhatsApp`}
+                        ? `${totalCartPairs} ${
+                            totalCartPairs === 1 ? "par" : "pares"
+                          } · WhatsApp`
+                        : `${totalCartPairs} ${
+                            totalCartPairs === 1 ? "pair" : "pairs"
+                          } · WhatsApp`}
                     </p>
                   </div>
                 </div>
 
-                <span className="text-sm font-semibold">{t("Enviar", "Send")} →</span>
+                <span className="text-sm font-semibold">
+                  {t("Enviar", "Send")} →
+                </span>
               </a>
             </div>
           </div>
@@ -1239,7 +1307,10 @@ export function JackieCatalog() {
           <p className="text-xs text-red-500">{errorMsg}</p>
         ) : filtered.length === 0 ? (
           <p className="text-xs text-slate-600">
-            {t("Por ahora no hay pares con estos filtros.", "No pairs match these filters right now.")}
+            {t(
+              "Por ahora no hay pares con estos filtros.",
+              "No pairs match these filters right now."
+            )}
           </p>
         ) : (
           <>
@@ -1261,9 +1332,10 @@ export function JackieCatalog() {
                           {modelLabel} Crocs
                         </p>
 
-                        {/* COLOR LINE */}
                         <div
-                          className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(item.color)} opacity-80`}
+                          className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
+                            item.color
+                          )} opacity-80`}
                         />
 
                         <p className="mt-1 text-[10px] text-slate-600 flex flex-col gap-0.5">
@@ -1297,7 +1369,6 @@ export function JackieCatalog() {
                       </span>
                     </div>
 
-                    {/* BUTTONS / QTY CONTROL */}
                     <div className="mt-2">
                       {qty === 0 ? (
                         <button
@@ -1323,7 +1394,7 @@ export function JackieCatalog() {
                             <span> x {qty} </span>
                             {atMax && (
                               <span className="ml-1 text-[10px] text-emerald-700">
-                                ({lang === "es" ? "Máximo" : "Max"})
+                                {lang === "es" ? "(Máximo)" : "(Max)"}
                               </span>
                             )}
                           </div>
@@ -1367,7 +1438,6 @@ export function JackieCatalog() {
           </>
         )}
 
-        {/* Spacer so the fixed WhatsApp bar doesn’t cover the last cards */}
         {totalCartPairs > 0 && <div className="h-28" />}
       </div>
     );
@@ -1375,7 +1445,9 @@ export function JackieCatalog() {
     const renderMobileMessages = () => (
       <div className="space-y-4">
         <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
-          <h2 className="text-sm font-semibold">{t("Chatea por WhatsApp", "Chat on WhatsApp")}</h2>
+          <h2 className="text-sm font-semibold">
+            {t("Chatea por WhatsApp", "Chat on WhatsApp")}
+          </h2>
           <p className="text-[11px] text-slate-600">
             {t(
               "Mándanos mensaje con talla, color y ubicación. Respuestas de 9am a 7pm.",
@@ -1384,16 +1456,22 @@ export function JackieCatalog() {
           </p>
 
           <a
-            href={supportWaLink || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              if (!WHATSAPP_NUMBER) return;
-              track("whatsapp_click_support", { lang, location: "messages" });
+            href={hasSupportWhatsApp ? supportWaLink : "#"}
+            target={hasSupportWhatsApp ? "_blank" : undefined}
+            rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
+            onClick={(e) => {
+              if (!hasSupportWhatsApp) {
+                e.preventDefault();
+                return;
+              }
+              track("whatsapp_click_support", {
+                lang,
+                location: "messages",
+              });
             }}
             className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-              WHATSAPP_NUMBER
-                ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+              hasSupportWhatsApp
+                ? "bg-emerald-500 text-white carinho shadow-md hover:bg-emerald-400"
                 : "bg-slate-200 text-slate-500 cursor-not-allowed"
             }`}
           >
@@ -1404,7 +1482,9 @@ export function JackieCatalog() {
 
         {cartLines.length > 0 && (
           <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold">{t("Tu carrito", "Your cart")}</h3>
+            <h3 className="text-sm font-semibold">
+              {t("Tu carrito", "Your cart")}
+            </h3>
             <p className="text-[11px] text-slate-600">
               {t(
                 "Estos pares se enviarán en el mensaje de WhatsApp:",
@@ -1414,18 +1494,31 @@ export function JackieCatalog() {
             <ul className="space-y-1 text-[11px] text-slate-700">
               {cartLines.map(({ item, count }, idx) => (
                 <li key={item.id}>
-                  {idx + 1}. 📍 {item.location_name || item.location_slug} · {translateColor(item.color, lang)} ·{" "}
-                  {t("Talla", "Size")} {item.size} · x{count} · ${item.price_mxn.toFixed(0)} MXN
+                  {idx + 1}. 📍 {item.location_name || item.location_slug} ·{" "}
+                  {translateColor(item.color, lang)} · {t("Talla", "Size")}{" "}
+                  {item.size} · x{count} · ${item.price_mxn.toFixed(0)} MXN
                 </li>
               ))}
             </ul>
 
+            {isMixedCart && (
+              <p className="text-[10px] text-red-500 mt-1">
+                {t(
+                  "Tu carrito tiene pares de Tijuana y Mexicali. Por favor haz un pedido por ciudad.",
+                  "Your cart has pairs from Tijuana and Mexicali. Please create one order per city."
+                )}
+              </p>
+            )}
+
             <a
-              href={waLinkForCart || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                if (!WHATSAPP_NUMBER || !cartLines.length) return;
+              href={hasCartWhatsApp ? waLinkForCart : "#"}
+              target={hasCartWhatsApp ? "_blank" : undefined}
+              rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
+              onClick={(e) => {
+                if (!hasCartWhatsApp) {
+                  e.preventDefault();
+                  return;
+                }
                 track("whatsapp_click_multi", {
                   count: totalCartPairs,
                   lang,
@@ -1433,16 +1526,20 @@ export function JackieCatalog() {
                 });
               }}
               className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                WHATSAPP_NUMBER && cartLines.length
+                hasCartWhatsApp
                   ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
                   : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
             >
               <span>✅</span>
-              <span>{t("Enviar carrito por WhatsApp", "Send cart via WhatsApp")}</span>
+              <span>
+                {t("Enviar carrito por WhatsApp", "Send cart via WhatsApp")}
+              </span>
             </a>
           </section>
         )}
+
+        <FeedbackBox lang={lang} context="messages_mobile" />
       </div>
     );
 
@@ -1516,37 +1613,48 @@ export function JackieCatalog() {
             </p>
 
             <p className="text-[11px] text-slate-700">
-              {t("Puedes hacerlo a la siguiente cuenta:", "You can make the deposit to the following account:")}
+              {t(
+                "Puedes hacerlo a la siguiente cuenta:",
+                "You can make the deposit to the following account:"
+              )}
             </p>
 
             <div className="space-y-1 text-[11px] text-slate-800">
               <p>
-                <span className="font-medium">{t("Banco: ", "Bank: ")}</span>
+                <span className="font-medium">
+                  {t("Banco: ", "Bank: ")}
+                </span>
                 {MEX_BANK_INFO.bankName}
               </p>
               <p>
-                <span className="font-medium">{t("Titular: ", "Account name: ")}</span>
+                <span className="font-medium">
+                  {t("Titular: ", "Account name: ")}
+                </span>
                 {MEX_BANK_INFO.accountName}
               </p>
               <p className="break-all">
-                <span className="font-medium">{t("Cuenta: ", "Account: ")}</span>
+                <span className="font-medium">
+                  {t("Cuenta: ", "Account: ")}
+                </span>
                 {MEX_BANK_INFO.accountNumber}
               </p>
               <p>
-                <span className="font-medium">{t("Concepto: ", "Reference: ")}</span>
+                <span className="font-medium">
+                  {t("Concepto: ", "Reference: ")}
+                </span>
                 {t("Tu Nombre", "Your Name")}
               </p>
             </div>
 
             <p className="text-[10px] text-slate-500 mt-1">
-              {t("Recuerda mandar foto de tu comprobante.", "Please remember to send a photo of your payment receipt.")}
+              {t(
+                "Recuerda mandar foto de tu comprobante.",
+                "Please remember to send a photo of your payment receipt."
+              )}
             </p>
           </section>
 
           <SizeGuide lang={lang} />
-
-          {/* Feedback box */}
-          <FeedbackBox lang={lang} context="messages_mobile" />
         </div>
       );
     };
@@ -1562,7 +1670,6 @@ export function JackieCatalog() {
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
-        {/* Mobile header */}
         <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
           <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
             <div className="flex items-center gap-2">
@@ -1577,13 +1684,14 @@ export function JackieCatalog() {
               </div>
             </div>
 
-            {/* language toggle */}
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[10px] shadow-sm">
               <button
                 type="button"
                 onClick={() => setLang("es")}
                 className={`px-2 py-0.5 rounded-full ${
-                  lang === "es" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  lang === "es"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 ES
@@ -1592,7 +1700,9 @@ export function JackieCatalog() {
                 type="button"
                 onClick={() => setLang("en")}
                 className={`px-2 py-0.5 rounded-full ${
-                  lang === "en" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  lang === "en"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 EN
@@ -1601,7 +1711,6 @@ export function JackieCatalog() {
           </div>
         </header>
 
-        {/* Main */}
         <main className="mx-auto max-w-md px-4 pt-4 pb-28 space-y-4">
           {tab === "home" && renderMobileHome()}
           {tab === "catalog" && renderMobileCatalog()}
@@ -1614,11 +1723,36 @@ export function JackieCatalog() {
             <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-[11px] shadow-lg">
               {(
                 [
-                  { id: "home", icon: "🏠", labelEs: "Inicio", labelEn: "Home" },
-                  { id: "catalog", icon: "🛒", labelEs: "Catálogo", labelEn: "Catalog" },
-                  { id: "messages", icon: "💬", labelEs: "Mensajes", labelEn: "Messages" },
-                  { id: "info", icon: "ℹ️", labelEs: "Info", labelEn: "Info" },
-                ] as { id: AppTab; icon: string; labelEs: string; labelEn: string }[]
+                  {
+                    id: "home",
+                    icon: "🏠",
+                    labelEs: "Inicio",
+                    labelEn: "Home",
+                  },
+                  {
+                    id: "catalog",
+                    icon: "🛒",
+                    labelEs: "Catálogo",
+                    labelEn: "Catalog",
+                  },
+                  {
+                    id: "messages",
+                    icon: "💬",
+                    labelEs: "Mensajes",
+                    labelEn: "Messages",
+                  },
+                  {
+                    id: "info",
+                    icon: "ℹ️",
+                    labelEs: "Info",
+                    labelEn: "Info",
+                  },
+                ] as {
+                  id: AppTab;
+                  icon: string;
+                  labelEs: string;
+                  labelEn: string;
+                }[]
               ).map(({ id, icon, labelEs, labelEn }) => {
                 const active = tab === id;
                 return (
@@ -1638,7 +1772,11 @@ export function JackieCatalog() {
                       {icon}
                     </span>
 
-                    <span className={`text-[10px] leading-none ${active ? "font-medium" : ""}`}>
+                    <span
+                      className={`text-[10px] leading-none ${
+                        active ? "font-medium" : ""
+                      }`}
+                    >
                       {lang === "es" ? labelEs : labelEn}
                     </span>
                   </button>
@@ -1664,7 +1802,6 @@ export function JackieCatalog() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-white text-slate-900 pb-24">
-      {/* TOP NAV */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1674,19 +1811,21 @@ export function JackieCatalog() {
             <div className="leading-tight">
               <p className="text-sm font-semibold">Jacky Shop</p>
               <p className="text-[11px] text-slate-500">
-                {t("Calzado · Ubicación", "Footwear · Location")}: {selectedLocationName}
+                {t("Calzado · Ubicación", "Footwear · Location")}:{" "}
+                {selectedLocationName}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Lang toggle */}
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setLang("es")}
                 className={`px-2.5 py-1 rounded-full ${
-                  lang === "es" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  lang === "es"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 ES
@@ -1695,43 +1834,53 @@ export function JackieCatalog() {
                 type="button"
                 onClick={() => setLang("en")}
                 className={`px-2.5 py-1 rounded-full ${
-                  lang === "en" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  lang === "en"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 EN
               </button>
             </div>
 
-            {/* Support CTA */}
             <a
-              href={supportWaLink || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                if (!WHATSAPP_NUMBER) return;
-                track("whatsapp_click_support", { lang, location: "nav" });
+              href={hasSupportWhatsApp ? supportWaLink : "#"}
+              target={hasSupportWhatsApp ? "_blank" : undefined}
+              rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
+              onClick={(e) => {
+                if (!hasSupportWhatsApp) {
+                  e.preventDefault();
+                  return;
+                }
+                track("whatsapp_click_support", {
+                  lang,
+                  location: "nav",
+                });
               }}
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border transition ${
-                WHATSAPP_NUMBER
+                hasSupportWhatsApp
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                   : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
               }`}
             >
               <span>📲</span>
-              <span>{lang === "es" ? "Dudas por WhatsApp" : "Questions on WhatsApp"}</span>
+              <span>
+                {lang === "es" ? "Dudas por WhatsApp" : "Questions on WhatsApp"}
+              </span>
             </a>
           </div>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
-        {/* HERO / STORE HEADER */}
         <section className="rounded-3xl bg-white/90 border border-emerald-100 shadow-sm p-4 sm:p-6">
           <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-center">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
                 <span>🛍️</span>
-                <span>{lang === "es" ? "Catálogo en tiempo real" : "Live stock catalog"}</span>
+                <span>
+                  {lang === "es" ? "Catálogo en tiempo real" : "Live stock catalog"}
+                </span>
               </div>
 
               <div className="space-y-2">
@@ -1754,7 +1903,9 @@ export function JackieCatalog() {
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-6 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
               >
                 <span>🛒</span>
-                <span>{lang === "es" ? "Ver crocs disponibles" : "View available Crocs"}</span>
+                <span>
+                  {lang === "es" ? "Ver crocs disponibles" : "View available Crocs"}
+                </span>
               </button>
 
               <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs">
@@ -1762,7 +1913,10 @@ export function JackieCatalog() {
                   📍 {t("Ubicación", "Location")}: {selectedLocationName}
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
-                  💵 {lang === "es" ? "Pago en efectivo o transferencia" : "Cash or bank transfer"}
+                  💵{" "}
+                  {lang === "es"
+                    ? "Pago en efectivo o transferencia"
+                    : "Cash or bank transfer"}
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 border border-slate-200">
                   🇺🇸 {lang === "es" ? "Tallas americanas" : "US sizing"}
@@ -1779,14 +1933,15 @@ export function JackieCatalog() {
               )}
             </div>
 
-            {/* Hero highlight card */}
             <div className="w-full max-w-sm mx-auto md:mx-0">
               <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
                     🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
                   </span>
-                  <p className="text-xs text-slate-500">{lang === "es" ? "Desde" : "From"} $600 MXN</p>
+                  <p className="text-xs text-slate-500">
+                    {lang === "es" ? "Desde" : "From"} $600 MXN
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-white/70 border border-emerald-100 px-4 py-5 flex items-center justify-between gap-3">
@@ -1794,7 +1949,9 @@ export function JackieCatalog() {
                     <p className="text-xs font-semibold text-slate-900">
                       {lang === "es" ? "Ubicación" : "Location"}
                     </p>
-                    <p className="text-[11px] text-slate-600">{selectedLocationName}</p>
+                    <p className="text-[11px] text-slate-600">
+                      {selectedLocationName}
+                    </p>
                     <p className="mt-2 text-[10px] text-slate-500">
                       {lang === "es"
                         ? "Filtra por talla y color según tu ciudad."
@@ -1814,17 +1971,22 @@ export function JackieCatalog() {
           </div>
         </section>
 
-        {/* PHOTO STRIP */}
         <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
           <div className="flex items-center justify-between text-[12px] sm:text-sm">
-            <p className="font-medium">{lang === "es" ? "Fotos reales del producto" : "Real product photos"}</p>
-            <p className="text-[11px] text-slate-500">{lang === "es" ? "Tomadas por nosotros." : "Taken by us."}</p>
+            <p className="font-medium">
+              {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {lang === "es" ? "Tomadas por nosotros." : "Taken by us."}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {Object.values(CROCS_PHOTOS).map((photo) => (
-              <div key={photo.src} className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div
+                key={photo.src}
+                className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100"
+              >
                 <Image
                   src={photo.src}
                   alt={photo.label}
@@ -1838,7 +2000,6 @@ export function JackieCatalog() {
           </div>
         </section>
 
-        {/* FILTER BAR */}
         <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-slate-900">
@@ -1846,10 +2007,14 @@ export function JackieCatalog() {
             </p>
             <div className="flex items-center gap-2 text-[11px]">
               {loading ? (
-                <span className="text-slate-500">{t("Cargando...", "Loading...")}</span>
+                <span className="text-slate-500">
+                  {t("Cargando...", "Loading...")}
+                </span>
               ) : (
                 <span className="text-slate-500">
-                  {lang === "es" ? `${totalPairsFiltered} pares disponibles` : `${totalPairsFiltered} pairs available`}
+                  {lang === "es"
+                    ? `${totalPairsFiltered} pares disponibles`
+                    : `${totalPairsFiltered} pairs available`}
                 </span>
               )}
               <button
@@ -1863,15 +2028,18 @@ export function JackieCatalog() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 text-[11px]">
-            {/* ✅ LOCATION */}
             <div className="flex-1 flex flex-col gap-1">
-              <span className="text-slate-700">{lang === "es" ? "Ubicación" : "Location"}</span>
+              <span className="text-slate-700">
+                {lang === "es" ? "Ubicación" : "Location"}
+              </span>
               <select
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
-                <option value="all">{t("Todas las ubicaciones", "All locations")}</option>
+                <option value="all">
+                  {t("Todas las ubicaciones", "All locations")}
+                </option>
                 {locations.map((l) => (
                   <option key={l.slug} value={l.slug}>
                     {l.name}
@@ -1881,28 +2049,38 @@ export function JackieCatalog() {
             </div>
 
             <div className="flex-1 flex flex-col gap-1">
-              <span className="text-slate-700">{lang === "es" ? "¿Para quién es la talla?" : "Who is the size for?"}</span>
+              <span className="text-slate-700">
+                {lang === "es" ? "¿Para quién es la talla?" : "Who is the size for?"}
+              </span>
               <select
                 value={buyerType}
                 onChange={(e) => setBuyerType(e.target.value as BuyerType)}
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">{lang === "es" ? "Todos" : "All"}</option>
-                <option value="men">{lang === "es" ? "Para hombre" : "For men"}</option>
-                <option value="women">{lang === "es" ? "Para mujer" : "For women"}</option>
+                <option value="men">
+                  {lang === "es" ? "Para hombre" : "For men"}
+                </option>
+                <option value="women">
+                  {lang === "es" ? "Para mujer" : "For women"}
+                </option>
                 <option value="kids">{lang === "es" ? "Niños" : "Kids"}</option>
                 <option value="youth">{lang === "es" ? "Juvenil" : "Youth"}</option>
               </select>
             </div>
 
             <div className="flex-1 flex flex-col gap-1">
-              <span className="text-slate-700">{lang === "es" ? "Filtrar por talla" : "Filter by size"}</span>
+              <span className="text-slate-700">
+                {lang === "es" ? "Filtrar por talla" : "Filter by size"}
+              </span>
               <select
                 value={sizeFilter}
                 onChange={(e) => setSizeFilter(e.target.value)}
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
-                <option value="all">{lang === "es" ? "Todas las tallas" : "All sizes"}</option>
+                <option value="all">
+                  {lang === "es" ? "Todas las tallas" : "All sizes"}
+                </option>
                 {allSizes.map((sz) => (
                   <option key={sz} value={sz}>
                     {formatSizeLabel(sz, lang, buyerType)}
@@ -1912,13 +2090,17 @@ export function JackieCatalog() {
             </div>
 
             <div className="flex-1 flex flex-col gap-1">
-              <span className="text-slate-700">{lang === "es" ? "Filtrar por color" : "Filter by color"}</span>
+              <span className="text-slate-700">
+                {lang === "es" ? "Filtrar por color" : "Filter by color"}
+              </span>
               <select
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
-                <option value="all">{lang === "es" ? "Todos los colores" : "All colors"}</option>
+                <option value="all">
+                  {lang === "es" ? "Todos los colores" : "All colors"}
+                </option>
                 {allColors.map((color) => (
                   <option key={color} value={color}>
                     {translateColor(color, lang)}
@@ -1935,15 +2117,19 @@ export function JackieCatalog() {
           </p>
         </section>
 
-        {/* PRODUCT GRID */}
         <section id="inventory-grid">
           {loading ? (
-            <p className="text-xs text-slate-600">{t("Cargando inventario…", "Loading inventory…")}</p>
+            <p className="text-xs text-slate-600">
+              {t("Cargando inventario…", "Loading inventory…")}
+            </p>
           ) : errorMsg ? (
             <p className="text-xs text-red-500">{errorMsg}</p>
           ) : filtered.length === 0 ? (
             <p className="text-xs text-slate-600">
-              {t("Por ahora no hay pares con estos filtros.", "No pairs match these filters right now.")}
+              {t(
+                "Por ahora no hay pares con estos filtros.",
+                "No pairs match these filters right now."
+              )}
             </p>
           ) : (
             <div className="space-y-3">
@@ -1954,7 +2140,10 @@ export function JackieCatalog() {
                   const qty = quantities[item.id] ?? 0;
                   const colorText = translateColor(item.color, lang);
                   const atMax = qty >= item.availableCount;
-                  const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
+                  const modelLabel = translateModelLabel(
+                    item.model_name || "Classic",
+                    lang
+                  );
 
                   return (
                     <article
@@ -1967,14 +2156,19 @@ export function JackieCatalog() {
                             {modelLabel} Crocs
                           </h3>
 
-                          <div className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(item.color)} opacity-80`} />
+                          <div
+                            className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
+                              item.color
+                            )} opacity-80`}
+                          />
 
                           <p className="mt-1 text-[11px] text-slate-600 flex flex-col gap-1">
                             <span className="flex items-center gap-1.5">
                               <span>{colorText}</span>
                               <span className="text-slate-400">·</span>
                               <span>
-                                {lang === "es" ? "Talla" : "Size"} {formatSizeLabel(item.size, lang, buyerType)}
+                                {lang === "es" ? "Talla" : "Size"}{" "}
+                                {formatSizeLabel(item.size, lang, buyerType)}
                               </span>
                             </span>
                             <span className="text-[10px] text-slate-500">
@@ -1998,7 +2192,6 @@ export function JackieCatalog() {
                         </span>
                       </div>
 
-                      {/* BUTTONS / QTY CONTROL */}
                       <div className="mt-2">
                         {qty === 0 ? (
                           <button
@@ -2026,7 +2219,7 @@ export function JackieCatalog() {
                               </span>
                               {atMax && (
                                 <span className="ml-1 text-[10px] text-emerald-700">
-                                  ({lang === "es" ? "Máximo" : "Max"})
+                                  {lang === "es" ? "(Máximo)" : "(Max)"}
                                 </span>
                               )}
                             </div>
@@ -2064,7 +2257,9 @@ export function JackieCatalog() {
                     onClick={() => setVisibleCount((prev) => prev + pageSize)}
                     className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
                   >
-                    {lang === "es" ? "Mostrar más opciones" : "Show more options"}
+                    {lang === "es"
+                      ? "Mostrar más opciones"
+                      : "Show more options"}
                   </button>
                 )}
               </div>
@@ -2072,22 +2267,42 @@ export function JackieCatalog() {
           )}
         </section>
 
-        {/* HOW IT WORKS + DELIVERY / PAYMENT */}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900">{lang === "es" ? "¿Cómo funciona?" : "How it works"}</h3>
+            <h3 className="text-sm font-semibold text-slate-900">
+              {lang === "es" ? "¿Cómo funciona?" : "How it works"}
+            </h3>
             <div className="grid sm:grid-cols-3 gap-3 text-[11px] text-slate-600">
               <div className="space-y-1">
-                <p className="font-medium">1. {t("Elige tus pares", "Pick pairs")}</p>
-                <p>{t("Filtra por ubicación, talla y color, y agrégalos al carrito.", "Filter by location, size and color, then add to cart.")}</p>
+                <p className="font-medium">
+                  1. {t("Elige tus pares", "Pick pairs")}
+                </p>
+                <p>
+                  {t(
+                    "Filtra por ubicación, talla y color, y agrégalos al carrito.",
+                    "Filter by location, size and color, then add to cart."
+                  )}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="font-medium">2. WhatsApp</p>
-                <p>{t("Envía tu carrito por WhatsApp para confirmar disponibilidad.", "Send your cart on WhatsApp to confirm stock.")}</p>
+                <p>
+                  {t(
+                    "Envía tu carrito por WhatsApp para confirmar disponibilidad.",
+                    "Send your cart on WhatsApp to confirm stock."
+                  )}
+                </p>
               </div>
               <div className="space-y-1">
-                <p className="font-medium">3. {t("Entrega y pago", "Pickup & pay")}</p>
-                <p>{t("Acuerda punto y horario. Pagas en efectivo o transferencia.", "Agree pickup spot and time. Pay in cash or bank transfer.")}</p>
+                <p className="font-medium">
+                  3. {t("Entrega y pago", "Pickup & pay")}
+                </p>
+                <p>
+                  {t(
+                    "Acuerda punto y horario. Pagas en efectivo o transferencia.",
+                    "Agree pickup spot and time. Pay in cash or bank transfer."
+                  )}
+                </p>
               </div>
             </div>
           </div>
@@ -2101,7 +2316,10 @@ export function JackieCatalog() {
 
               {desktopSpots.length === 0 ? (
                 <p className="text-[11px] text-slate-600">
-                  {t("Los puntos de entrega se confirman por WhatsApp.", "Pickup spots are confirmed on WhatsApp.")}
+                  {t(
+                    "Los puntos de entrega se confirman por WhatsApp.",
+                    "Pickup spots are confirmed on WhatsApp."
+                  )}
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -2138,20 +2356,29 @@ export function JackieCatalog() {
               </p>
 
               <p className="text-[11px] text-slate-700">
-                {t("Puedes hacerlo a la siguiente cuenta:", "You can make the deposit to the following account:")}
+                {t(
+                  "Puedes hacerlo a la siguiente cuenta:",
+                  "You can make the deposit to the following account:"
+                )}
               </p>
 
               <div className="space-y-1 text-[11px] text-slate-800">
                 <p>
-                  <span className="font-medium">{lang === "es" ? "Banco: " : "Bank: "}</span>
+                  <span className="font-medium">
+                    {lang === "es" ? "Banco: " : "Bank: "}
+                  </span>
                   {MEX_BANK_INFO.bankName}
                 </p>
                 <p>
-                  <span className="font-medium">{lang === "es" ? "Titular: " : "Account name: "}</span>
+                  <span className="font-medium">
+                    {lang === "es" ? "Titular: " : "Account name: "}
+                  </span>
                   {MEX_BANK_INFO.accountName}
                 </p>
                 <p className="break-all">
-                  <span className="font-medium">{lang === "es" ? "Cuenta: " : "Account: "}</span>
+                  <span className="font-medium">
+                    {lang === "es" ? "Cuenta: " : "Account: "}
+                  </span>
                   {MEX_BANK_INFO.accountNumber}
                 </p>
                 <p className="break-all">
@@ -2164,27 +2391,45 @@ export function JackieCatalog() {
         </section>
 
         <SizeGuide lang={lang} />
+
+        <FeedbackBox lang={lang} context="catalog_desktop" />
       </div>
 
-      {/* STICKY CART BAR (desktop/tablet) */}
       {totalCartPairs > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_30px_rgba(15,23,42,0.12)]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="text-[11px] text-slate-700">
-              {lang === "es"
-                ? `✅ ${totalCartPairs} ${
-                    totalCartPairs === 1 ? "par listo para enviar por WhatsApp" : "pares listos para enviar por WhatsApp"
-                  }`
-                : `✅ ${totalCartPairs} ${
-                    totalCartPairs === 1 ? "pair ready to send on WhatsApp" : "pairs ready to send on WhatsApp"
-                  }`}
-            </p>
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px] text-slate-700">
+                {lang === "es"
+                  ? `✅ ${totalCartPairs} ${
+                      totalCartPairs === 1
+                        ? "par listo para enviar por WhatsApp"
+                        : "pares listos para enviar por WhatsApp"
+                    }`
+                  : `✅ ${totalCartPairs} ${
+                      totalCartPairs === 1
+                        ? "pair ready to send on WhatsApp"
+                        : "pairs ready to send on WhatsApp"
+                    }`}
+              </p>
+              {isMixedCart && (
+                <p className="text-[10px] text-red-500">
+                  {t(
+                    "Tu carrito tiene pares de Tijuana y Mexicali. Por favor haz un pedido por ciudad.",
+                    "Your cart has pairs from Tijuana and Mexicali. Please create one order per city."
+                  )}
+                </p>
+              )}
+            </div>
             <a
-              href={waLinkForCart || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                if (!WHATSAPP_NUMBER || !totalCartPairs) return;
+              href={hasCartWhatsApp ? waLinkForCart : "#"}
+              target={hasCartWhatsApp ? "_blank" : undefined}
+              rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
+              onClick={(e) => {
+                if (!hasCartWhatsApp) {
+                  e.preventDefault();
+                  return;
+                }
                 track("whatsapp_click_multi", {
                   count: totalCartPairs,
                   lang,
@@ -2192,13 +2437,15 @@ export function JackieCatalog() {
                 });
               }}
               className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
-                WHATSAPP_NUMBER
+                hasCartWhatsApp
                   ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
                   : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
             >
               <span className="text-base">📲</span>
-              {lang === "es" ? "Enviar carrito por WhatsApp" : "Send cart via WhatsApp"}
+              {lang === "es"
+                ? "Enviar carrito por WhatsApp"
+                : "Send cart via WhatsApp"}
             </a>
           </div>
         </div>
