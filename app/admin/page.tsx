@@ -185,7 +185,6 @@ export default function AdminDashboardPage() {
   const totalAvailable = itemsScoped.filter((i) => i.status === "available").length;
   const totalReserved = itemsScoped.filter((i) => i.status === "reserved").length;
   const totalPaidComplete = itemsScoped.filter((i) => i.status === "paid_complete").length;
-  const totalPaidPartial = itemsScoped.filter((i) => i.status === "paid_partial").length;
   const totalCancelled = itemsScoped.filter((i) => i.status === "cancelled").length;
 
   // Revenue: only fully paid (scoped)
@@ -383,12 +382,6 @@ export default function AdminDashboardPage() {
             value={totalPaidComplete}
             hint={t("Pagados al 100%", "100% paid")}
             emoji="✅"
-          />
-          <StatCard
-            label={t("Pagado parcial", "Partially paid")}
-            value={totalPaidPartial}
-            hint={t("Pagados parciales", "Partial payments")}
-            emoji="💵"
           />
           <StatCard
             label={t("Cancelados", "Cancelled")}
@@ -608,12 +601,6 @@ export default function AdminDashboardPage() {
           emoji="✅"
         />
         <StatCard
-          label={t("Pagado parcial", "Partially paid")}
-          value={totalPaidPartial}
-          hint={t("Pagados parciales", "Partial payments")}
-          emoji="💵"
-        />
-        <StatCard
           label={t("Cancelados", "Cancelled")}
           value={totalCancelled}
           hint={t("Ventas canceladas", "Cancelled sales")}
@@ -729,14 +716,6 @@ export default function AdminDashboardPage() {
               </p>
               <p className="text-slate-600">
                 {totalPaidComplete} {t("pares", "pairs")}
-              </p>
-            </div>
-            <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
-              <p className="font-semibold text-amber-800">
-                {t("Pagado parcial", "Partially paid")}
-              </p>
-              <p className="text-slate-600">
-                {totalPaidPartial} {t("pares", "pairs")}
               </p>
             </div>
           </div>

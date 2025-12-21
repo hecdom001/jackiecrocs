@@ -10,7 +10,6 @@ export type InventoryStatus =
   | "available"
   | "reserved"
   | "paid_complete"
-  | "paid_partial"
   | "cancelled";
 
 export type InventoryItem = {

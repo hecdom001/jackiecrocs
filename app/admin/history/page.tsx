@@ -16,7 +16,6 @@ const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   available: { es: "Disponible", en: "Available" },
   reserved: { es: "Apartado", en: "Reserved" },
   paid_complete: { es: "Pagado Completo", en: "Fully Paid" },
-  paid_partial: { es: "Pagado Incompleto", en: "Partially Paid" },
   cancelled: { es: "Cancelado", en: "Cancelled" },
 };
 
@@ -100,8 +99,6 @@ function statusBadgeClass(status: InventoryStatus) {
     : status === "reserved"
     ? "bg-amber-50 text-amber-700 border-amber-200"
     : status === "paid_complete"
-    ? "bg-sky-50 text-sky-700 border-sky-200"
-    : status === "paid_partial"
     ? "bg-sky-50 text-sky-700 border-sky-200"
     : "bg-rose-50 text-rose-700 border-rose-200";
 }

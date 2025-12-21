@@ -67,7 +67,6 @@ create table inventory_items (
       'available',
       'reserved',
       'paid_complete',
-      'paid_partial',
       'delivered',
       'cancelled'))
     default 'available',

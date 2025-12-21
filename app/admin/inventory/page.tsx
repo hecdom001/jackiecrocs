@@ -15,7 +15,6 @@ const statusOptions: InventoryStatus[] = [
   "available",
   "reserved",
   "paid_complete",
-  "paid_partial",
   "cancelled",
 ];
 
@@ -23,7 +22,6 @@ const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   available: { es: "Disponible", en: "Available" },
   reserved: { es: "Apartado", en: "Reserved" },
   paid_complete: { es: "Pagado Completo", en: "Fully Paid" },
-  paid_partial: { es: "Pagado Incompleto", en: "Partially Paid" },
   cancelled: { es: "Cancelado", en: "Cancelled" },
 };
 
@@ -264,8 +262,6 @@ export default function AdminInventoryPage() {
     available: filteredItems.filter((i) => i.status === "available").length,
     reserved: filteredItems.filter((i) => i.status === "reserved").length,
     paid_complete: filteredItems.filter((i) => i.status === "paid_complete")
-      .length,
-    paid_partial: filteredItems.filter((i) => i.status === "paid_partial")
       .length,
     cancelled: filteredItems.filter((i) => i.status === "cancelled").length,
   };
@@ -614,12 +610,6 @@ export default function AdminInventoryPage() {
             emoji="✅"
           />
           <StatusChip
-            label={t("Pagado parcial", "Paid partial")}
-            value={countsByStatus.paid_partial}
-            colorClass="bg-sky-50 text-sky-700 border-sky-200"
-            emoji="🧾"
-          />
-          <StatusChip
             label={t("Cancelados", "Cancelled")}
             value={countsByStatus.cancelled}
             colorClass="bg-rose-50 text-rose-700 border-rose-200"
@@ -845,8 +835,6 @@ function InventoryRow({
       ? "bg-amber-50 text-amber-700 border-amber-200"
       : localStatus === "paid_complete"
       ? "bg-sky-50 text-sky-700 border-sky-200"
-      : localStatus === "paid_partial"
-      ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
   return (
@@ -1026,8 +1014,6 @@ function InventoryCardMobile({
       : localStatus === "reserved"
       ? "bg-amber-50 text-amber-700 border-amber-200"
       : localStatus === "paid_complete"
-      ? "bg-sky-50 text-sky-700 border-sky-200"
-      : localStatus === "paid_partial"
       ? "bg-sky-50 text-sky-700 border-sky-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
 
