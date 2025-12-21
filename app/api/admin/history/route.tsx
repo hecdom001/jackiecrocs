@@ -15,11 +15,15 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
+
+    // limit: default 20, max 30 (same as MAX_HISTORY on UI)
     const limitParam = searchParams.get("limit");
     const limit = Math.min(Number(limitParam) || 20, 30);
 
-    // ✅ include location_id + join locations
-    const { data, error } = await supabase
+    // optional location filter (by location_id) – safe even if UI doesn't send it yet
+    const locationId = searchParams.get("locationId");
+
+    let query = supabase
       .from("inventory_items")
       .select(
         `
@@ -41,25 +45,39 @@ export async function GET(req: NextRequest) {
         locations ( id, slug, name )
       `
       )
+      .neq("status", "available")
       .order("updated_at", { ascending: false })
       .limit(limit);
 
+    if (locationId && locationId !== "all") {
+      query = query.eq("location_id", locationId);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       console.error("Error fetching history:", error);
-      return NextResponse.json({ error: "Error fetching history" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Error fetching history" },
+        { status: 500 }
+      );
     }
 
     const history = (data ?? []).map((row: any) => ({
       ...row,
-      size: row.sizes?.label ?? "", // UI uses entry.size
+      // UI uses entry.size
+      size: row.sizes?.label ?? "",
+      // normalized fields the UI code expects
       location_id: row.location_id ?? null,
-      // keep as `locations` for your UI normalizer (it supports row.locations)
       locations: row.locations ?? null,
     }));
 
     return NextResponse.json({ history });
   } catch (err) {
     console.error("Unexpected error in /api/admin/history:", err);
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unexpected error" },
+      { status: 500 }
+    );
   }
 }

@@ -32,7 +32,7 @@ type HistoryEntry = {
   notes: string | null;
   updated_at: string;
 
-  // ✅ NEW (for locations)
+  // Location data from API
   location_id?: string | null;
   location?: { id: string; slug: string; name: string } | null;
 };
@@ -106,13 +106,23 @@ function statusBadgeClass(status: InventoryStatus) {
     : "bg-rose-50 text-rose-700 border-rose-200";
 }
 
+// Human-readable name for chips & dropdown labels
 function getLocationName(entry: HistoryEntry) {
   if (entry.location?.name) return entry.location.name;
-  if (entry.location?.slug) {
-    const s = entry.location.slug;
+
+  const slug = entry.location?.slug;
+  if (slug) {
+    const s = slug.toString();
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
+
   return "—";
+}
+
+// Key used for filtering and for the API's locationId param (uuid)
+function getLocationKey(entry: HistoryEntry): string {
+  const raw = entry.location_id || entry.location?.id || "";
+  return raw ? String(raw) : "";
 }
 
 function LocationChip({ name }: { name: string }) {
@@ -129,14 +139,18 @@ export default function AdminHistoryPage() {
   const router = useRouter();
   const { lang, t } = useAdminLang();
 
+  // 👉 allEntries: snapshot of "all" for dropdown
+  const [allEntries, setAllEntries] = useState<HistoryEntry[]>([]);
+  // 👉 entries: current list for selected filter
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
   const [visibleCount, setVisibleCount] = useState<number>(0);
 
-  // ✅ NEW: location filter (location_id or "all")
+  // "all" | location_id (uuid)
   const [locationFilter, setLocationFilter] = useState<string>("all");
 
   // Mobile detection
@@ -160,12 +174,18 @@ export default function AdminHistoryPage() {
     return false;
   }
 
-  async function loadHistory() {
+  async function loadHistory(locationKey: string) {
     setLoading(true);
     setErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/admin/history?limit=${MAX_HISTORY}`);
+      const params = new URLSearchParams();
+      params.set("limit", String(MAX_HISTORY));
+      if (locationKey !== "all") {
+        params.set("locationId", locationKey);
+      }
+
+      const res = await fetch(`/api/admin/history?${params.toString()}`);
       if (handleMaybeUnauthorized(res)) return;
 
       const data = await res.json();
@@ -180,30 +200,35 @@ export default function AdminHistoryPage() {
 
       const raw: any[] = data.items || data.history || [];
 
-      const normalized: HistoryEntry[] = raw.slice(0, MAX_HISTORY).map((row) => ({
-        id: row.id,
-        model_name: row.model_name ?? row.models?.name ?? null,
-        color: row.color ?? row.colors?.name_en ?? null,
-        size: row.size,
-        price_mxn: Number(row.price_mxn),
-        status: row.status as InventoryStatus,
-        customer_name: row.customer_name ?? null,
-        customer_whatsapp: row.customer_whatsapp ?? null,
-        notes: row.notes ?? null,
-        updated_at: row.updated_at,
+      const normalized: HistoryEntry[] = raw.map((row) => {
+        const loc = row.location ?? row.locations ?? null;
 
-        // ✅ NEW normalize location
-        location_id: row.location_id ?? null,
-        location: row.location
-          ? row.location
-          : row.locations
-          ? {
-              id: row.locations.id,
-              slug: row.locations.slug,
-              name: row.locations.name,
-            }
-          : null,
-      }));
+        return {
+          id: row.id,
+          model_name: row.model_name ?? row.models?.name ?? null,
+          color: row.color ?? row.colors?.name_en ?? null,
+          size: row.size,
+          price_mxn: Number(row.price_mxn),
+          status: row.status as InventoryStatus,
+          customer_name: row.customer_name ?? null,
+          customer_whatsapp: row.customer_whatsapp ?? null,
+          notes: row.notes ?? null,
+          updated_at: row.updated_at,
+          location_id: row.location_id ?? loc?.id ?? null,
+          location: loc
+            ? {
+                id: loc.id,
+                slug: loc.slug,
+                name: loc.name,
+              }
+            : null,
+        };
+      });
+
+      // When loading ALL, also refresh the source for dropdown options
+      if (locationKey === "all") {
+        setAllEntries(normalized);
+      }
 
       setEntries(normalized);
     } catch (err) {
@@ -215,49 +240,57 @@ export default function AdminHistoryPage() {
     }
   }
 
+  // Initial load: all locations
   useEffect(() => {
-    loadHistory();
+    loadHistory("all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ NEW: location options from data
+  // Build dropdown options from allEntries (fallback: current entries)
   const locationOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>();
-    for (const e of entries) {
-      const id = e.location_id || e.location?.id;
-      if (!id) continue;
-      map.set(id, { id, name: getLocationName(e) });
+    const source = allEntries.length > 0 ? allEntries : entries;
+    const map = new Map<string, { key: string; name: string }>();
+
+    for (const e of source) {
+      const key = getLocationKey(e);
+      const name = getLocationName(e);
+      if (!key || !name || name === "—") continue;
+      map.set(key, { key, name });
     }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries]);
 
-  // ✅ NEW: filtered entries
-  const filteredEntries = useMemo(() => {
-    if (locationFilter === "all") return entries;
-    return entries.filter((e) => {
-      const id = e.location_id || e.location?.id || "";
-      return id === locationFilter;
-    });
-  }, [entries, locationFilter]);
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [allEntries, entries]);
 
-  // When entries OR layout changes, reset visibleCount
+  // No need to re-filter by status or location; API already did both
+  const totalEntries = entries.length;
+
+  const visibleEntries = entries.slice(
+    0,
+    Math.min(visibleCount || pageSize, totalEntries)
+  );
+
+  const canLoadMore = visibleCount < Math.min(totalEntries, MAX_HISTORY);
+
+  // When entries or layout change, reset visibleCount
   useEffect(() => {
-    if (filteredEntries.length === 0) {
+    if (totalEntries === 0) {
       setVisibleCount(0);
       return;
     }
-    setVisibleCount(Math.min(pageSize, filteredEntries.length, MAX_HISTORY));
-  }, [pageSize, filteredEntries.length]);
-
-  const totalEntries = filteredEntries.length;
-  const visibleEntries = filteredEntries.slice(
-    0,
-    Math.min(visibleCount, totalEntries)
-  );
-  const canLoadMore = visibleCount < Math.min(totalEntries, MAX_HISTORY);
+    setVisibleCount(Math.min(pageSize, totalEntries, MAX_HISTORY));
+  }, [pageSize, totalEntries]);
 
   function handleLoadMore() {
-    setVisibleCount((prev) => Math.min(prev + pageSize, totalEntries, MAX_HISTORY));
+    setVisibleCount((prev) =>
+      Math.min(prev + pageSize, totalEntries, MAX_HISTORY)
+    );
+  }
+
+  function handleChangeLocation(value: string) {
+    setLocationFilter(value);
+    loadHistory(value);
   }
 
   return (
@@ -270,7 +303,10 @@ export default function AdminHistoryPage() {
               {t("Historial", "History")}
             </h1>
             <p className="text-xs text-slate-500">
-              {t("Últimos pares actualizados por fecha.", "Latest updated pairs by date.")}
+              {t(
+                "Últimos pares actualizados por fecha.",
+                "Latest updated pairs by date."
+              )}
             </p>
             <p className="mt-0.5 text-[11px] text-slate-500">
               {t(
@@ -283,16 +319,18 @@ export default function AdminHistoryPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={loadHistory}
+              onClick={() => loadHistory(locationFilter)}
               disabled={loading}
               className="inline-flex justify-center items-center rounded-full bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition shadow-sm"
             >
-              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
+              {loading
+                ? t("Actualizando…", "Refreshing…")
+                : t("Actualizar datos", "Refresh data")}
             </button>
           </div>
         </div>
 
-        {/* ✅ NEW: Location filter (simple, always visible) */}
+        {/* Location filter */}
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div className="text-[11px] text-slate-600">
             {t("Filtrar por ubicación", "Filter by location")}
@@ -301,12 +339,12 @@ export default function AdminHistoryPage() {
           <div className="sm:w-[260px]">
             <select
               value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
+              onChange={(e) => handleChangeLocation(e.target.value)}
               className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-2 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
             >
               <option value="all">{t("Todas", "All")}</option>
               {locationOptions.map((loc) => (
-                <option key={loc.id} value={loc.id}>
+                <option key={loc.key} value={loc.key}>
                   {loc.name}
                 </option>
               ))}
@@ -314,7 +352,9 @@ export default function AdminHistoryPage() {
           </div>
         </div>
 
-        {errorMsg && <p className="text-[11px] text-rose-600">{errorMsg}</p>}
+        {errorMsg && (
+          <p className="text-[11px] text-rose-600">{errorMsg}</p>
+        )}
       </section>
 
       {/* LIST */}
@@ -373,12 +413,9 @@ export default function AdminHistoryPage() {
                       <th className="text-left px-3 py-2 font-semibold text-slate-600">
                         {t("Talla", "Size")}
                       </th>
-
-                      {/* ✅ NEW */}
                       <th className="text-left px-3 py-2 font-semibold text-slate-600">
                         {t("Ubicación", "Location")}
                       </th>
-
                       <th className="text-right px-3 py-2 font-semibold text-slate-600">
                         {t("Precio", "Price")}
                       </th>
@@ -440,13 +477,12 @@ function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {translateColorLabel(entry.color, lang)}
       </td>
-      <td className="px-3 py-2 align-top text-slate-900 text-xs">{entry.size}</td>
-
-      {/* ✅ NEW */}
+      <td className="px-3 py-2 align-top text-slate-900 text-xs">
+        {entry.size}
+      </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         <LocationChip name={locName} />
       </td>
-
       <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
         ${entry.price_mxn.toFixed(0)} MXN
       </td>
@@ -474,7 +510,13 @@ function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
 
 /* ---------- Mobile card ---------- */
 
-function HistoryCardMobile({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
+function HistoryCardMobile({
+  entry,
+  lang,
+}: {
+  entry: HistoryEntry;
+  lang: Lang;
+}) {
   const tt = (es: string, en: string) => (lang === "es" ? es : en);
   const locName = getLocationName(entry);
 
@@ -482,15 +524,15 @@ function HistoryCardMobile({ entry, lang }: { entry: HistoryEntry; lang: Lang })
     <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-slate-500">{formatDate(entry.updated_at, lang)}</p>
+          <p className="text-xs text-slate-500">
+            {formatDate(entry.updated_at, lang)}
+          </p>
           <p className="mt-0.5 text-sm font-semibold text-slate-900">
             {translateModelLabel(entry.model_name, lang)} · {entry.size}
           </p>
           <p className="text-[11px] text-slate-500">
             {translateColorLabel(entry.color, lang)}
           </p>
-
-          {/* ✅ NEW */}
           <div className="mt-1">
             <LocationChip name={locName} />
           </div>
@@ -512,7 +554,9 @@ function HistoryCardMobile({ entry, lang }: { entry: HistoryEntry; lang: Lang })
 
       {entry.customer_name && (
         <p className="text-[11px] text-slate-700">
-          <span className="font-medium">{tt("Cliente: ", "Customer: ")}</span>
+          <span className="font-medium">
+            {tt("Cliente: ", "Customer: ")}
+          </span>
           {entry.customer_name}
         </p>
       )}
