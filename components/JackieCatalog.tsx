@@ -1131,7 +1131,7 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                       {formatSizeLabel(v.size, lang)}
                     </span>
                     <span className="text-[10px] font-semibold text-emerald-700">
-                      ${v.price_mxn.toFixed(0)} MXN
+                      - ${v.price_mxn.toFixed(0)} MXN
                     </span>
                   </div>
 
