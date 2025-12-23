@@ -151,6 +151,7 @@ function sizeRank(size: string): number {
   return 1000;
 }
 
+// Kept for possible future use; not used in new layout but harmless.
 function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
   const cat = inferSizeCategory(size);
 
@@ -169,11 +170,7 @@ function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
   return true;
 }
 
-function formatSizeLabel(
-  size: string,
-  lang: Lang,
-  buyerType: BuyerType = "all"
-) {
+function formatSizeLabel(size: string, lang: Lang, buyerType: BuyerType = "all") {
   const isKids = size.startsWith("C");
   const isYouth = size.startsWith("J");
 
@@ -246,6 +243,24 @@ const CROCS_PHOTOS = {
   },
 } as const;
 
+type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
+
+function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey] | null {
+  const key = colorEn.trim().toLowerCase();
+
+  if (key === "black") return CROCS_PHOTOS.black;
+  if (key === "white") return CROCS_PHOTOS.white;
+  if (key === "beige") return CROCS_PHOTOS.beige;
+  if (key === "lilac" || key === "lila") return CROCS_PHOTOS.lila;
+  if (key === "red") return CROCS_PHOTOS.red;
+  if (key === "arctic") return CROCS_PHOTOS.arctic;
+  if (key === "camo" || key === "camuflaje") return CROCS_PHOTOS.camo;
+  if (key === "baby pink" || key === "light pink") return CROCS_PHOTOS.light_pink;
+  if (key.includes("shimmer")) return CROCS_PHOTOS.gem;
+
+  return null;
+}
+
 /** WhatsApp numbers */
 const WHATSAPP_NUMBER_TIJUANA =
   process.env.NEXT_PUBLIC_WHATSAPP_PHONE_TIJUANA || "";
@@ -277,8 +292,8 @@ const MEX_BANK_INFO = {
   accountNumber: "0140 2026 0401 0725 79",
 } as const;
 
-const MOBILE_INITIAL_VISIBLE = 6;
-const DESKTOP_INITIAL_VISIBLE = 12;
+const MOBILE_INITIAL_VISIBLE = 4;
+const DESKTOP_INITIAL_VISIBLE = 8;
 
 // ---------- WhatsApp helper functions ----------
 
@@ -673,6 +688,19 @@ function SizeGuideLink({ lang }: { lang: Lang }) {
   );
 }
 
+// ---------- Grouped color type ----------
+
+type ColorGroup = {
+  key: string;
+  model_name: string;
+  color: string;
+  location_slug: string;
+  location_name: string;
+  price_mxn_min: number;
+  price_mxn_max: number;
+  variants: PublicItem[];
+};
+
 // ---------- Component ----------
 
 export function JackieCatalog() {
@@ -684,7 +712,8 @@ export function JackieCatalog() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const [buyerType, setBuyerType] = useState<BuyerType>("all");
+  // We now always show all sizes (kids, youth, adult) in each color card,
+  // so no buyerType selector is needed for filtering.
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
@@ -890,39 +919,85 @@ export function JackieCatalog() {
 
   useEffect(() => {
     setSizeFilter("all");
-  }, [buyerType]);
-
-  useEffect(() => {
-    setSizeFilter("all");
     setColorFilter("all");
   }, [locationFilter]);
 
+  // ---- Options for filters ----
   const scopedForOptions = items.filter((i) => {
     const byLoc =
       locationFilter === "all" || i.location_slug === locationFilter;
-    const byBuyer = sizeMatchesBuyerType(i.size, buyerType);
-    return byLoc && byBuyer;
+    return byLoc;
   });
 
   const allSizes = Array.from(new Set(scopedForOptions.map((i) => i.size)))
-    .filter((sz) => sizeMatchesBuyerType(sz, buyerType))
     .sort((a, b) => sizeRank(a) - sizeRank(b));
 
   const allColors = Array.from(new Set(scopedForOptions.map((i) => i.color)))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
-  const filtered = items.filter((item) => {
+  // ---- Group inventory: 1 card per color+model+location ----
+  const inventoryScoped = items.filter((item) => {
     const byLoc =
       locationFilter === "all" || item.location_slug === locationFilter;
-    const byBuyer = sizeMatchesBuyerType(item.size, buyerType);
-    const bySize = sizeFilter === "all" || item.size === sizeFilter;
     const byColor = colorFilter === "all" || item.color === colorFilter;
-    return byLoc && byBuyer && bySize && byColor;
+    return byLoc && byColor;
   });
 
-  const limited = filtered.slice(0, visibleCount);
+  const groupMap = new Map<string, ColorGroup>();
 
+  for (const item of inventoryScoped) {
+    const key = `${item.location_slug}__${item.model_name}__${item.color}`;
+
+    const existing = groupMap.get(key);
+    if (!existing) {
+      groupMap.set(key, {
+        key,
+        model_name: item.model_name,
+        color: item.color,
+        location_slug: item.location_slug,
+        location_name: item.location_name,
+        price_mxn_min: item.price_mxn,
+        price_mxn_max: item.price_mxn,
+        variants: [item],
+      });
+    } else {
+      existing.variants.push(item);
+      existing.price_mxn_min = Math.min(existing.price_mxn_min, item.price_mxn);
+      existing.price_mxn_max = Math.max(existing.price_mxn_max, item.price_mxn);
+    }
+  }
+
+  let groupsFiltered = Array.from(groupMap.values());
+
+  // Apply size filter at group level (card must have that size)
+  if (sizeFilter !== "all") {
+    groupsFiltered = groupsFiltered.filter((g) =>
+      g.variants.some((v) => v.size === sizeFilter)
+    );
+  }
+
+  // Sort groups by color, then model, then price
+  groupsFiltered.sort((a, b) => {
+    const c = a.color.localeCompare(b.color);
+    if (c !== 0) return c;
+    const m = (a.model_name || "").localeCompare(b.model_name || "");
+    if (m !== 0) return m;
+    return a.price_mxn_min - b.price_mxn_min;
+  });
+
+  const limitedGroups = groupsFiltered.slice(0, visibleCount);
+
+  const totalPairsFiltered = groupsFiltered.reduce((sum, g) => {
+    return (
+      sum +
+      g.variants.reduce((inner, v) => inner + v.availableCount, 0)
+    );
+  }, 0);
+
+  const showingCount = Math.min(visibleCount, groupsFiltered.length);
+
+  // ---- Cart ----
   const cartLines: CartLine[] = items
     .map((item) => ({
       item,
@@ -967,11 +1042,134 @@ export function JackieCatalog() {
     });
   };
 
-  const showingCount = Math.min(visibleCount, filtered.length);
-  const totalPairsFiltered = filtered.reduce(
-    (sum, item) => sum + item.availableCount,
-    0
-  );
+  // Helper to render grouped sizes inside a color card
+  const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
+    const tLocal = t;
+
+    const adult = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "adult")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const youth = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "youth")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const kids = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "kids")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const unknown = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "unknown")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+
+    const sectionClass = isCompact
+      ? "space-y-1"
+      : "space-y-1.5";
+
+    const sizeRowClass = isCompact
+      ? "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
+      : "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5";
+
+    const labelClass = isCompact
+      ? "text-[11px] font-medium text-slate-900"
+      : "text-[12px] font-medium text-slate-900";
+
+    const subtitleClass = "text-[10px] text-slate-500";
+
+    const renderSection = (
+      titleEs: string,
+      titleEn: string,
+      list: PublicItem[]
+    ) => {
+      if (!list.length) return null;
+      return (
+        <div className={sectionClass}>
+          <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+            <span>
+              {titleEs.startsWith("Adulto") ? "👟" : titleEs.startsWith("Juvenil") ? "🧑" : "🧒"}
+            </span>
+            <span>{tLocal(titleEs, titleEn)}</span>
+          </p>
+          <div className="space-y-1">
+            {list.map((v) => {
+              const qty = quantities[v.id] ?? 0;
+              const atMax = qty >= v.availableCount;
+              const isSelectedSize = sizeFilter !== "all" && v.size === sizeFilter;
+
+              return (
+                <div
+                  key={v.id}
+                  className={`${sizeRowClass} ${
+                    isSelectedSize ? "ring-1 ring-emerald-300 bg-emerald-50" : ""
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className={labelClass}>
+                      {formatSizeLabel(v.size, lang)}
+                    </span>
+                    <span className={subtitleClass}>
+                      {availabilityText(v.availableCount, lang)}
+                    </span>
+                  </div>
+
+                  {qty === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(v)}
+                      className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition"
+                    >
+                      <span>+</span>
+                      <span className="ml-1 hidden xs:inline">
+                        {tLocal("Agregar", "Add")}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromCart(v.id)}
+                        className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-slate-200 bg-white text-[14px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                      >
+                        –
+                      </button>
+
+                      <div className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                        <span className="mr-1">x{qty}</span>
+                        {atMax && (
+                          <span className="text-[9px] text-emerald-700">
+                            {tLocal("Máx", "Max")}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddToCart(v)}
+                        disabled={atMax}
+                        className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-[14px] transition ${
+                          atMax
+                            ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                            : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="mt-2 space-y-2">
+        {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
+        {renderSection("Juvenil", "Youth", youth)}
+        {renderSection("Niños", "Kids", kids)}
+        {renderSection("Otras tallas", "Other sizes", unknown)}
+      </div>
+    );
+  };
 
   // ------------------------------------------------------------------
   // MOBILE VIEW
@@ -1021,7 +1219,7 @@ export function JackieCatalog() {
 
           <div className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight">
-              {t("Crocs disponibles 🐊", "Crocs available 🐊")}
+              {t("Calzado disponibles", "Footwear available")}
             </h1>
             <p className="text-[12px] text-slate-600">
               {t(
@@ -1037,7 +1235,7 @@ export function JackieCatalog() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-5 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
           >
             <span>🛒</span>
-            <span>{t("Ver crocs disponibles", "View available Crocs")}</span>
+            <span>{t("Ver Calzado disponibles", "View available Footwear")}</span>
           </button>
 
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -1096,7 +1294,9 @@ export function JackieCatalog() {
               type="button"
               disabled={!mobileCanNext}
               onClick={() =>
-                setMobilePhotoIndex((i) => Math.min(photoList.length - 1, i + 1))
+                setMobilePhotoIndex((i) =>
+                  Math.min(photoList.length - 1, i + 1)
+                )
               }
               className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
                 !mobileCanNext ? "opacity-30" : "hover:bg-white"
@@ -1142,7 +1342,7 @@ export function JackieCatalog() {
         <div className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2 shadow-sm">
           <div className="flex items-center justify-between text-xs">
             <p className="font-medium">
-              {t("Crocs disponibles", "Available Crocs")} ·{" "}
+              {t("Calzado disponibles", "Available Footwear")} ·{" "}
               <span className="text-slate-500">{selectedLocationName}</span>
             </p>
             <button
@@ -1150,7 +1350,9 @@ export function JackieCatalog() {
               onClick={loadInventory}
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
             >
-              {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar", "Refresh")}
+              {loading
+                ? t("Actualizando…", "Refreshing…")
+                : t("Actualizar", "Refresh")}
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
@@ -1164,20 +1366,6 @@ export function JackieCatalog() {
 
           <div className="mt-1 grid grid-cols-1 gap-2 text-[11px]">
             <select
-              value={buyerType}
-              onChange={(e) => setBuyerType(e.target.value as BuyerType)}
-              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-            >
-              <option value="all">{lang === "es" ? "Todos" : "All"}</option>
-              <option value="men">{lang === "es" ? "Para hombre" : "For men"}</option>
-              <option value="women">
-                {lang === "es" ? "Para mujer" : "For women"}
-              </option>
-              <option value="kids">{lang === "es" ? "Niños" : "Kids"}</option>
-              <option value="youth">{lang === "es" ? "Juvenil" : "Youth"}</option>
-            </select>
-
-            <select
               value={sizeFilter}
               onChange={(e) => setSizeFilter(e.target.value)}
               className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
@@ -1187,7 +1375,7 @@ export function JackieCatalog() {
               </option>
               {allSizes.map((sz) => (
                 <option key={sz} value={sz}>
-                  {formatSizeLabel(sz, lang, buyerType)}
+                  {formatSizeLabel(sz, lang)}
                 </option>
               ))}
             </select>
@@ -1210,8 +1398,8 @@ export function JackieCatalog() {
 
           <p className="mt-2 text-[10px] text-slate-500">
             {t(
-              "Primero elige si la talla es para hombre, mujer o niños. Luego filtra por talla y color.",
-              "First choose if the size is for men, women or kids. Then filter by size and color."
+              "Filtra por talla o color, y en cada tarjeta verás todas las tallas disponibles (niños, juvenil y adulto).",
+              "Filter by size or color; each card shows all available sizes (kids, youth and adult)."
             )}
           </p>
 
@@ -1241,7 +1429,9 @@ export function JackieCatalog() {
         >
           <span>📏</span>
           <span>
-            {lang === "es" ? "¿Cómo elegir tu talla?" : "How to choose your size?"}
+            {lang === "es"
+              ? "¿Cómo elegir tu talla?"
+              : "How to choose your size?"}
           </span>
         </button>
 
@@ -1305,7 +1495,7 @@ export function JackieCatalog() {
 
         {errorMsg ? (
           <p className="text-xs text-red-500">{errorMsg}</p>
-        ) : filtered.length === 0 ? (
+        ) : groupsFiltered.length === 0 ? (
           <p className="text-xs text-slate-600">
             {t(
               "Por ahora no hay pares con estos filtros.",
@@ -1314,106 +1504,82 @@ export function JackieCatalog() {
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              {limited.map((item) => {
-                const qty = quantities[item.id] ?? 0;
-                const colorText = translateColor(item.color, lang);
-                const atMax = qty >= item.availableCount;
-                const modelLabel = translateModelLabel(item.model_name || "Classic", lang);
+            <div className="grid grid-cols-1 gap-3">
+              {limitedGroups.map((group) => {
+                const colorText = translateColor(group.color, lang);
+                const modelLabel = translateModelLabel(
+                  group.model_name || "Classic",
+                  lang
+                );
+                const photo = getPhotoForColor(group.color);
+
+                const showPriceText =
+                  group.price_mxn_min === group.price_mxn_max
+                    ? `$${group.price_mxn_min.toFixed(0)} MXN`
+                    : t(
+                        `Desde $${group.price_mxn_min.toFixed(0)} MXN`,
+                        `From $${group.price_mxn_min.toFixed(0)} MXN`
+                      );
+
+                const totalPairsForGroup = group.variants.reduce(
+                  (sum, v) => sum + v.availableCount,
+                  0
+                );
 
                 return (
                   <article
-                    key={item.id}
+                    key={group.key}
                     className="rounded-3xl bg-white/95 border border-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.03)] hover:shadow-[0_12px_32px_rgba(15,23,42,0.07)] hover:-translate-y-0.5 transition-all flex flex-col p-3 gap-2"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <p className="text-[11px] font-semibold text-slate-900 line-clamp-1">
-                          {modelLabel} Crocs
-                        </p>
-
-                        <div
-                          className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
-                            item.color
-                          )} opacity-80`}
-                        />
-
-                        <p className="mt-1 text-[10px] text-slate-600 flex flex-col gap-0.5">
-                          <span className="flex items-center gap-1.5">
-                            <span>{colorText}</span>
-                            <span className="text-slate-400">·</span>
-                            <span>
-                              {lang === "es" ? "Talla" : "Size"}{" "}
-                              {formatSizeLabel(item.size, lang, buyerType)}
-                            </span>
-                          </span>
-
-                          <span className="text-[10px] text-slate-500">
-                            📍 {item.location_name || selectedLocationName}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-1">
-                      <div>
-                        <p className="text-sm font-semibold text-emerald-600">
-                          ${item.price_mxn.toFixed(0)} MXN
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                          {availabilityText(item.availableCount, lang)}
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[9px]">
-                        {lang === "es" ? "Disponible" : "Available"}
-                      </span>
-                    </div>
-
-                    <div className="mt-2">
-                      {qty === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => handleAddToCart(item)}
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
-                        >
-                          <span>🛒</span>
-                          <span>{lang === "es" ? "Agregar" : "Add"}</span>
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFromCart(item.id)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
-                          >
-                            –
-                          </button>
-
-                          <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
-                            <span className="mr-1">🛒</span>
-                            <span> x {qty} </span>
-                            {atMax && (
-                              <span className="ml-1 text-[10px] text-emerald-700">
-                                {lang === "es" ? "(Máximo)" : "(Max)"}
-                              </span>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(item)}
-                            disabled={atMax}
-                            className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
-                              atMax
-                                ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
-                                : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
-                            }`}
-                          >
-                            +
-                          </button>
+                    <div className="flex gap-3">
+                      {photo && (
+                        <div className="relative h-20 w-20 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 flex-shrink-0">
+                          <Image
+                            src={photo.src}
+                            alt={photo.label}
+                            width={300}
+                            height={300}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
                       )}
+                      <div className="flex-1">
+                        <p className="text-[12px] font-semibold text-slate-900 line-clamp-1">
+                          {modelLabel} Crocs
+                        </p>
+                        <div
+                          className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
+                            group.color
+                          )} opacity-80`}
+                        />
+                        <p className="mt-1 text-[11px] text-slate-600 flex flex-col gap-0.5">
+                          <span className="flex items-center gap-1.5">
+                            <span>{colorText}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            📍 {group.location_name || selectedLocationName}
+                          </span>
+                        </p>
+                        <div className="mt-1 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-emerald-600">
+                              {showPriceText}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {t(
+                                `${totalPairsForGroup} pares en total`,
+                                `${totalPairsForGroup} pairs total`
+                              )}
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[9px]">
+                            {lang === "es" ? "Varias tallas" : "Multiple sizes"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
+
+                    {renderGroupSizeSections(group, true)}
                   </article>
                 );
               })}
@@ -1422,16 +1588,18 @@ export function JackieCatalog() {
             <div className="flex flex-col items-center gap-2 mt-1">
               <p className="text-[10px] text-slate-500">
                 {lang === "es"
-                  ? `Mostrando ${showingCount} de ${filtered.length} opciones`
-                  : `Showing ${showingCount} of ${filtered.length} options`}
+                  ? `Mostrando ${showingCount} de ${groupsFiltered.length} modelos por color`
+                  : `Showing ${showingCount} of ${groupsFiltered.length} color options`}
               </p>
-              {filtered.length > limited.length && (
+              {groupsFiltered.length > limitedGroups.length && (
                 <button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + pageSize)}
                   className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
                 >
-                  {lang === "es" ? "Mostrar más opciones" : "Show more options"}
+                  {lang === "es"
+                    ? "Mostrar más colores"
+                    : "Show more colors"}
                 </button>
               )}
             </div>
@@ -1471,7 +1639,7 @@ export function JackieCatalog() {
             }}
             className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
               hasSupportWhatsApp
-                ? "bg-emerald-500 text-white carinho shadow-md hover:bg-emerald-400"
+                ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
                 : "bg-slate-200 text-slate-500 cursor-not-allowed"
             }`}
           >
@@ -1495,8 +1663,9 @@ export function JackieCatalog() {
               {cartLines.map(({ item, count }, idx) => (
                 <li key={item.id}>
                   {idx + 1}. 📍 {item.location_name || item.location_slug} ·{" "}
-                  {translateColor(item.color, lang)} · {t("Talla", "Size")}{" "}
-                  {item.size} · x{count} · ${item.price_mxn.toFixed(0)} MXN
+                  {translateColor(item.color, lang)} ·{" "}
+                  {t("Talla", "Size")} {item.size} · x{count} · $
+                  {item.price_mxn.toFixed(0)} MXN
                 </li>
               ))}
             </ul>
@@ -1793,7 +1962,8 @@ export function JackieCatalog() {
   // DESKTOP / TABLET VIEW
   // ------------------------------------------------------------------
 
-  const desktopSpotsSlug = locationFilter === "all" ? "tijuana" : locationFilter;
+  const desktopSpotsSlug =
+    locationFilter === "all" ? "tijuana" : locationFilter;
   const desktopSpots = DELIVERY_SPOTS_BY_LOCATION[desktopSpotsSlug] ?? [];
   const desktopCityName =
     locationFilter === "all"
@@ -1865,7 +2035,9 @@ export function JackieCatalog() {
             >
               <span>📲</span>
               <span>
-                {lang === "es" ? "Dudas por WhatsApp" : "Questions on WhatsApp"}
+                {lang === "es"
+                  ? "Dudas por WhatsApp"
+                  : "Questions on WhatsApp"}
               </span>
             </a>
           </div>
@@ -1879,13 +2051,15 @@ export function JackieCatalog() {
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
                 <span>🛍️</span>
                 <span>
-                  {lang === "es" ? "Catálogo en tiempo real" : "Live stock catalog"}
+                  {lang === "es"
+                    ? "Catálogo en tiempo real"
+                    : "Live stock catalog"}
                 </span>
               </div>
 
               <div className="space-y-2">
                 <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-                  {lang === "es" ? "Crocs disponibles 🐊" : "Crocs available 🐊"}
+                  {lang === "es" ? "Calzado disponibles" : "Footwear available"}
                 </h1>
                 <p className="text-sm text-slate-600 max-w-md">
                   {lang === "es"
@@ -1904,7 +2078,9 @@ export function JackieCatalog() {
               >
                 <span>🛒</span>
                 <span>
-                  {lang === "es" ? "Ver crocs disponibles" : "View available Crocs"}
+                  {lang === "es"
+                    ? "Ver Calzado disponibles"
+                    : "View available Footwear"}
                 </span>
               </button>
 
@@ -1928,82 +2104,63 @@ export function JackieCatalog() {
 
               {lastUpdated && (
                 <p className="text-[11px] text-slate-500">
-                  {t("Última actualización", "Last updated")}: {formattedLastUpdated}
+                  {t("Última actualización", "Last updated")}:{" "}
+                  {formattedLastUpdated}
                 </p>
               )}
             </div>
 
             <div className="w-full max-w-sm mx-auto md:mx-0">
-              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-sky-50 border border-emerald-100 shadow-sm p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700 border border-emerald-100">
-                    🌟 {lang === "es" ? "Crocs originales" : "Original Crocs"}
-                  </span>
-                  <p className="text-xs text-slate-500">
-                    {lang === "es" ? "Desde" : "From"} $600 MXN
+            <div className="rounded-3xl bg-gradient-to-br from-sky-50 via-white to-emerald-50 border border-slate-200 shadow-sm p-4 space-y-4">
+              
+              {/* Top badge + price */}
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-slate-700 border border-slate-200">
+                  👟{" "}
+                  {lang === "es"
+                    ? "Calzado de Calidad"
+                    : "Quality Footwear"}
+                </span>
+
+                <p className="text-xs text-slate-500">
+                  {lang === "es" ? "Desde" : "From"} $600 MXN
+                </p>
+              </div>
+
+              {/* Location card */}
+              <div className="rounded-2xl bg-white/70 border border-slate-200 px-4 py-5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-900">
+                    {lang === "es" ? "Ubicación" : "Location"}
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    {selectedLocationName}
+                  </p>
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    {lang === "es"
+                      ? "Filtra por talla y color según tu ciudad."
+                      : "Filter by size and color for your city."}
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/70 border border-emerald-100 px-4 py-5 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-900">
-                      {lang === "es" ? "Ubicación" : "Location"}
-                    </p>
-                    <p className="text-[11px] text-slate-600">
-                      {selectedLocationName}
-                    </p>
-                    <p className="mt-2 text-[10px] text-slate-500">
-                      {lang === "es"
-                        ? "Filtra por talla y color según tu ciudad."
-                        : "Filter by size and color for your city."}
-                    </p>
-                  </div>
-                  <div className="text-4xl md:text-5xl">🐊</div>
-                </div>
-
-                <p className="text-[11px] text-slate-600">
-                  {lang === "es"
-                    ? "Elige tus pares, agrégalos al carrito y mándalos por WhatsApp para confirmar disponibilidad."
-                    : "Pick your pairs, add them to the cart and send them on WhatsApp to confirm stock."}
-                </p>
+                <div className="text-4xl md:text-5xl">👟</div>
               </div>
+
+              {/* Description */}
+              <p className="text-[11px] text-slate-600">
+                {lang === "es"
+                  ? "Explora nuestro calzado por color y talla, añade tus pares al carrito y envía tu pedido por WhatsApp."
+                  : "Browse our footwear by color and size, add your pairs to the cart and send your order on WhatsApp."}
+              </p>
             </div>
           </div>
-        </section>
-
-        <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-2">
-          <div className="flex items-center justify-between text-[12px] sm:text-sm">
-            <p className="font-medium">
-              {lang === "es" ? "Fotos reales del producto" : "Real product photos"}
-            </p>
-            <p className="text-[11px] text-slate-500">
-              {lang === "es" ? "Tomadas por nosotros." : "Taken by us."}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Object.values(CROCS_PHOTOS).map((photo) => (
-              <div
-                key={photo.src}
-                className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100"
-              >
-                <Image
-                  src={photo.src}
-                  alt={photo.label}
-                  width={600}
-                  height={600}
-                  className="h-36 w-full object-cover"
-                  priority={false}
-                />
-              </div>
-            ))}
           </div>
         </section>
 
         <section className="rounded-2xl bg-white border border-slate-100 p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-slate-900">
-              {lang === "es" ? "Crocs disponibles" : "Available Crocs"}
+              {lang === "es" ? "Calzado disponibles" : "Available Footwear"}
             </p>
             <div className="flex items-center gap-2 text-[11px]">
               {loading ? (
@@ -2022,7 +2179,9 @@ export function JackieCatalog() {
                 onClick={loadInventory}
                 className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
               >
-                {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar", "Refresh")}
+                {loading
+                  ? t("Actualizando…", "Refreshing…")
+                  : t("Actualizar", "Refresh")}
               </button>
             </div>
           </div>
@@ -2050,27 +2209,6 @@ export function JackieCatalog() {
 
             <div className="flex-1 flex flex-col gap-1">
               <span className="text-slate-700">
-                {lang === "es" ? "¿Para quién es la talla?" : "Who is the size for?"}
-              </span>
-              <select
-                value={buyerType}
-                onChange={(e) => setBuyerType(e.target.value as BuyerType)}
-                className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-              >
-                <option value="all">{lang === "es" ? "Todos" : "All"}</option>
-                <option value="men">
-                  {lang === "es" ? "Para hombre" : "For men"}
-                </option>
-                <option value="women">
-                  {lang === "es" ? "Para mujer" : "For women"}
-                </option>
-                <option value="kids">{lang === "es" ? "Niños" : "Kids"}</option>
-                <option value="youth">{lang === "es" ? "Juvenil" : "Youth"}</option>
-              </select>
-            </div>
-
-            <div className="flex-1 flex flex-col gap-1">
-              <span className="text-slate-700">
                 {lang === "es" ? "Filtrar por talla" : "Filter by size"}
               </span>
               <select
@@ -2083,7 +2221,7 @@ export function JackieCatalog() {
                 </option>
                 {allSizes.map((sz) => (
                   <option key={sz} value={sz}>
-                    {formatSizeLabel(sz, lang, buyerType)}
+                    {formatSizeLabel(sz, lang)}
                   </option>
                 ))}
               </select>
@@ -2112,8 +2250,8 @@ export function JackieCatalog() {
 
           <p className="mt-1 text-[10px] text-slate-500">
             {lang === "es"
-              ? "Primero elige la ubicación; luego talla y color."
-              : "First choose location; then size and color."}
+              ? "Filtra por ubicación, talla o color. Cada tarjeta muestra todas las tallas (niños, juvenil y adulto) disponibles para ese color."
+              : "Filter by location, size or color. Each card shows all available sizes (kids, youth and adult) for that color."}
           </p>
         </section>
 
@@ -2124,7 +2262,7 @@ export function JackieCatalog() {
             </p>
           ) : errorMsg ? (
             <p className="text-xs text-red-500">{errorMsg}</p>
-          ) : filtered.length === 0 ? (
+          ) : groupsFiltered.length === 0 ? (
             <p className="text-xs text-slate-600">
               {t(
                 "Por ahora no hay pares con estos filtros.",
@@ -2136,21 +2274,44 @@ export function JackieCatalog() {
               <SizeGuideLink lang={lang} />
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                {limited.map((item) => {
-                  const qty = quantities[item.id] ?? 0;
-                  const colorText = translateColor(item.color, lang);
-                  const atMax = qty >= item.availableCount;
+                {limitedGroups.map((group) => {
+                  const colorText = translateColor(group.color, lang);
                   const modelLabel = translateModelLabel(
-                    item.model_name || "Classic",
+                    group.model_name || "Classic",
                     lang
+                  );
+                  const photo = getPhotoForColor(group.color);
+
+                  const showPriceText =
+                    group.price_mxn_min === group.price_mxn_max
+                      ? `$${group.price_mxn_min.toFixed(0)} MXN`
+                      : t(
+                          `Desde $${group.price_mxn_min.toFixed(0)} MXN`,
+                          `From $${group.price_mxn_min.toFixed(0)} MXN`
+                        );
+
+                  const totalPairsForGroup = group.variants.reduce(
+                    (sum, v) => sum + v.availableCount,
+                    0
                   );
 
                   return (
                     <article
-                      key={item.id}
+                      key={group.key}
                       className="rounded-3xl bg-white border border-slate-100 shadow-[0_10px_26px_rgba(15,23,42,0.03)] hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 transition-all flex flex-col p-4 gap-3"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
+                        {photo && (
+                          <div className="relative h-24 w-24 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 flex-shrink-0">
+                            <Image
+                              src={photo.src}
+                              alt={photo.label}
+                              width={400}
+                              height={400}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        )}
                         <div className="flex-1">
                           <h3 className="text-sm font-semibold text-slate-900 line-clamp-1">
                             {modelLabel} Crocs
@@ -2158,87 +2319,41 @@ export function JackieCatalog() {
 
                           <div
                             className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
-                              item.color
+                              group.color
                             )} opacity-80`}
                           />
 
                           <p className="mt-1 text-[11px] text-slate-600 flex flex-col gap-1">
                             <span className="flex items-center gap-1.5">
                               <span>{colorText}</span>
-                              <span className="text-slate-400">·</span>
-                              <span>
-                                {lang === "es" ? "Talla" : "Size"}{" "}
-                                {formatSizeLabel(item.size, lang, buyerType)}
-                              </span>
                             </span>
                             <span className="text-[10px] text-slate-500">
-                              📍 {item.location_name || item.location_slug}
+                              📍 {group.location_name || group.location_slug}
                             </span>
                           </p>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-base font-semibold text-emerald-600">
-                            ${item.price_mxn.toFixed(0)} MXN
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            {availabilityText(item.availableCount, lang)}
-                          </p>
-                        </div>
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-0.5 text-[10px]">
-                          {lang === "es" ? "Disponible" : "Available"}
-                        </span>
-                      </div>
-
-                      <div className="mt-2">
-                        {qty === 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(item)}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium border bg-white text-slate-800 border-slate-200 hover:border-emerald-400 hover:text-emerald-700 transition"
-                          >
-                            <span>🛒</span>
-                            <span>{lang === "es" ? "Agregar" : "Add"}</span>
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFromCart(item.id)}
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 bg-white text-[16px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
-                            >
-                              –
-                            </button>
-
-                            <div className="flex-1 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-800">
-                              <span className="mr-1">🛒</span>
-                              <span>
-                                {lang === "es" ? "En carrito" : "In cart"} · x{qty}
-                              </span>
-                              {atMax && (
-                                <span className="ml-1 text-[10px] text-emerald-700">
-                                  {lang === "es" ? "(Máximo)" : "(Max)"}
-                                </span>
-                              )}
+                          <div className="mt-1 flex items-center justify-between">
+                            <div>
+                              <p className="text-base font-semibold text-emerald-600">
+                                {showPriceText}
+                              </p>
+                              <p className="text-[10px] text-slate-500">
+                                {t(
+                                  `${totalPairsForGroup} pares en total`,
+                                  `${totalPairsForGroup} pairs total`
+                                )}
+                              </p>
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleAddToCart(item)}
-                              disabled={atMax}
-                              className={`inline-flex items-center justify-center h-8 w-8 rounded-full border text-[16px] transition ${
-                                atMax
-                                  ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
-                                  : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
-                              }`}
-                            >
-                              +
-                            </button>
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-0.5 text-[10px]">
+                              {lang === "es"
+                                ? "Varias tallas"
+                                : "Multiple sizes"}
+                            </span>
                           </div>
-                        )}
+                        </div>
                       </div>
+
+                      {renderGroupSizeSections(group, false)}
                     </article>
                   );
                 })}
@@ -2247,19 +2362,19 @@ export function JackieCatalog() {
               <div className="flex flex-col items-center gap-2">
                 <p className="text-[10px] text-slate-500">
                   {lang === "es"
-                    ? `Mostrando ${showingCount} de ${filtered.length} opciones`
-                    : `Showing ${showingCount} of ${filtered.length} options`}
+                    ? `Mostrando ${showingCount} de ${groupsFiltered.length} modelos por color`
+                    : `Showing ${showingCount} of ${groupsFiltered.length} color options`}
                 </p>
 
-                {filtered.length > limited.length && (
+                {groupsFiltered.length > limitedGroups.length && (
                   <button
                     type="button"
                     onClick={() => setVisibleCount((prev) => prev + pageSize)}
                     className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
                   >
                     {lang === "es"
-                      ? "Mostrar más opciones"
-                      : "Show more options"}
+                      ? "Mostrar más colores"
+                      : "Show more colors"}
                   </button>
                 )}
               </div>
