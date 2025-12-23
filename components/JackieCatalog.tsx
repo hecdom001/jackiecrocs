@@ -1294,9 +1294,6 @@ export function JackieCatalog() {
 
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-              📍 {t("Ubicación", "Location")}: {selectedLocationName}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
               💵 {t("Efectivo o transferencia", "Cash or bank transfer")}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
