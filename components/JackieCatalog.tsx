@@ -7,7 +7,7 @@ import { track } from "@vercel/analytics";
 import Image from "next/image";
 
 type Lang = "es" | "en";
-type AppTab = "home" | "catalog" | "messages" | "info";
+type AppTab = "home" | "catalog" | "cart" | "info";
 type BuyerType = "all" | "men" | "women" | "kids" | "youth";
 
 type LocationOption = {
@@ -114,7 +114,7 @@ function colorLineClass(colorEn: string) {
     case "pink shimmer":
     case "shimmer pink":
       return "bg-rose-200";
-   case "fuchsia":
+    case "fuchsia":
       return "bg-pink-200";
     case "rust brown":
       return "bg-orange-200";
@@ -178,7 +178,11 @@ function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
   return true;
 }
 
-function formatSizeLabel(size: string, lang: Lang, buyerType: BuyerType = "all") {
+function formatSizeLabel(
+  size: string,
+  lang: Lang,
+  buyerType: BuyerType = "all"
+) {
   const isKids = size.startsWith("C");
   const isYouth = size.startsWith("J");
 
@@ -261,7 +265,9 @@ const CROCS_PHOTOS = {
 
 type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
 
-function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey] | null {
+function getPhotoForColor(
+  colorEn: string
+): (typeof CROCS_PHOTOS)[CrocsPhotoKey] | null {
   const key = colorEn.trim().toLowerCase();
 
   if (key === "black") return CROCS_PHOTOS.black;
@@ -271,8 +277,9 @@ function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey]
   if (key === "red") return CROCS_PHOTOS.red;
   if (key === "arctic") return CROCS_PHOTOS.arctic;
   if (key === "camo" || key === "camuflaje") return CROCS_PHOTOS.camo;
-  if (key === "baby pink" || key === "light pink") return CROCS_PHOTOS.light_pink;
-   if (key === "fuchsia") return CROCS_PHOTOS.fuchsia;
+  if (key === "baby pink" || key === "light pink")
+    return CROCS_PHOTOS.light_pink;
+  if (key === "fuchsia") return CROCS_PHOTOS.fuchsia;
   if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
   if (key.includes("shimmer")) return CROCS_PHOTOS.gem;
 
@@ -769,13 +776,17 @@ export function JackieCatalog() {
     if (typeof window === "undefined") return;
 
     const saved = window.localStorage.getItem("jackie_tab");
+
     if (
       saved === "home" ||
       saved === "catalog" ||
-      saved === "messages" ||
+      saved === "cart" ||
       saved === "info"
     ) {
       setTab(saved as AppTab);
+    } else if (saved === "messages") {
+      // migrate old value
+      setTab("cart");
     }
   }, []);
 
@@ -1060,148 +1071,157 @@ export function JackieCatalog() {
     });
   };
 
+  const clearCart = () => {
+    setQuantities({});
+  };
+
+  const removeItemFromCart = (itemId: string) => {
+    setQuantities((prev) => {
+      const { [itemId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
   // Helper to render grouped sizes inside a color card
-  // Helper to render grouped sizes inside a color card
-const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
-  const tLocal = t;
+  const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
+    const tLocal = t;
 
-  const adult = group.variants
-    .filter((v) => inferSizeCategory(v.size) === "adult")
-    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-  const youth = group.variants
-    .filter((v) => inferSizeCategory(v.size) === "youth")
-    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-  const kids = group.variants
-    .filter((v) => inferSizeCategory(v.size) === "kids")
-    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-  const unknown = group.variants
-    .filter((v) => inferSizeCategory(v.size) === "unknown")
-    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const adult = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "adult")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const youth = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "youth")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const kids = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "kids")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const unknown = group.variants
+      .filter((v) => inferSizeCategory(v.size) === "unknown")
+      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
 
-  const sectionClass = isCompact ? "space-y-1" : "space-y-1.5";
+    const sectionClass = isCompact ? "space-y-1" : "space-y-1.5";
 
-  const sizeRowClass = isCompact
-    ? "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
-    : "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5";
+    const sizeRowClass = isCompact
+      ? "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
+      : "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5";
 
-  const labelClass = isCompact
-    ? "text-[11px] font-medium text-slate-900"
-    : "text-[12px] font-medium text-slate-900";
+    const labelClass = isCompact
+      ? "text-[11px] font-medium text-slate-900"
+      : "text-[12px] font-medium text-slate-900";
 
-  const subtitleClass = "text-[10px] text-slate-500";
+    const subtitleClass = "text-[10px] text-slate-500";
 
-  const renderSection = (
-    titleEs: string,
-    titleEn: string,
-    list: PublicItem[]
-  ) => {
-    if (!list.length) return null;
-    return (
-      <div className={sectionClass}>
-        <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
-          <span>
-            {titleEs.startsWith("Adulto")
-              ? "👟"
-              : titleEs.startsWith("Juvenil")
-              ? "🧑"
-              : "🧒"}
-          </span>
-          <span>{tLocal(titleEs, titleEn)}</span>
-        </p>
-        <div className="space-y-1">
-          {list.map((v) => {
-            const qty = quantities[v.id] ?? 0;
-            const atMax = qty >= v.availableCount;
-            const isSelectedSize =
-              sizeFilter !== "all" && v.size === sizeFilter;
+    const renderSection = (
+      titleEs: string,
+      titleEn: string,
+      list: PublicItem[]
+    ) => {
+      if (!list.length) return null;
+      return (
+        <div className={sectionClass}>
+          <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+            <span>
+              {titleEs.startsWith("Adulto")
+                ? "👟"
+                : titleEs.startsWith("Juvenil")
+                ? "🧑"
+                : "🧒"}
+            </span>
+            <span>{tLocal(titleEs, titleEn)}</span>
+          </p>
+          <div className="space-y-1">
+            {list.map((v) => {
+              const qty = quantities[v.id] ?? 0;
+              const atMax = qty >= v.availableCount;
+              const isSelectedSize =
+                sizeFilter !== "all" && v.size === sizeFilter;
 
-            return (
-              <div
-                key={v.id}
-                className={`${sizeRowClass} ${
-                  isSelectedSize
-                    ? "ring-1 ring-emerald-300 bg-emerald-50"
-                    : ""
-                }`}
-              >
-                <div className="flex flex-col">
-                  {/* Size + price on the same line */}
-                  <div className="flex items-center gap-1">
-                    <span className={labelClass}>
-                      {formatSizeLabel(v.size, lang)}
-                    </span>
-                    <span className="text-[10px] font-semibold text-emerald-700">
-                      - ${v.price_mxn.toFixed(0)} MXN
+              return (
+                <div
+                  key={v.id}
+                  className={`${sizeRowClass} ${
+                    isSelectedSize
+                      ? "ring-1 ring-emerald-300 bg-emerald-50"
+                      : ""
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    {/* Size + price on the same line */}
+                    <div className="flex items-center gap-1">
+                      <span className={labelClass}>
+                        {formatSizeLabel(v.size, lang)}
+                      </span>
+                      <span className="text-[10px] font-semibold text-emerald-700">
+                        - ${v.price_mxn.toFixed(0)} MXN
+                      </span>
+                    </div>
+
+                    <span className={subtitleClass}>
+                      {availabilityText(v.availableCount, lang)}
                     </span>
                   </div>
 
-                  <span className={subtitleClass}>
-                    {availabilityText(v.availableCount, lang)}
-                  </span>
-                </div>
-
-                {qty === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => handleAddToCart(v)}
-                    className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition"
-                  >
-                    <span>+</span>
-                    <span className="ml-1 hidden xs:inline">
-                      {tLocal("Agregar", "Add")}
-                    </span>
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFromCart(v.id)}
-                      className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-slate-200 bg-white text-[14px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
-                    >
-                      –
-                    </button>
-
-                    <div className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
-                      <span className="mr-1">x{qty}</span>
-                      {atMax && (
-                        <span className="text-[9px] text-emerald-700">
-                          {tLocal("Máx", "Max")}
-                        </span>
-                      )}
-                    </div>
-
+                  {qty === 0 ? (
                     <button
                       type="button"
                       onClick={() => handleAddToCart(v)}
-                      disabled={atMax}
-                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-[14px] transition ${
-                        atMax
-                          ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
-                          : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
-                      }`}
+                      className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition"
                     >
-                      +
+                      <span>+</span>
+                      <span className="ml-1 hidden xs:inline">
+                        {tLocal("Agregar", "Add")}
+                      </span>
                     </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromCart(v.id)}
+                        className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-slate-200 bg-white text-[14px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                      >
+                        –
+                      </button>
+
+                      <div className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                        <span className="mr-1">x{qty}</span>
+                        {atMax && (
+                          <span className="text-[9px] text-emerald-700">
+                            {tLocal("Máx", "Max")}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddToCart(v)}
+                        disabled={atMax}
+                        className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-[14px] transition ${
+                          atMax
+                            ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                            : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
+      );
+    };
+
+    return (
+      <div className="mt-2 space-y-2">
+        {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
+        {renderSection("Juvenil", "Youth", youth)}
+        {renderSection("Niños", "Kids", kids)}
+        {renderSection("Otras tallas", "Other sizes", unknown)}
       </div>
     );
   };
-
-  return (
-    <div className="mt-2 space-y-2">
-      {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
-      {renderSection("Juvenil", "Youth", youth)}
-      {renderSection("Niños", "Kids", kids)}
-      {renderSection("Otras tallas", "Other sizes", unknown)}
-    </div>
-  );
-};
-
 
   // ------------------------------------------------------------------
   // MOBILE VIEW
@@ -1267,7 +1287,9 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-5 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
           >
             <span>🛒</span>
-            <span>{t("Ver Calzado disponibles", "View available Footwear")}</span>
+            <span>
+              {t("Ver Calzado disponibles", "View available Footwear")}
+            </span>
           </button>
 
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -1442,31 +1464,7 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setTab("info");
-            setTimeout(() => {
-              if (typeof document === "undefined") return;
-              const el = document.getElementById("size-guide");
-              if (el) {
-                el.scrollIntoView({
-                  behavior: "smooth",
-                  block: "start",
-                });
-              }
-            }, 120);
-          }}
-          className="block text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 font-medium mb-2 flex items-center gap-1"
-        >
-          <span>📏</span>
-          <span>
-            {lang === "es"
-              ? "¿Cómo elegir tu talla?"
-              : "How to choose your size?"}
-          </span>
-        </button>
-
+        {/* Sticky "View cart" bar */}
         {totalCartPairs > 0 && (
           <div className="fixed inset-x-0 bottom-[76px] z-30">
             <div className="mx-auto max-w-md px-4">
@@ -1478,49 +1476,38 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                   )}
                 </p>
               )}
-              <a
-                href={hasCartWhatsApp ? waLinkForCart : "#"}
-                target={hasCartWhatsApp ? "_blank" : undefined}
-                rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
-                onClick={(e) => {
-                  if (!hasCartWhatsApp) {
-                    e.preventDefault();
-                    return;
-                  }
-                  track("whatsapp_click_multi", {
-                    count: totalCartPairs,
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("cart");
+                  track("view_cart_from_catalog", {
                     lang,
                     location: "catalog_mobile_sticky",
                   });
                 }}
-                className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 shadow-lg border transition ${
-                  hasCartWhatsApp
-                    ? "bg-emerald-500 text-white border-emerald-400 hover:bg-emerald-400"
-                    : "bg-slate-200 text-slate-500 border-slate-200 cursor-not-allowed"
-                }`}
+                className="flex w-full items-center justify-between rounded-2xl bg-emerald-500 text-white px-4 py-3 shadow-lg text-sm font-semibold border border-emerald-400 hover:bg-emerald-400 transition"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-base">📲</span>
+                  <span className="text-base">🛒</span>
                   <div className="leading-tight">
                     <p className="text-sm font-semibold">
-                      {t("Enviar carrito", "Send cart")}
+                      {t("Ver carrito", "View cart")}
                     </p>
                     <p className="text-[11px] opacity-90">
                       {lang === "es"
                         ? `${totalCartPairs} ${
-                            totalCartPairs === 1 ? "par" : "pares"
-                          } · WhatsApp`
+                            totalCartPairs === 1 ? "artículo" : "artículos"
+                          }`
                         : `${totalCartPairs} ${
-                            totalCartPairs === 1 ? "pair" : "pairs"
-                          } · WhatsApp`}
+                            totalCartPairs === 1 ? "item" : "items"
+                          }`}
                     </p>
                   </div>
                 </div>
 
-                <span className="text-sm font-semibold">
-                  {t("Enviar", "Send")} →
-                </span>
-              </a>
+                <span className="text-sm font-semibold">→</span>
+              </button>
             </div>
           </div>
         )}
@@ -1642,45 +1629,29 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
       </div>
     );
 
-    const renderMobileMessages = () => (
+    const renderMobileCart = () => (
       <div className="space-y-4">
-        <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
-          <h2 className="text-sm font-semibold">
-            {t("Chatea por WhatsApp", "Chat on WhatsApp")}
-          </h2>
-          <p className="text-[11px] text-slate-600">
-            {t(
-              "Mándanos mensaje con talla, color y ubicación. Respuestas de 9am a 7pm.",
-              "Send us a message with size, color and location. We reply from 9am to 7pm."
-            )}
-          </p>
-
-          <a
-            href={hasSupportWhatsApp ? supportWaLink : "#"}
-            target={hasSupportWhatsApp ? "_blank" : undefined}
-            rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
-            onClick={(e) => {
-              if (!hasSupportWhatsApp) {
-                e.preventDefault();
-                return;
-              }
-              track("whatsapp_click_support", {
-                lang,
-                location: "messages",
-              });
-            }}
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-              hasSupportWhatsApp
-                ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
-                : "bg-slate-200 text-slate-500 cursor-not-allowed"
-            }`}
-          >
-            <span className="text-base">📲</span>
-            <span>{t("Abrir WhatsApp", "Open WhatsApp")}</span>
-          </a>
-        </section>
-
-        {cartLines.length > 0 && (
+        {cartLines.length === 0 ? (
+          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
+            <h2 className="text-sm font-semibold">
+              {t("Tu carrito está vacío", "Your cart is empty")}
+            </h2>
+            <p className="text-[11px] text-slate-600">
+              {t(
+                "Regresa al catálogo para agregar pares.",
+                "Go back to the catalog to add pairs."
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setTab("catalog")}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
+            >
+              <span>🛒</span>
+              <span>{t("Ver catálogo", "View catalog")}</span>
+            </button>
+          </section>
+        ) : (
           <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
             <h3 className="text-sm font-semibold">
               {t("Tu carrito", "Your cart")}
@@ -1691,13 +1662,51 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                 "These pairs will be included in the WhatsApp message:"
               )}
             </p>
-            <ul className="space-y-1 text-[11px] text-slate-700">
+
+            {/* Cart items with ability to adjust or remove */}
+            <ul className="space-y-2 text-[11px] text-slate-700">
               {cartLines.map(({ item, count }, idx) => (
-                <li key={item.id}>
-                  {idx + 1}. 📍 {item.location_name || item.location_slug} ·{" "}
-                  {translateColor(item.color, lang)} ·{" "}
-                  {t("Talla", "Size")} {item.size} · x{count} · $
-                  {item.price_mxn.toFixed(0)} MXN
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium line-clamp-2">
+                      {idx + 1}. 📍 {item.location_name || item.location_slug} ·{" "}
+                      {translateColor(item.color, lang)} ·{" "}
+                      {t("Talla", "Size")} {item.size}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      x{count} · ${item.price_mxn.toFixed(0)} MXN
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFromCart(item.id)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white text-[13px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                    >
+                      –
+                    </button>
+                    <span className="text-[11px] font-semibold text-slate-800 w-6 text-center">
+                      {count}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(item)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-emerald-300 bg-white text-[13px] text-emerald-700 hover:bg-emerald-50 transition"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeItemFromCart(item.id)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-rose-300 bg-white text-[13px] text-rose-600 hover:bg-rose-50 transition"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1711,36 +1720,50 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
               </p>
             )}
 
-            <a
-              href={hasCartWhatsApp ? waLinkForCart : "#"}
-              target={hasCartWhatsApp ? "_blank" : undefined}
-              rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
-              onClick={(e) => {
-                if (!hasCartWhatsApp) {
-                  e.preventDefault();
-                  return;
-                }
-                track("whatsapp_click_multi", {
-                  count: totalCartPairs,
-                  lang,
-                  location: "messages_tab",
-                });
-              }}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                hasCartWhatsApp
-                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
-              }`}
-            >
-              <span>✅</span>
-              <span>
-                {t("Enviar carrito por WhatsApp", "Send cart via WhatsApp")}
-              </span>
-            </a>
+            {/* Actions: send to WhatsApp or clear all */}
+            <div className="space-y-2">
+              <a
+                href={hasCartWhatsApp ? waLinkForCart : "#"}
+                target={hasCartWhatsApp ? "_blank" : undefined}
+                rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
+                onClick={(e) => {
+                  if (!hasCartWhatsApp) {
+                    e.preventDefault();
+                    return;
+                  }
+                  track("whatsapp_click_multi", {
+                    count: totalCartPairs,
+                    lang,
+                    location: "cart_tab",
+                  });
+                }}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  hasCartWhatsApp
+                    ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                <span>✅</span>
+                <span>
+                  {t("Enviar carrito por WhatsApp", "Send cart via WhatsApp")}
+                </span>
+              </a>
+
+              <button
+                type="button"
+                onClick={clearCart}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:border-rose-400 hover:text-rose-600 transition"
+              >
+                <span>🗑️</span>
+                <span>
+                  {lang === "es" ? "Vaciar carrito" : "Clear cart"}
+                </span>
+              </button>
+            </div>
           </section>
         )}
 
-        <FeedbackBox lang={lang} context="messages_mobile" />
+        <FeedbackBox lang={lang} context="cart_mobile" />
       </div>
     );
 
@@ -1766,39 +1789,44 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
             </p>
           </section>
 
-          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <span>🚚</span>
-              <span>{t("Puntos de entrega", "Pickup spots")}</span>
-            </h3>
+          {/* WhatsApp support moved here */}
+          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-3">
+            <h2 className="text-sm font-semibold">
+              {t("Chatea por WhatsApp", "Chat on WhatsApp")}
+            </h2>
+            <p className="text-[11px] text-slate-600">
+              {t(
+                "Mándanos mensaje con talla, color y ubicación. Respuestas de 9am a 7pm.",
+                "Send us a message with size, color and location. We reply from 9am to 7pm."
+              )}
+            </p>
 
-            {spots.length === 0 ? (
-              <p className="text-[11px] text-slate-600">
-                {t(
-                  "Los puntos de entrega se confirman por WhatsApp.",
-                  "Pickup spots are confirmed on WhatsApp."
-                )}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {spots.map((spot) => (
-                  <li key={spot}>
-                    <a
-                      href={googleMapsLink(spot, cityName)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-600 hover:underline"
-                    >
-                      <span className="text-red-500">📍</span>
-                      <span>{spot}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <a
+              href={hasSupportWhatsApp ? supportWaLink : "#"}
+              target={hasSupportWhatsApp ? "_blank" : undefined}
+              rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
+              onClick={(e) => {
+                if (!hasSupportWhatsApp) {
+                  e.preventDefault();
+                  return;
+                }
+                track("whatsapp_click_support", {
+                  lang,
+                  location: "info_mobile",
+                });
+              }}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                hasSupportWhatsApp
+                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
+              }`}
+            >
+              <span className="text-base">📲</span>
+              <span>{t("Abrir WhatsApp", "Open WhatsApp")}</span>
+            </a>
           </section>
 
-          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
+           <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <span>🛍️</span>
               <span>{t("Apartados", "Reservations")}</span>
@@ -1855,6 +1883,38 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
             </p>
           </section>
 
+          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <span>🚚</span>
+              <span>{t("Puntos de entrega", "Pickup spots")}</span>
+            </h3>
+
+            {spots.length === 0 ? (
+              <p className="text-[11px] text-slate-600">
+                {t(
+                  "Los puntos de entrega se confirman por WhatsApp.",
+                  "Pickup spots are confirmed on WhatsApp."
+                )}
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {spots.map((spot) => (
+                  <li key={spot}>
+                    <a
+                      href={googleMapsLink(spot, cityName)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-blue-600 hover:underline"
+                    >
+                      <span className="text-red-500">📍</span>
+                      <span>{spot}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           <SizeGuide lang={lang} />
         </div>
       );
@@ -1865,8 +1925,8 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
         ? t("Inicio", "Home")
         : tab === "catalog"
         ? t("Catálogo", "Catalog")
-        : tab === "messages"
-        ? t("Mensajes", "Messages")
+        : tab === "cart"
+        ? t("Carrito", "Cart")
         : t("Información", "Info");
 
     return (
@@ -1915,7 +1975,7 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
         <main className="mx-auto max-w-md px-4 pt-4 pb-28 space-y-4">
           {tab === "home" && renderMobileHome()}
           {tab === "catalog" && renderMobileCatalog()}
-          {tab === "messages" && renderMobileMessages()}
+          {tab === "cart" && renderMobileCart()}
           {tab === "info" && renderMobileInfo()}
         </main>
 
@@ -1937,10 +1997,10 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                     labelEn: "Catalog",
                   },
                   {
-                    id: "messages",
-                    icon: "💬",
-                    labelEs: "Mensajes",
-                    labelEn: "Messages",
+                    id: "cart",
+                    icon: "🧺",
+                    labelEs: "Carrito",
+                    labelEn: "Cart",
                   },
                   {
                     id: "info",
@@ -1965,13 +2025,21 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                       active ? "text-emerald-600" : "text-slate-400"
                     }`}
                   >
-                    <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-full text-base ${
-                        active ? "bg-emerald-50" : "bg-slate-100"
-                      }`}
-                    >
-                      {icon}
-                    </span>
+                    <div className="relative">
+                      <span
+                        className={`flex h-7 w-7 items-center justify-center rounded-full text-base ${
+                          active ? "bg-emerald-50" : "bg-slate-100"
+                        }`}
+                      >
+                        {icon}
+                      </span>
+
+                      {id === "cart" && totalCartPairs > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-h-[14px] min-w-[14px] rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center px-1">
+                          {totalCartPairs > 9 ? "9+" : totalCartPairs}
+                        </span>
+                      )}
+                    </div>
 
                     <span
                       className={`text-[10px] leading-none ${
@@ -2143,49 +2211,48 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
             </div>
 
             <div className="w-full max-w-sm mx-auto md:mx-0">
-            <div className="rounded-3xl bg-gradient-to-br from-sky-50 via-white to-emerald-50 border border-slate-200 shadow-sm p-4 space-y-4">
-              
-              {/* Top badge + price */}
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-slate-700 border border-slate-200">
-                  👟{" "}
-                  {lang === "es"
-                    ? "Calzado de Calidad"
-                    : "Quality Footwear"}
-                </span>
-
-                <p className="text-xs text-slate-500">
-                  {lang === "es" ? "Desde" : "From"} $600 MXN
-                </p>
-              </div>
-
-              {/* Location card */}
-              <div className="rounded-2xl bg-white/70 border border-slate-200 px-4 py-5 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">
-                    {lang === "es" ? "Ubicación" : "Location"}
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    {selectedLocationName}
-                  </p>
-                  <p className="mt-2 text-[10px] text-slate-500">
+              <div className="rounded-3xl bg-gradient-to-br from-sky-50 via-white to-emerald-50 border border-slate-200 shadow-sm p-4 space-y-4">
+                {/* Top badge + price */}
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-slate-700 border border-slate-200">
+                    👟{" "}
                     {lang === "es"
-                      ? "Filtra por talla y color según tu ciudad."
-                      : "Filter by size and color for your city."}
+                      ? "Calzado de Calidad"
+                      : "Quality Footwear"}
+                  </span>
+
+                  <p className="text-xs text-slate-500">
+                    {lang === "es" ? "Desde" : "From"} $600 MXN
                   </p>
                 </div>
 
-                <div className="text-4xl md:text-5xl">👟</div>
-              </div>
+                {/* Location card */}
+                <div className="rounded-2xl bg-white/70 border border-slate-200 px-4 py-5 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900">
+                      {lang === "es" ? "Ubicación" : "Location"}
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      {selectedLocationName}
+                    </p>
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      {lang === "es"
+                        ? "Filtra por talla y color según tu ciudad."
+                        : "Filter by size and color for your city."}
+                    </p>
+                  </div>
 
-              {/* Description */}
-              <p className="text-[11px] text-slate-600">
-                {lang === "es"
-                  ? "Explora nuestro calzado por color y talla, añade tus pares al carrito y envía tu pedido por WhatsApp."
-                  : "Browse our footwear by color and size, add your pairs to the cart and send your order on WhatsApp."}
-              </p>
+                  <div className="text-4xl md:text-5xl">👟</div>
+                </div>
+
+                {/* Description */}
+                <p className="text-[11px] text-slate-600">
+                  {lang === "es"
+                    ? "Explora nuestro calzado por color y talla, añade tus pares al carrito y envía tu pedido por WhatsApp."
+                    : "Browse our footwear by color and size, add your pairs to the cart and send your order on WhatsApp."}
+                </p>
+              </div>
             </div>
-          </div>
           </div>
         </section>
 
@@ -2492,7 +2559,9 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                 <span>🛍️</span>
                 <span>{t("Apartados", "Reservations")}</span>
                 <span>-</span>
-                <span>{t("Pago por transferencia", "Pay by bank transfer")}</span>
+                <span>
+                  {t("Pago por transferencia", "Pay by bank transfer")}
+                </span>
               </h3>
 
               <p className="text-[11px] text-slate-700 leading-relaxed">
@@ -2568,32 +2637,45 @@ const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
                 </p>
               )}
             </div>
-            <a
-              href={hasCartWhatsApp ? waLinkForCart : "#"}
-              target={hasCartWhatsApp ? "_blank" : undefined}
-              rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
-              onClick={(e) => {
-                if (!hasCartWhatsApp) {
-                  e.preventDefault();
-                  return;
-                }
-                track("whatsapp_click_multi", {
-                  count: totalCartPairs,
-                  lang,
-                  location: "sticky_cart",
-                });
-              }}
-              className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
-                hasCartWhatsApp
-                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
-              }`}
-            >
-              <span className="text-base">📲</span>
-              {lang === "es"
-                ? "Enviar carrito por WhatsApp"
-                : "Send cart via WhatsApp"}
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={clearCart}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] sm:text-xs font-medium text-slate-700 hover:border-rose-400 hover:text-rose-600 transition"
+              >
+                <span>🗑️</span>
+                <span>
+                  {lang === "es" ? "Vaciar carrito" : "Clear cart"}
+                </span>
+              </button>
+
+              <a
+                href={hasCartWhatsApp ? waLinkForCart : "#"}
+                target={hasCartWhatsApp ? "_blank" : undefined}
+                rel={hasCartWhatsApp ? "noopener noreferrer" : undefined}
+                onClick={(e) => {
+                  if (!hasCartWhatsApp) {
+                    e.preventDefault();
+                    return;
+                  }
+                  track("whatsapp_click_multi", {
+                    count: totalCartPairs,
+                    lang,
+                    location: "sticky_cart",
+                  });
+                }}
+                className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
+                  hasCartWhatsApp
+                    ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                <span className="text-base">📲</span>
+                {lang === "es"
+                  ? "Enviar carrito por WhatsApp"
+                  : "Send cart via WhatsApp"}
+              </a>
+            </div>
           </div>
         </div>
       )}
