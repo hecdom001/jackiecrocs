@@ -44,8 +44,12 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Azul Ártico";
     case "camo":
       return "Camuflaje";
-    case "light pink shimmer":  
+    case "light pink shimmer":
       return "Rosa Claro con Brillo";
+    case "fuchsia":
+      return "Fucsia";
+    case "rust brown":
+      return "Café Óxido";
     default:
       return colorEn;
   }

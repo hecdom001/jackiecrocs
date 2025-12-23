@@ -63,6 +63,10 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Camuflaje";
     case "light pink shimmer":
       return "Rosa Claro con Brillo";
+    case "fuchsia":
+      return "Fucsia";
+    case "rust brown":
+      return "Café Óxido";
     default:
       return colorEn;
   }

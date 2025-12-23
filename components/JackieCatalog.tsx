@@ -62,6 +62,10 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Camuflaje";
     case "light pink shimmer":
       return "Rosa Claro con Brillo";
+    case "fuchsia":
+      return "Fucsia";
+    case "rust brown":
+      return "Café Óxido";
     default:
       return colorEn;
   }
@@ -110,6 +114,10 @@ function colorLineClass(colorEn: string) {
     case "pink shimmer":
     case "shimmer pink":
       return "bg-rose-200";
+   case "fuchsia":
+      return "bg-pink-200";
+    case "rust brown":
+      return "bg-orange-200";
     default:
       return "bg-slate-300";
   }
@@ -241,6 +249,14 @@ const CROCS_PHOTOS = {
     src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`,
     label: "Rosa Claro con Brillo",
   },
+  fuchsia: {
+    src: `${SUPABASE_IMAGE_BASE}/crocs-fuchsia.jpg`,
+    label: "Crocs Fucsia",
+  },
+  rust_brown: {
+    src: `${SUPABASE_IMAGE_BASE}/crocs-rust-brown.jpg`,
+    label: "Café Óxido",
+  },
 } as const;
 
 type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
@@ -256,6 +272,8 @@ function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey]
   if (key === "arctic") return CROCS_PHOTOS.arctic;
   if (key === "camo" || key === "camuflaje") return CROCS_PHOTOS.camo;
   if (key === "baby pink" || key === "light pink") return CROCS_PHOTOS.light_pink;
+   if (key === "fuchsia") return CROCS_PHOTOS.fuchsia;
+  if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
   if (key.includes("shimmer")) return CROCS_PHOTOS.gem;
 
   return null;
