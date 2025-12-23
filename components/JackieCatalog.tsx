@@ -926,14 +926,17 @@ export function JackieCatalog() {
 
       const nextPageSize =
         width >= 1024 ? DESKTOP_INITIAL_VISIBLE : MOBILE_INITIAL_VISIBLE;
+
       setPageSize(nextPageSize);
-      setVisibleCount(nextPageSize);
+      // no visibleCount change here
     };
 
     compute();
     window.addEventListener("resize", compute);
     return () => window.removeEventListener("resize", compute);
   }, []);
+
+
 
   useEffect(() => {
     if (tab !== "catalog") return;
