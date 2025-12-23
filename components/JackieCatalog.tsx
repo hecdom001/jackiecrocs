@@ -1478,9 +1478,12 @@ export function JackieCatalog() {
                 type="button"
                 onClick={() => {
                   setTab("cart");
-                  track("view_cart_from_catalog", {
+                  track("whatsapp_click_multi", {
+                    count: totalCartPairs,
                     lang,
-                    location: "catalog_mobile_sticky",
+                    ui_location: "catalog_mobile_sticky",
+                    cart_location_slug:
+                      cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown"),
                   });
                 }}
                 className="flex w-full items-center justify-between rounded-2xl bg-emerald-500 text-white px-4 py-3 shadow-lg text-sm font-semibold border border-emerald-400 hover:bg-emerald-400 transition"
@@ -1731,7 +1734,9 @@ export function JackieCatalog() {
                   track("whatsapp_click_multi", {
                     count: totalCartPairs,
                     lang,
-                    location: "cart_tab",
+                    ui_location: "cart_tab",
+                    cart_location_slug:
+                      cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown"),
                   });
                 }}
                 className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
@@ -2658,7 +2663,9 @@ export function JackieCatalog() {
                   track("whatsapp_click_multi", {
                     count: totalCartPairs,
                     lang,
-                    location: "sticky_cart",
+                    ui_location: "sticky_cart",
+                    cart_location_slug:
+                      cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown"),
                   });
                 }}
                 className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-xs sm:text-sm font-semibold transition ${
