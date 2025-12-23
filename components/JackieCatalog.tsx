@@ -1061,133 +1061,147 @@ export function JackieCatalog() {
   };
 
   // Helper to render grouped sizes inside a color card
-  const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
-    const tLocal = t;
+  // Helper to render grouped sizes inside a color card
+const renderGroupSizeSections = (group: ColorGroup, isCompact: boolean) => {
+  const tLocal = t;
 
-    const adult = group.variants
-      .filter((v) => inferSizeCategory(v.size) === "adult")
-      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-    const youth = group.variants
-      .filter((v) => inferSizeCategory(v.size) === "youth")
-      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-    const kids = group.variants
-      .filter((v) => inferSizeCategory(v.size) === "kids")
-      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
-    const unknown = group.variants
-      .filter((v) => inferSizeCategory(v.size) === "unknown")
-      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+  const adult = group.variants
+    .filter((v) => inferSizeCategory(v.size) === "adult")
+    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+  const youth = group.variants
+    .filter((v) => inferSizeCategory(v.size) === "youth")
+    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+  const kids = group.variants
+    .filter((v) => inferSizeCategory(v.size) === "kids")
+    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+  const unknown = group.variants
+    .filter((v) => inferSizeCategory(v.size) === "unknown")
+    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
 
-    const sectionClass = isCompact
-      ? "space-y-1"
-      : "space-y-1.5";
+  const sectionClass = isCompact ? "space-y-1" : "space-y-1.5";
 
-    const sizeRowClass = isCompact
-      ? "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
-      : "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5";
+  const sizeRowClass = isCompact
+    ? "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
+    : "flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5";
 
-    const labelClass = isCompact
-      ? "text-[11px] font-medium text-slate-900"
-      : "text-[12px] font-medium text-slate-900";
+  const labelClass = isCompact
+    ? "text-[11px] font-medium text-slate-900"
+    : "text-[12px] font-medium text-slate-900";
 
-    const subtitleClass = "text-[10px] text-slate-500";
+  const subtitleClass = "text-[10px] text-slate-500";
 
-    const renderSection = (
-      titleEs: string,
-      titleEn: string,
-      list: PublicItem[]
-    ) => {
-      if (!list.length) return null;
-      return (
-        <div className={sectionClass}>
-          <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
-            <span>
-              {titleEs.startsWith("Adulto") ? "👟" : titleEs.startsWith("Juvenil") ? "🧑" : "🧒"}
-            </span>
-            <span>{tLocal(titleEs, titleEn)}</span>
-          </p>
-          <div className="space-y-1">
-            {list.map((v) => {
-              const qty = quantities[v.id] ?? 0;
-              const atMax = qty >= v.availableCount;
-              const isSelectedSize = sizeFilter !== "all" && v.size === sizeFilter;
+  const renderSection = (
+    titleEs: string,
+    titleEn: string,
+    list: PublicItem[]
+  ) => {
+    if (!list.length) return null;
+    return (
+      <div className={sectionClass}>
+        <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+          <span>
+            {titleEs.startsWith("Adulto")
+              ? "👟"
+              : titleEs.startsWith("Juvenil")
+              ? "🧑"
+              : "🧒"}
+          </span>
+          <span>{tLocal(titleEs, titleEn)}</span>
+        </p>
+        <div className="space-y-1">
+          {list.map((v) => {
+            const qty = quantities[v.id] ?? 0;
+            const atMax = qty >= v.availableCount;
+            const isSelectedSize =
+              sizeFilter !== "all" && v.size === sizeFilter;
 
-              return (
-                <div
-                  key={v.id}
-                  className={`${sizeRowClass} ${
-                    isSelectedSize ? "ring-1 ring-emerald-300 bg-emerald-50" : ""
-                  }`}
-                >
-                  <div className="flex flex-col">
+            return (
+              <div
+                key={v.id}
+                className={`${sizeRowClass} ${
+                  isSelectedSize
+                    ? "ring-1 ring-emerald-300 bg-emerald-50"
+                    : ""
+                }`}
+              >
+                <div className="flex flex-col">
+                  {/* Size + price on the same line */}
+                  <div className="flex items-center gap-1">
                     <span className={labelClass}>
                       {formatSizeLabel(v.size, lang)}
                     </span>
-                    <span className={subtitleClass}>
-                      {availabilityText(v.availableCount, lang)}
+                    <span className="text-[10px] font-semibold text-emerald-700">
+                      ${v.price_mxn.toFixed(0)} MXN
                     </span>
                   </div>
 
-                  {qty === 0 ? (
+                  <span className={subtitleClass}>
+                    {availabilityText(v.availableCount, lang)}
+                  </span>
+                </div>
+
+                {qty === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(v)}
+                    className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition"
+                  >
+                    <span>+</span>
+                    <span className="ml-1 hidden xs:inline">
+                      {tLocal("Agregar", "Add")}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFromCart(v.id)}
+                      className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-slate-200 bg-white text-[14px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+                    >
+                      –
+                    </button>
+
+                    <div className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                      <span className="mr-1">x{qty}</span>
+                      {atMax && (
+                        <span className="text-[9px] text-emerald-700">
+                          {tLocal("Máx", "Max")}
+                        </span>
+                      )}
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => handleAddToCart(v)}
-                      className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition"
+                      disabled={atMax}
+                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-[14px] transition ${
+                        atMax
+                          ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                          : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
+                      }`}
                     >
-                      <span>+</span>
-                      <span className="ml-1 hidden xs:inline">
-                        {tLocal("Agregar", "Add")}
-                      </span>
+                      +
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFromCart(v.id)}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-slate-200 bg-white text-[14px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
-                      >
-                        –
-                      </button>
-
-                      <div className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
-                        <span className="mr-1">x{qty}</span>
-                        {atMax && (
-                          <span className="text-[9px] text-emerald-700">
-                            {tLocal("Máx", "Max")}
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(v)}
-                        disabled={atMax}
-                        className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-[14px] transition ${
-                          atMax
-                            ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
-                            : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"
-                        }`}
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      );
-    };
-
-    return (
-      <div className="mt-2 space-y-2">
-        {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
-        {renderSection("Juvenil", "Youth", youth)}
-        {renderSection("Niños", "Kids", kids)}
-        {renderSection("Otras tallas", "Other sizes", unknown)}
       </div>
     );
   };
+
+  return (
+    <div className="mt-2 space-y-2">
+      {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
+      {renderSection("Juvenil", "Youth", youth)}
+      {renderSection("Niños", "Kids", kids)}
+      {renderSection("Otras tallas", "Other sizes", unknown)}
+    </div>
+  );
+};
+
 
   // ------------------------------------------------------------------
   // MOBILE VIEW
