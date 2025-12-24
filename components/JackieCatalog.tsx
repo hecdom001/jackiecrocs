@@ -296,11 +296,7 @@ const WHATSAPP_NUMBER_MEXICALI =
 // Delivery spots per location
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   tijuana: [
-    "Privada Pizaro - BLVD De las Americas",
-    "Colectivo Paseo del Rio",
-    "Zona Rio - Calimax Plus Rio",
-    "Terrazas de la Presa",
-    "UABC Otay",
+    "Colectivo Paseo del Rio"
   ],
   mexicali: ["Oaxaca 1820"],
   mexicali_b: ["Jardin Las Palmas"],
@@ -1232,6 +1228,19 @@ export function JackieCatalog() {
   // ------------------------------------------------------------------
 
   if (isMobile) {
+    // --- Shared pickup spots for mobile (used in Home + Info) ---
+    const pickupGroupedSpots: Record<string, string[]> =
+      locationFilter === "all"
+        ? DELIVERY_SPOTS_BY_LOCATION
+        : {
+            [locationFilter]:
+              DELIVERY_SPOTS_BY_LOCATION[locationFilter] ?? [],
+          };
+
+    const hasAnyPickupSpots = Object.values(pickupGroupedSpots).some(
+      (list) => list.length > 0
+    );
+
     const renderLocationPicker = (variant: "home" | "catalog") => (
       <div className="rounded-3xl bg-white/95 border border-slate-100 p-3 shadow-sm space-y-2">
         <p className="text-[11px] text-slate-700 font-medium flex items-center gap-2">
@@ -1266,103 +1275,51 @@ export function JackieCatalog() {
     );
 
     const renderMobileHome = () => (
-      <div className="space-y-4">
-        <section className="rounded-3xl bg-white/95 border border-emerald-100 shadow-sm p-4 space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
-            <span>🛍️</span>
-            <span>{t("Catálogo en tiempo real", "Live stock catalog")}</span>
-          </div>
+  <div className="space-y-4">
+    <section className="rounded-3xl bg-white/95 border border-emerald-100 shadow-sm p-4 space-y-3">
+      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 border border-emerald-100">
+        <span>🛍️</span>
+        <span>{t("Catálogo en tiempo real", "Live stock catalog")}</span>
+      </div>
 
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">
-              {t("Calzado disponibles", "Footwear available")}
-            </h1>
-            <p className="text-[12px] text-slate-600">
-              {t(
-                "Elige ubicación, color y talla, agrégalos al carrito y mándanos tu pedido por WhatsApp.",
-                "Pick your location, color and size, add pairs to your cart and send your order on WhatsApp."
-              )}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setTab("catalog")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-5 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
-          >
-            <span>🛒</span>
-            <span>
-              {t("Ver Calzado disponibles", "View available Footwear")}
-            </span>
-          </button>
-
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-              💵 {t("Efectivo o transferencia", "Cash or bank transfer")}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-              🇺🇸 {t("Tallas americanas", "US sizing")}
-            </span>
-          </div>
-
-          {lastUpdated && (
-            <p className="text-[10px] text-slate-500">
-              {t("Última actualización", "Last updated")}: {formattedLastUpdated}
-            </p>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold tracking-tight">
+          {t("Calzado disponibles", "Footwear available")}
+        </h1>
+        <p className="text-[12px] text-slate-600">
+          {t(
+            "Elige ubicación, color y talla, agrégalos al carrito y mándanos tu pedido por WhatsApp.",
+            "Pick your location, color and size, add pairs to your cart and send your order on WhatsApp."
           )}
-        </section>
+        </p>
+      </div>
 
-        {renderLocationPicker("home")}
+      <button
+        type="button"
+        onClick={() => setTab("catalog")}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 text-white px-5 py-3 text-sm font-semibold shadow-md hover:bg-emerald-400 transition"
+      >
+        <span>🛒</span>
+        <span>{t("Ver Calzado disponibles", "View available Footwear")}</span>
+      </button>
 
-        <section className="rounded-3xl bg-white/95 border border-slate-100 p-3 space-y-2">
-          <div className="flex items-center justify-between text-[12px]">
-            <p className="font-medium">
-              {t("Fotos reales del producto", "Real product photos")}
-            </p>
-            <p className="text-[10px] text-slate-500">
-              {mobilePhotoIndex + 1} / {photoList.length}
-            </p>
-          </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+          💵 {t("Efectivo o transferencia", "Cash or bank transfer")}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+          🇺🇸 {t("Tallas americanas", "US sizing")}
+        </span>
+      </div>
 
-          <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
-            <Image
-              src={photoList[mobilePhotoIndex].src}
-              alt={photoList[mobilePhotoIndex].label}
-              width={900}
-              height={900}
-              className="h-60 w-full object-cover"
-              priority={false}
-            />
-
-            <button
-              type="button"
-              disabled={!mobileCanPrev}
-              onClick={() => setMobilePhotoIndex((i) => Math.max(0, i - 1))}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
-                !mobileCanPrev ? "opacity-30" : "hover:bg-white"
-              }`}
-            >
-              ‹
-            </button>
-
-            <button
-              type="button"
-              disabled={!mobileCanNext}
-              onClick={() =>
-                setMobilePhotoIndex((i) =>
-                  Math.min(photoList.length - 1, i + 1)
-                )
-              }
-              className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border shadow flex items-center justify-center text-lg ${
-                !mobileCanNext ? "opacity-30" : "hover:bg-white"
-              }`}
-            >
-              ›
-            </button>
-          </div>
-        </section>
-
-        <section className="rounded-3xl bg-white/95 border border-slate-100 p-4 space-y-2">
+      {lastUpdated && (
+        <p className="text-[10px] text-slate-500">
+          {t("Última actualización", "Last updated")}: {formattedLastUpdated}
+        </p>
+      )}
+    </section>
+    {renderLocationPicker("home")}
+    <section className="rounded-3xl bg-white/95 border border-slate-100 p-4 space-y-2">
           <h2 className="text-sm font-semibold">
             {t("¿Cómo funciona?", "How it works")}
           </h2>
@@ -1387,8 +1344,63 @@ export function JackieCatalog() {
             </li>
           </ol>
         </section>
-      </div>
-    );
+
+    {/* ✅ NEW: Pickup spots on Home (mobile) using pickupGroupedSpots / hasAnyPickupSpots */}
+    <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
+      <h3 className="text-sm font-semibold flex items-center gap-2">
+        <span>🚚</span>
+        <span>{t("Puntos de entrega", "Pickup spots")}</span>
+      </h3>
+
+      {!hasAnyPickupSpots ? (
+        <p className="text-[11px] text-slate-600">
+          {t(
+            "Los puntos de entrega se confirman por WhatsApp.",
+            "Pickup spots are confirmed on WhatsApp."
+          )}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {Object.entries(pickupGroupedSpots).map(([slug, spotsForSlug]) => {
+            if (!spotsForSlug.length) return null;
+
+            const cityLabel =
+              locations.find((l) => l.slug === slug)?.name ||
+              slug
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+
+            return (
+              <div key={slug} className="space-y-1">
+                <h4 className="text-[12px] font-semibold text-slate-800 flex items-center gap-1">
+                  <span>📍</span>
+                  <span>{cityLabel}</span>
+                </h4>
+
+                <ul className="space-y-1 ml-4">
+                  {spotsForSlug.map((spot) => (
+                    <li key={spot}>
+                      <a
+                        href={googleMapsLink(spot, cityLabel)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:underline"
+                      >
+                        <span className="text-red-500">•</span>
+                        <span>{spot}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  </div>
+);
+
 
     const renderMobileCatalog = () => (
       <div className="space-y-4">
@@ -1967,60 +1979,6 @@ export function JackieCatalog() {
               )}
             </p>
           </section>
-
-          <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
-  <h3 className="text-sm font-semibold flex items-center gap-2">
-    <span>🚚</span>
-    <span>{t("Puntos de entrega", "Pickup spots")}</span>
-  </h3>
-
-  {!hasAnySpots ? (
-    <p className="text-[11px] text-slate-600">
-      {t(
-        "Los puntos de entrega se confirman por WhatsApp.",
-        "Pickup spots are confirmed on WhatsApp."
-      )}
-    </p>
-  ) : (
-    <div className="space-y-4">
-      {Object.entries(groupedSpots).map(([slug, spotsForSlug]) => {
-        if (!spotsForSlug.length) return null;
-
-        // Get nice city label from locations list or fallback from slug
-        const cityLabel =
-          locations.find((l) => l.slug === slug)?.name ||
-          slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-
-        return (
-          <div key={slug} className="space-y-1">
-            <h4 className="text-[12px] font-semibold text-slate-800 flex items-center gap-1">
-              <span>📍</span>
-              <span>{cityLabel}</span>
-            </h4>
-
-            <ul className="space-y-1 ml-4">
-              {spotsForSlug.map((spot) => (
-                <li key={spot}>
-                  <a
-                    href={googleMapsLink(spot, cityLabel)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-blue-600 hover:underline"
-                  >
-                    <span className="text-red-500">•</span>
-                    <span>{spot}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
-  )}
-</section>
-
-
           <SizeGuide lang={lang} />
         </div>
       );
