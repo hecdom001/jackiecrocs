@@ -302,7 +302,8 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
     "Terrazas de la Presa",
     "UABC Otay",
   ],
-  mexicali: [],
+  mexicali: ["Oaxaca 1820"],
+  mexicali_b: ["Jardin Las Palmas"],
 };
 
 function googleMapsLink(place: string, city: string) {
@@ -1773,13 +1774,20 @@ export function JackieCatalog() {
     );
 
     const renderMobileInfo = () => {
-      const citySlug = locationFilter === "all" ? "tijuana" : locationFilter;
-      const cityName =
+      // Group pickup spots based on current locationFilter
+      const groupedSpots: Record<string, string[]> =
         locationFilter === "all"
-          ? "Tijuana"
-          : locations.find((l) => l.slug === locationFilter)?.name || "Tijuana";
+          ? DELIVERY_SPOTS_BY_LOCATION // all locations
+          : {
+              [locationFilter]:
+                DELIVERY_SPOTS_BY_LOCATION[locationFilter] ?? [],
+            };
 
-      const spots = DELIVERY_SPOTS_BY_LOCATION[citySlug] ?? [];
+      const hasAnySpots = Object.values(groupedSpots).some(
+        (list) => list.length > 0
+      );
+
+
 
       return (
         <div className="space-y-4">
@@ -1961,36 +1969,57 @@ export function JackieCatalog() {
           </section>
 
           <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <span>🚚</span>
-              <span>{t("Puntos de entrega", "Pickup spots")}</span>
-            </h3>
+  <h3 className="text-sm font-semibold flex items-center gap-2">
+    <span>🚚</span>
+    <span>{t("Puntos de entrega", "Pickup spots")}</span>
+  </h3>
 
-            {spots.length === 0 ? (
-              <p className="text-[11px] text-slate-600">
-                {t(
-                  "Los puntos de entrega se confirman por WhatsApp.",
-                  "Pickup spots are confirmed on WhatsApp."
-                )}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {spots.map((spot) => (
-                  <li key={spot}>
-                    <a
-                      href={googleMapsLink(spot, cityName)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-600 hover:underline"
-                    >
-                      <span className="text-red-500">📍</span>
-                      <span>{spot}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+  {!hasAnySpots ? (
+    <p className="text-[11px] text-slate-600">
+      {t(
+        "Los puntos de entrega se confirman por WhatsApp.",
+        "Pickup spots are confirmed on WhatsApp."
+      )}
+    </p>
+  ) : (
+    <div className="space-y-4">
+      {Object.entries(groupedSpots).map(([slug, spotsForSlug]) => {
+        if (!spotsForSlug.length) return null;
+
+        // Get nice city label from locations list or fallback from slug
+        const cityLabel =
+          locations.find((l) => l.slug === slug)?.name ||
+          slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+        return (
+          <div key={slug} className="space-y-1">
+            <h4 className="text-[12px] font-semibold text-slate-800 flex items-center gap-1">
+              <span>📍</span>
+              <span>{cityLabel}</span>
+            </h4>
+
+            <ul className="space-y-1 ml-4">
+              {spotsForSlug.map((spot) => (
+                <li key={spot}>
+                  <a
+                    href={googleMapsLink(spot, cityLabel)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-blue-600 hover:underline"
+                  >
+                    <span className="text-red-500">•</span>
+                    <span>{spot}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</section>
+
 
           <SizeGuide lang={lang} />
         </div>
