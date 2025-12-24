@@ -1806,29 +1806,101 @@ export function JackieCatalog() {
               )}
             </p>
 
-            <a
-              href={hasSupportWhatsApp ? supportWaLink : "#"}
-              target={hasSupportWhatsApp ? "_blank" : undefined}
-              rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
-              onClick={(e) => {
-                if (!hasSupportWhatsApp) {
-                  e.preventDefault();
-                  return;
-                }
-                track("whatsapp_click_support", {
-                  lang,
-                  location: "info_mobile",
-                });
-              }}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                hasSupportWhatsApp
-                  ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
-              }`}
-            >
-              <span className="text-base">📲</span>
-              <span>{t("Abrir WhatsApp", "Open WhatsApp")}</span>
-            </a>
+            {locationFilter === "all" ? (
+              // ✅ When ALL locations are selected → show both city buttons
+              <div className="flex flex-col gap-2">
+                {/* Tijuana button */}
+                {(() => {
+                  const linkTijuana = buildWhatsAppSupportLink(lang, "tijuana");
+                  const hasTijuana = linkTijuana !== "#";
+                  return (
+                    <a
+                      href={hasTijuana ? linkTijuana : "#"}
+                      target={hasTijuana ? "_blank" : undefined}
+                      rel={hasTijuana ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!hasTijuana) {
+                          e.preventDefault();
+                          return;
+                        }
+                        track("whatsapp_click_support", {
+                          lang,
+                          location: "info_mobile_tijuana",
+                        });
+                      }}
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        hasTijuana
+                          ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <span className="text-base">📲</span>
+                      <span>
+                        {t("Abrir WhatsApp Tijuana", "Open WhatsApp (Tijuana)")}
+                      </span>
+                    </a>
+                  );
+                })()}
+
+                {/* Mexicali button */}
+                {(() => {
+                  const linkMexicali = buildWhatsAppSupportLink(lang, "mexicali");
+                  const hasMexicali = linkMexicali !== "#";
+                  return (
+                    <a
+                      href={hasMexicali ? linkMexicali : "#"}
+                      target={hasMexicali ? "_blank" : undefined}
+                      rel={hasMexicali ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!hasMexicali) {
+                          e.preventDefault();
+                          return;
+                        }
+                        track("whatsapp_click_support", {
+                          lang,
+                          location: "info_mobile_mexicali",
+                        });
+                      }}
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        hasMexicali
+                          ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <span className="text-base">📲</span>
+                      <span>
+                        {t("Abrir WhatsApp Mexicali", "Open WhatsApp (Mexicali)")}
+                      </span>
+                    </a>
+                  );
+                })()}
+              </div>
+            ) : (
+              // 🔁 Original behavior: single button for selected location
+              <a
+                href={hasSupportWhatsApp ? supportWaLink : "#"}
+                target={hasSupportWhatsApp ? "_blank" : undefined}
+                rel={hasSupportWhatsApp ? "noopener noreferrer" : undefined}
+                onClick={(e) => {
+                  if (!hasSupportWhatsApp) {
+                    e.preventDefault();
+                    return;
+                  }
+                  track("whatsapp_click_support", {
+                    lang,
+                    location: "info_mobile",
+                  });
+                }}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  hasSupportWhatsApp
+                    ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                <span className="text-base">📲</span>
+                <span>{t("Abrir WhatsApp", "Open WhatsApp")}</span>
+              </a>
+            )}
           </section>
 
            <section className="rounded-3xl bg-white border border-slate-100 p-4 shadow-sm space-y-2">
