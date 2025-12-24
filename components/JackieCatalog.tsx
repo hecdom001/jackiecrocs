@@ -327,7 +327,7 @@ function getWhatsAppNumberForLocationSlug(slug: string | "all") {
     return WHATSAPP_NUMBER_MEXICALI || WHATSAPP_NUMBER_TIJUANA;
   }
 
-  if (slug === "tijuana" || slug === "all") {
+  if (slug === "tijuana" || slug === "all" || slug === "mexicali_b") {
     return WHATSAPP_NUMBER_TIJUANA || WHATSAPP_NUMBER_MEXICALI;
   }
 
@@ -1836,7 +1836,7 @@ export function JackieCatalog() {
                     >
                       <span className="text-base">📲</span>
                       <span>
-                        {t("Abrir WhatsApp Tijuana", "Open WhatsApp (Tijuana)")}
+                        {t("Abrir WhatsApp Tijuana/Mexicali Punto B", "Open WhatsApp (Tijuana/Mexicali Punto B)")}
                       </span>
                     </a>
                   );
