@@ -49,7 +49,7 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
     case "fuchsia":
       return "Fucsia";
     case "rust brown":
-      return "Café Óxido";
+       return "Ladrillo";
     default:
       return colorEn;
   }

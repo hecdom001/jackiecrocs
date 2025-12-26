@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     // limit: default 20, max 30 (same as MAX_HISTORY on UI)
     const limitParam = searchParams.get("limit");
-    const limit = Math.min(Number(limitParam) || 20, 30);
+    const limit = Math.min(Number(limitParam) || 90, 100);
 
     // optional location filter (by location_id) – safe even if UI doesn't send it yet
     const locationId = searchParams.get("locationId");

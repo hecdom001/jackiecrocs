@@ -8,9 +8,9 @@ import type { InventoryStatus } from "@/types/inventory";
 
 export const dynamic = "force-dynamic";
 
-const MAX_HISTORY = 30;
+const MAX_HISTORY = 100;
 const MOBILE_PAGE_SIZE = 5;
-const DESKTOP_PAGE_SIZE = 20;
+const DESKTOP_PAGE_SIZE = 90;
 
 const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   available: { es: "Disponible", en: "Available" },
@@ -66,7 +66,7 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
     case "fuchsia":
       return "Fucsia";
     case "rust brown":
-      return "Café Óxido";
+       return "Ladrillo";
     default:
       return colorEn;
   }

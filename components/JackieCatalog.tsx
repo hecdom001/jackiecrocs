@@ -65,7 +65,7 @@ function translateColor(colorEn: string, lang: Lang) {
     case "fuchsia":
       return "Fucsia";
     case "rust brown":
-      return "Café Óxido";
+      return "Ladrillo";
     default:
       return colorEn;
   }
@@ -293,6 +293,9 @@ const WHATSAPP_NUMBER_TIJUANA =
 const WHATSAPP_NUMBER_MEXICALI =
   process.env.NEXT_PUBLIC_WHATSAPP_PHONE_MEXICALI || "";
 
+const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali"];
+const hasMexicaliB = VISIBLE_LOCATION_SLUGS.includes("mexicali_b");
+
 // Delivery spots per location
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   tijuana: [
@@ -301,6 +304,13 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   mexicali: ["Oaxaca 1820"],
   mexicali_b: ["Jardin Las Palmas"],
 };
+
+// Apply visibility filtering:
+const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
+  Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) =>
+    VISIBLE_LOCATION_SLUGS.includes(slug)
+  )
+);
 
 function googleMapsLink(place: string, city: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -1231,10 +1241,10 @@ export function JackieCatalog() {
     // --- Shared pickup spots for mobile (used in Home + Info) ---
     const pickupGroupedSpots: Record<string, string[]> =
       locationFilter === "all"
-        ? DELIVERY_SPOTS_BY_LOCATION
+        ? FILTERED_DELIVERY_SPOTS
         : {
             [locationFilter]:
-              DELIVERY_SPOTS_BY_LOCATION[locationFilter] ?? [],
+              FILTERED_DELIVERY_SPOTS[locationFilter] ?? [],
           };
 
     const hasAnyPickupSpots = Object.values(pickupGroupedSpots).some(
@@ -1256,11 +1266,13 @@ export function JackieCatalog() {
           <option value="all">
             {t("Todas las ubicaciones", "All locations")}
           </option>
-          {locations.map((l) => (
-            <option key={l.slug} value={l.slug}>
-              {l.name}
-            </option>
-          ))}
+          {locations
+            .filter((l) => VISIBLE_LOCATION_SLUGS.includes(l.slug))
+            .map((l) => (
+              <option key={l.slug} value={l.slug}>
+                {l.name}
+              </option>
+            ))}
         </select>
 
         {variant === "home" && (
@@ -1789,10 +1801,10 @@ export function JackieCatalog() {
       // Group pickup spots based on current locationFilter
       const groupedSpots: Record<string, string[]> =
         locationFilter === "all"
-          ? DELIVERY_SPOTS_BY_LOCATION // all locations
+          ? FILTERED_DELIVERY_SPOTS // all locations
           : {
               [locationFilter]:
-                DELIVERY_SPOTS_BY_LOCATION[locationFilter] ?? [],
+                FILTERED_DELIVERY_SPOTS[locationFilter] ?? [],
             };
 
       const hasAnySpots = Object.values(groupedSpots).some(
@@ -1856,7 +1868,12 @@ export function JackieCatalog() {
                     >
                       <span className="text-base">📲</span>
                       <span>
-                        {t("Abrir WhatsApp Tijuana/Mexicali Punto B", "Open WhatsApp (Tijuana/Mexicali Punto B)")}
+                        {hasMexicaliB
+                          ? t(
+                              "Abrir WhatsApp Tijuana/Mexicali Punto B",
+                              "Open WhatsApp (Tijuana/Mexicali Punto B)"
+                            )
+                          : t("Abrir WhatsApp Tijuana", "Open WhatsApp Tijuana")}
                       </span>
                     </a>
                   );
@@ -2126,13 +2143,18 @@ export function JackieCatalog() {
   // DESKTOP / TABLET VIEW
   // ------------------------------------------------------------------
 
-  const desktopSpotsSlug =
-    locationFilter === "all" ? "tijuana" : locationFilter;
-  const desktopSpots = DELIVERY_SPOTS_BY_LOCATION[desktopSpotsSlug] ?? [];
-  const desktopCityName =
+  // Group pickup spots for desktop similar to mobile
+  const desktopPickupGroupedSpots: Record<string, string[]> =
     locationFilter === "all"
-      ? "Tijuana"
-      : locations.find((l) => l.slug === locationFilter)?.name || "Tijuana";
+      ? FILTERED_DELIVERY_SPOTS
+      : {
+          [locationFilter]:
+            FILTERED_DELIVERY_SPOTS[locationFilter] ?? [],
+        };
+
+  const desktopHasAnySpots = Object.values(desktopPickupGroupedSpots).some(
+    (list) => list.length > 0
+  );
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-white text-slate-900 pb-24">
@@ -2362,11 +2384,13 @@ export function JackieCatalog() {
                 <option value="all">
                   {t("Todas las ubicaciones", "All locations")}
                 </option>
-                {locations.map((l) => (
-                  <option key={l.slug} value={l.slug}>
-                    {l.name}
-                  </option>
-                ))}
+                {locations
+                  .filter((l) => VISIBLE_LOCATION_SLUGS.includes(l.slug))
+                  .map((l) => (
+                    <option key={l.slug} value={l.slug}>
+                      {l.name}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -2585,88 +2609,57 @@ export function JackieCatalog() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
-              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
-                <span>🚚</span>
-                {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
-              </h3>
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
+            <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
+              <span>🚚</span>
+              {lang === "es" ? "Puntos de entrega" : "Pickup spots"}
+            </h3>
 
-              {desktopSpots.length === 0 ? (
-                <p className="text-[11px] text-slate-600">
-                  {t(
-                    "Los puntos de entrega se confirman por WhatsApp.",
-                    "Pickup spots are confirmed on WhatsApp."
-                  )}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {desktopSpots.map((spot) => (
-                    <li key={spot}>
-                      <a
-                        href={googleMapsLink(spot, desktopCityName)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-600 hover:underline"
-                      >
-                        <span className="text-red-500">📍</span>
-                        <span>{spot}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-2">
-              <h3 className="text-sm font-medium flex items-center gap-2 text-slate-900">
-                <span>🛍️</span>
-                <span>{t("Apartados", "Reservations")}</span>
-                <span>-</span>
-                <span>
-                  {t("Pago por transferencia", "Pay by bank transfer")}
-                </span>
-              </h3>
-
-              <p className="text-[11px] text-slate-700 leading-relaxed">
+            {!desktopHasAnySpots ? (
+              <p className="text-[11px] text-slate-600">
                 {t(
-                  "Para Apartar tu par de Crocs a tu nombre, es necesario realizar un anticipo del 100% del total de tu compra.",
-                  "To reserve your pair of Crocs under your name, a 100% advance payment of the total purchase amount is required."
+                  "Los puntos de entrega se confirman por WhatsApp.",
+                  "Pickup spots are confirmed on WhatsApp."
                 )}
               </p>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(desktopPickupGroupedSpots).map(([slug, spots]) => {
+                  if (!spots.length) return null;
 
-              <p className="text-[11px] text-slate-700">
-                {t(
-                  "Puedes hacerlo a la siguiente cuenta:",
-                  "You can make the deposit to the following account:"
-                )}
-              </p>
+                  const cityLabel =
+                    locations.find((l) => l.slug === slug)?.name ||
+                    slug
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase());
 
-              <div className="space-y-1 text-[11px] text-slate-800">
-                <p>
-                  <span className="font-medium">
-                    {lang === "es" ? "Banco: " : "Bank: "}
-                  </span>
-                  {MEX_BANK_INFO.bankName}
-                </p>
-                <p>
-                  <span className="font-medium">
-                    {lang === "es" ? "Titular: " : "Account name: "}
-                  </span>
-                  {MEX_BANK_INFO.accountName}
-                </p>
-                <p className="break-all">
-                  <span className="font-medium">
-                    {lang === "es" ? "Cuenta: " : "Account: "}
-                  </span>
-                  {MEX_BANK_INFO.accountNumber}
-                </p>
-                <p className="break-all">
-                  <span className="font-medium">Concepto: </span>
-                  {t("Tu Nombre", "Your Name")}
-                </p>
+                  return (
+                    <div key={slug} className="space-y-1">
+                      <h4 className="text-[12px] font-semibold text-slate-800 flex items-center gap-1">
+                        <span>📍</span>
+                        <span>{cityLabel}</span>
+                      </h4>
+
+                      <ul className="space-y-1 ml-4">
+                        {spots.map((spot) => (
+                          <li key={spot}>
+                            <a
+                              href={googleMapsLink(spot, cityLabel)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-blue-600 hover:underline"
+                            >
+                              <span className="text-red-500">•</span>
+                              <span>{spot}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </div>
         </section>
 
