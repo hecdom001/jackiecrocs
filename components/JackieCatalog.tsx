@@ -293,7 +293,7 @@ const WHATSAPP_NUMBER_TIJUANA =
 const WHATSAPP_NUMBER_MEXICALI =
   process.env.NEXT_PUBLIC_WHATSAPP_PHONE_MEXICALI || "";
 
-const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali"];
+const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "mexicali_b"];
 const hasMexicaliB = VISIBLE_LOCATION_SLUGS.includes("mexicali_b");
 
 // Delivery spots per location
