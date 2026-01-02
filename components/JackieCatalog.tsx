@@ -340,7 +340,7 @@ function getWhatsAppNumberForLocationSlug(slug: string | "all") {
     return WHATSAPP_NUMBER_MEXICALI || WHATSAPP_NUMBER_TIJUANA;
   }
 
-  if (slug === "mexicali_B") {
+  if (slug === "mexicali_b") {
     return WHATSAPP_NUMBER_MEXICALI_B || WHATSAPP_NUMBER_TIJUANA;
   }
 
