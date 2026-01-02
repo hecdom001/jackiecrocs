@@ -293,8 +293,13 @@ const WHATSAPP_NUMBER_TIJUANA =
 const WHATSAPP_NUMBER_MEXICALI =
   process.env.NEXT_PUBLIC_WHATSAPP_PHONE_MEXICALI || "";
 
-const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "mexicali_b"];
-const hasMexicaliB = VISIBLE_LOCATION_SLUGS.includes("mexicali_b");
+const WHATSAPP_NUMBER_MEXICALI_B =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_MEXICALI_B || "";
+
+const WHATSAPP_NUMBER_HERMOSILLO =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_HERMOSILLO || "";
+
+const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "mexicali_b", "hermosillo_sonora"];
 
 // Delivery spots per location
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
@@ -303,6 +308,7 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   ],
   mexicali: ["Oaxaca 1820"],
   mexicali_b: ["Jardin Las Palmas"],
+  hermosillo_sonora: [],
 };
 
 // Apply visibility filtering:
@@ -334,7 +340,15 @@ function getWhatsAppNumberForLocationSlug(slug: string | "all") {
     return WHATSAPP_NUMBER_MEXICALI || WHATSAPP_NUMBER_TIJUANA;
   }
 
-  if (slug === "tijuana" || slug === "all" || slug === "mexicali_b") {
+  if (slug === "mexicali_B") {
+    return WHATSAPP_NUMBER_MEXICALI_B || WHATSAPP_NUMBER_TIJUANA;
+  }
+
+  if (slug === "hermosillo_sonora") {
+    return WHATSAPP_NUMBER_HERMOSILLO || WHATSAPP_NUMBER_TIJUANA;
+  }
+
+  if (slug === "tijuana" || slug === "all") {
     return WHATSAPP_NUMBER_TIJUANA || WHATSAPP_NUMBER_MEXICALI;
   }
 
@@ -1868,12 +1882,7 @@ export function JackieCatalog() {
                     >
                       <span className="text-base">📲</span>
                       <span>
-                        {hasMexicaliB
-                          ? t(
-                              "Abrir WhatsApp Tijuana/Mexicali Punto B",
-                              "Open WhatsApp (Tijuana/Mexicali Punto B)"
-                            )
-                          : t("Abrir WhatsApp Tijuana", "Open WhatsApp Tijuana")}
+                        {t("Abrir WhatsApp Tijuana", "Open WhatsApp Tijuana")}
                       </span>
                     </a>
                   );
@@ -1906,7 +1915,73 @@ export function JackieCatalog() {
                     >
                       <span className="text-base">📲</span>
                       <span>
-                        {t("Abrir WhatsApp Mexicali", "Open WhatsApp (Mexicali)")}
+                        {t("Abrir WhatsApp Mexicali (Pueblo Nuevo)", "Open WhatsApp Mexicali (Pueblo Nuevo)")}
+                      </span>
+                    </a>
+                  );
+                })()}
+
+                {/* Mexicali B button */}
+                {(() => {
+                  const linkMexicali_b = buildWhatsAppSupportLink(lang, "mexicali_b");
+                  const hasMexicali_b = linkMexicali_b !== "#";
+                  return (
+                    <a
+                      href={hasMexicali_b ? linkMexicali_b : "#"}
+                      target={hasMexicali_b ? "_blank" : undefined}
+                      rel={hasMexicali_b ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!hasMexicali_b) {
+                          e.preventDefault();
+                          return;
+                        }
+                        track("whatsapp_click_support", {
+                          lang,
+                          location: "info_mobile_mexicali",
+                        });
+                      }}
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        hasMexicali_b
+                          ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <span className="text-base">📲</span>
+                      <span>
+                        {t("Abrir WhatsApp Mexicali (Justo Sierra)", "Open WhatsApp Mexicali (Justo Sierra)")}
+                      </span>
+                    </a>
+                  );
+                })()}
+
+                {/* Hermosillo button */}
+                {(() => {
+                  const linkHermosillo = buildWhatsAppSupportLink(lang, "hermosillo_sonora");
+                  const hasHermosillo = linkHermosillo !== "#";
+                  return (
+                    <a
+                      href={linkHermosillo ? linkHermosillo : "#"}
+                      target={linkHermosillo ? "_blank" : undefined}
+                      rel={linkHermosillo ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!linkHermosillo) {
+                          e.preventDefault();
+                          return;
+                        }
+                        track("whatsapp_click_support", {
+                          lang,
+                          location: "info_mobile_hermosillo",
+                        });
+                      }}
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        linkHermosillo
+                          ? "bg-emerald-500 text-white shadow-md hover:bg-emerald-400"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <span className="text-base">📲</span>
+                      <span>
+                        {t("Abrir WhatsApp Hermosillo", "Open WhatsApp (Hermosillo)")}
                       </span>
                     </a>
                   );
