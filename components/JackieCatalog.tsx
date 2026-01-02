@@ -308,7 +308,7 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
   ],
   mexicali: ["Oaxaca 1820"],
   mexicali_b: ["Jardin Las Palmas"],
-  hermosillo_sonora: [],
+  hermosillo_sonora: ["Villa Bonita"],
 };
 
 // Apply visibility filtering:
