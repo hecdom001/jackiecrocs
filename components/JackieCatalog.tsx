@@ -1573,7 +1573,7 @@ export function JackieCatalog() {
                 type="button"
                 onClick={() => {
                   setTab("cart");
-                  track("whatsapp_click_multi", {
+                  track("whatsapp_click_cart", {
                     count: totalCartPairs,
                     lang,
                     ui_location: "catalog_mobile_sticky",
@@ -1826,7 +1826,7 @@ export function JackieCatalog() {
                     e.preventDefault();
                     return;
                   }
-                  track("whatsapp_click_multi", {
+                  track("whatsapp_click_cart", {
                     count: totalCartPairs,
                     lang,
                     ui_location: "cart_tab",
@@ -2849,7 +2849,7 @@ export function JackieCatalog() {
                     e.preventDefault();
                     return;
                   }
-                  track("whatsapp_click_multi", {
+                  track("whatsapp_click_cart", {
                     count: totalCartPairs,
                     lang,
                     ui_location: "sticky_cart",
