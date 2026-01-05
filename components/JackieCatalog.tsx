@@ -734,6 +734,20 @@ function SizeGuideLink({ lang }: { lang: Lang }) {
   );
 }
 
+// ---------- GEO Location ----------
+const LS_LOCATION_KEY = "jackie_location_filter";
+
+function geoCityToLocationSlug(cityRaw: string | null): string | null {
+  if (!cityRaw) return null;
+  const city = cityRaw.trim().toLowerCase();
+
+  if (city.includes("tijuana")) return "tijuana";
+  if (city.includes("mexicali")) return "mexicali"; // or mexicali_b if you prefer
+  if (city.includes("hermosillo")) return "hermosillo_sonora";
+
+  return null;
+}
+
 // ---------- Grouped color type ----------
 
 type ColorGroup = {
@@ -815,6 +829,39 @@ export function JackieCatalog() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("jackie_tab", tab);
   }, [tab]);
+
+  useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  // 1) If user already chose before, respect it
+  const saved = window.localStorage.getItem(LS_LOCATION_KEY);
+  if (saved && (saved === "all" || VISIBLE_LOCATION_SLUGS.includes(saved))) {
+    setLocationFilter(saved);
+    return;
+  }
+
+  // 2) Otherwise use geo to set default (or keep all)
+  (async () => {
+    try {
+      const res = await fetch("/api/geo", { cache: "no-store" });
+      if (!res.ok) return;
+
+      const geo = await res.json();
+      const slug = geoCityToLocationSlug(geo?.city ?? null);
+
+      const next =
+        slug && VISIBLE_LOCATION_SLUGS.includes(slug) ? slug : "all";
+
+      setLocationFilter(next);
+      window.localStorage.setItem(LS_LOCATION_KEY, next);
+    } catch {
+      // If geo fails, leave as all (and save)
+      setLocationFilter("all");
+      window.localStorage.setItem(LS_LOCATION_KEY, "all");
+    }
+  })();
+}, []);
+
 
   async function loadLocations() {
     const { data, error } = await supabase
@@ -1274,7 +1321,13 @@ export function JackieCatalog() {
 
         <select
           value={locationFilter}
-          onChange={(e) => setLocationFilter(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setLocationFilter(next);
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(LS_LOCATION_KEY, next);
+            }
+          }}
           className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
         >
           <option value="all">
@@ -2453,7 +2506,13 @@ export function JackieCatalog() {
               </span>
               <select
                 value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
+               onChange={(e) => {
+                  const next = e.target.value;
+                  setLocationFilter(next);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem(LS_LOCATION_KEY, next);
+                  }
+                }}
                 className="appearance-none rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               >
                 <option value="all">
