@@ -127,18 +127,28 @@ function colorLineClass(colorEn: string) {
 
 function inferSizeCategory(
   size: string
-): "adult" | "kids" | "youth" | "unknown" {
-  const s = size.trim().toUpperCase();
+): "adult" | "kids" | "youth" | "cm" | "unknown" {
+  const raw = size.trim();
+  const s = raw.toUpperCase();
+
   if (/^M\d+-W\d+$/.test(s)) return "adult";
   if (/^C\d+$/.test(s)) return "kids";
   if (/^J\d+$/.test(s)) return "youth";
+
+  // ✅ CM formats we support:
+  // "23", "23.5", "26.5", "23 CM", "23.5cm"
+  const cmNormalized = raw.replace(/\s+/g, "").toLowerCase();
+  if (/^\d+(\.\d+)?(cm)?$/.test(cmNormalized)) return "cm";
+
   return "unknown";
 }
+
 
 // Sorting: kids (C) → youth (J) → adult (M/W)
 function sizeRank(size: string): number {
   const cat = inferSizeCategory(size);
-  const s = size.trim().toUpperCase();
+  const raw = size.trim();
+  const s = raw.toUpperCase();
 
   if (cat === "kids") {
     const num = parseInt(s.slice(1), 10);
@@ -156,8 +166,17 @@ function sizeRank(size: string): number {
     return 300 + (Number.isNaN(men) ? 0 : men);
   }
 
+  // ✅ CM sizes (numeric)
+  if (cat === "cm") {
+    // "23.5", "23 cm", "23.5cm"
+    const n = parseFloat(raw.toLowerCase().replace("cm", "").trim());
+    // Sort these after adult, before unknown
+    return 400 + (Number.isNaN(n) ? 0 : Math.round(n * 10));
+  }
+
   return 1000;
 }
+
 
 // Kept for possible future use; not used in new layout but harmless.
 function sizeMatchesBuyerType(size: string, buyerType: BuyerType): boolean {
@@ -183,19 +202,29 @@ function formatSizeLabel(
   lang: Lang,
   buyerType: BuyerType = "all"
 ) {
-  const isKids = size.startsWith("C");
-  const isYouth = size.startsWith("J");
+  const cat = inferSizeCategory(size);
+  const raw = size.trim();
+
+  if (cat === "cm") {
+    // Normalize: show "23.5 cm" (always)
+    const n = parseFloat(raw.toLowerCase().replace("cm", "").trim());
+    const label = Number.isNaN(n) ? raw : `${n} cm`;
+    return lang === "es" ? `Talla ${label}` : `Size ${label}`;
+  }
+
+  const isKids = raw.startsWith("C");
+  const isYouth = raw.startsWith("J");
 
   if (isKids) {
-    return lang === "es" ? `Niños ${size} (US)` : `Kids ${size} (US)`;
+    return lang === "es" ? `Niños ${raw} (US)` : `Kids ${raw} (US)`;
   }
 
   if (isYouth) {
-    return lang === "es" ? `Juvenil ${size} (US)` : `Junior ${size} (US)`;
+    return lang === "es" ? `Juvenil ${raw} (US)` : `Junior ${raw} (US)`;
   }
 
-  if (size.includes("-")) {
-    const [m, w] = size.split("-");
+  if (raw.includes("-")) {
+    const [m, w] = raw.split("-");
     const men = m.replace(/M/i, "");
     const women = w.replace(/W/i, "");
 
@@ -207,11 +236,12 @@ function formatSizeLabel(
 
     if (buyerType === "men") return `Men ${men} (US)`;
     if (buyerType === "women") return `Women ${women} (US)`;
-    return `${size} (US)`;
+    return `${raw} (US)`;
   }
 
-  return `${size} (US)`;
+  return `${raw} (US)`;
 }
+
 
 const SUPABASE_IMAGE_BASE =
   "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
@@ -430,7 +460,7 @@ function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
     return `• ${idx + 1}:
       ${locLine ? `${locLine}\n      ` : ""}Modelo: ${modelEs} Crocs
       Color: ${colorEs} (${item.color})
-      Talla: ${item.size}
+      Talla: ${formatSizeLabel(item.size, lang)}
       Precio por par: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
   });
@@ -1179,6 +1209,9 @@ export function JackieCatalog() {
     const unknown = group.variants
       .filter((v) => inferSizeCategory(v.size) === "unknown")
       .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+    const cm = group.variants
+    .filter((v) => inferSizeCategory(v.size) === "cm")
+    .sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
 
     const sectionClass = isCompact ? "space-y-1" : "space-y-1.5";
 
@@ -1202,11 +1235,13 @@ export function JackieCatalog() {
         <div className={sectionClass}>
           <p className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
             <span>
-              {titleEs.startsWith("Adulto")
-                ? "👟"
-                : titleEs.startsWith("Juvenil")
-                ? "🧑"
-                : "🧒"}
+             {titleEs === "CM"
+              ? "📏"
+              : titleEs.startsWith("Adulto")
+              ? "👟"
+              : titleEs.startsWith("Juvenil")
+              ? "🧑"
+              : "🧒"}
             </span>
             <span>{tLocal(titleEs, titleEn)}</span>
           </p>
@@ -1299,6 +1334,7 @@ export function JackieCatalog() {
         {renderSection("Adulto / Unisex", "Adult / Unisex", adult)}
         {renderSection("Juvenil", "Youth", youth)}
         {renderSection("Niños", "Kids", kids)}
+        {renderSection("CM", "CM", cm)}
         {renderSection("Otras tallas", "Other sizes", unknown)}
       </div>
     );
