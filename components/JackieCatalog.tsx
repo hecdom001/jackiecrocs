@@ -1659,7 +1659,7 @@ export function JackieCatalog() {
                       )}
                       <div className="flex-1">
                         <p className="text-[12px] font-semibold text-slate-900 line-clamp-1">
-                          {modelLabel} Crocs
+                          {modelLabel}
                         </p>
                         <div
                           className={`mt-0.5 h-[4px] w-full rounded-full ${colorLineClass(
@@ -2635,7 +2635,7 @@ export function JackieCatalog() {
                         )}
                         <div className="flex-1">
                           <h3 className="text-sm font-semibold text-slate-900 line-clamp-1">
-                            {modelLabel} Crocs
+                            {modelLabel}
                           </h3>
 
                           <div
