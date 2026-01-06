@@ -30,6 +30,8 @@ type PublicItem = {
 
   price_mxn: number;
   availableCount: number; // number of pairs for this variant
+
+  created_at: string;
 };
 
 type CartLine = {
@@ -798,6 +800,7 @@ type ColorGroup = {
   location_name: string;
   price_mxn_min: number;
   price_mxn_max: number;
+  latest_created_at: string;
   variants: PublicItem[];
 };
 
@@ -967,40 +970,47 @@ export function JackieCatalog() {
     }
 
     const variantMap = new Map<string, PublicItem>();
+      (data ?? []).forEach((row: any) => {
+        const model_name: string = row.models?.name ?? "";
+        const color: string = row.colors?.name_en ?? "";
+        const size_id: string = row.size_id as string;
+        const sizeLabel: string = row.sizes?.label ?? "";
+        const locSlug: string = row.locations?.slug ?? "unknown";
+        const locName: string = row.locations?.name ?? "";
+        const price_mxn: number = Number(row.price_mxn);
 
-    (data ?? []).forEach((row: any) => {
-      const model_name: string = row.models?.name ?? "";
-      const color: string = row.colors?.name_en ?? "";
-      const size_id: string = row.size_id as string;
-      const sizeLabel: string = row.sizes?.label ?? "";
-      const locSlug: string = row.locations?.slug ?? "unknown";
-      const locName: string = row.locations?.name ?? "";
-      const price_mxn: number = Number(row.price_mxn);
+        // ✅ created_at (fallback if null)
+        const created_at: string = row.created_at ?? new Date(0).toISOString();
 
-      if (!size_id || !sizeLabel) {
-        console.warn("Skipping inventory row without size info", row);
-        return;
-      }
+        if (!size_id || !sizeLabel) {
+          console.warn("Skipping inventory row without size info", row);
+          return;
+        }
 
-      const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
+        const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
 
-      const existing = variantMap.get(key);
-      if (existing) {
-        existing.availableCount += 1;
-      } else {
-        variantMap.set(key, {
-          id: row.id as string,
-          model_name,
-          color,
-          size: sizeLabel,
-          size_id,
-          location_slug: locSlug,
-          location_name: locName,
-          price_mxn,
-          availableCount: 1,
-        });
-      }
-    });
+        const existing = variantMap.get(key);
+        if (existing) {
+          existing.availableCount += 1;
+
+          // ✅ keep newest created_at per variant (so the group can be “newest first”)
+          if (created_at > existing.created_at) existing.created_at = created_at;
+        } else {
+          variantMap.set(key, {
+            id: row.id as string,
+            model_name,
+            color,
+            size: sizeLabel,
+            size_id,
+            location_slug: locSlug,
+            location_name: locName,
+            price_mxn,
+            availableCount: 1,
+            created_at, // ✅ REQUIRED (your PublicItem type demands it)
+          });
+        }
+      });
+
 
     const mapped: PublicItem[] = Array.from(variantMap.values());
 
@@ -1086,7 +1096,7 @@ export function JackieCatalog() {
 
   const groupMap = new Map<string, ColorGroup>();
 
-  for (const item of inventoryScoped) {
+    for (const item of inventoryScoped) {
     const key = `${item.location_slug}__${item.model_name}__${item.color}`;
 
     const existing = groupMap.get(key);
@@ -1099,14 +1109,21 @@ export function JackieCatalog() {
         location_name: item.location_name,
         price_mxn_min: item.price_mxn,
         price_mxn_max: item.price_mxn,
+        latest_created_at: item.created_at, // ✅
         variants: [item],
       });
     } else {
       existing.variants.push(item);
       existing.price_mxn_min = Math.min(existing.price_mxn_min, item.price_mxn);
       existing.price_mxn_max = Math.max(existing.price_mxn_max, item.price_mxn);
+
+      // ✅ keep newest created_at across variants in the group
+      if (item.created_at > existing.latest_created_at) {
+        existing.latest_created_at = item.created_at;
+      }
     }
   }
+
 
   let groupsFiltered = Array.from(groupMap.values());
 
@@ -1118,13 +1135,21 @@ export function JackieCatalog() {
   }
 
   // Sort groups by color, then model, then price
-  groupsFiltered.sort((a, b) => {
+    groupsFiltered.sort((a, b) => {
+    // ✅ newest groups first
+    const t = b.latest_created_at.localeCompare(a.latest_created_at);
+    if (t !== 0) return t;
+
+    // tie-breakers (stable)
     const c = a.color.localeCompare(b.color);
     if (c !== 0) return c;
+
     const m = (a.model_name || "").localeCompare(b.model_name || "");
     if (m !== 0) return m;
+
     return a.price_mxn_min - b.price_mxn_min;
   });
+
 
   const limitedGroups = groupsFiltered.slice(0, visibleCount);
 
