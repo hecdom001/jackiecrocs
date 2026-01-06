@@ -575,7 +575,7 @@ function AddInventorySection({
       if (maxErr) throw maxErr;
 
       const max = Number(maxRow?.[0]?.sort_order ?? 0);
-      const nextSort = Number.isFinite(max) ? max + 10 : 10;
+      const nextSort = Number.isFinite(max) ? max + 1 : 1;
 
       const { data: inserted, error } = await supabase
         .from("sizes")
