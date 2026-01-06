@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     siteName: "JackyWear",
     images: [
       {
-        url: "https://jackywear.com/og.png",
+        url: "https://jackywear.com/og-v2.png",
         width: 1200,
         height: 630,
         alt: "JackyWear — Calzado disponibles hoy",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: "/favicon2.ico",
+    icon: "/favicon.ico",
   },
 };
 
