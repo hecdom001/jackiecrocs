@@ -2144,10 +2144,10 @@ export function JackieCatalog() {
           <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">
-                🐊
+                👟
               </div>
               <div className="leading-tight">
-                <p className="text-sm font-semibold">Jacky Shop</p>
+                <p className="text-sm font-semibold">Jacky Wear</p>
                 <p className="text-[10px] text-slate-500">
                   {headerSubtitle} · {selectedLocationName}
                 </p>
@@ -2290,10 +2290,10 @@ export function JackieCatalog() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-full bg-emerald-500 flex items-center justify-center text-lg text-white">
-              🐊
+              👟
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-semibold">Jacky Shop</p>
+              <p className="text-sm font-semibold">Jacky Wear</p>
               <p className="text-[11px] text-slate-500">
                 {t("Calzado · Ubicación", "Footwear · Location")}:{" "}
                 {selectedLocationName}
