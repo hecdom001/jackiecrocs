@@ -64,12 +64,12 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   if (lang === "en") return modelEn;
   const key = modelEn.trim().toLowerCase();
   switch (key) {
-    case "classic":
-      return "Clásico";
-    case "classic platform":
-      return "Plataforma Clásica";
-    case "classic shimmer gemstone":
-      return "Clásico Shimmer Gemstone";
+    case "classic crocs":
+      return "Crocs Clásico";
+    case "classic platform crocs":
+      return "Crocs Plataforma Clásica";
+    case "classic shimmer gemstone crocs":
+      return "Crocs Clásico Shimmer Gemstone";
     default:
       return modelEn;
   }
