@@ -54,6 +54,10 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Fucsia";
     case "rust brown":
       return "Ladrillo";
+    case "grey black":
+      return "Gris/Negro";
+    case "beige brown":
+      return "Beige/Café";
     default:
       return colorEn;
   }
