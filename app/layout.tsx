@@ -16,23 +16,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jacky Crocs",
-  description: "Crocs disponibles en Tijuana · Pedido directo por WhatsApp",
+  title: "JackyWear",
+  description: "Calzado disponibles · Pedido directo por WhatsApp",
 
-  metadataBase: new URL("https://jackycrocs.com"),
+  metadataBase: new URL("https://jackywear.com"),
 
   openGraph: {
-    title: "Jacky Crocs",
+    title: "JackyWear",
     description:
       "Consulta tallas y colores disponibles. Pedido directo por WhatsApp.",
-    url: "https://jackycrocs.com",
-    siteName: "Jacky Crocs",
+    url: "https://jackywear.com",
+    siteName: "JackyWear",
     images: [
       {
-        url: "/og.jpg", // we'll add this next
+        url: "/og.jpg",
         width: 1200,
         height: 630,
-        alt: "Jacky Crocs — Crocs disponibles hoy",
+        alt: "JackyWear — Calzado disponibles hoy",
       },
     ],
     locale: "es_MX",
@@ -58,7 +58,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        {/* ✅ Vercel Analytics */}
         <Analytics />
       </body>
     </html>
