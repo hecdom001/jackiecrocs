@@ -261,6 +261,14 @@ const CROCS_PHOTOS = {
     src: `${SUPABASE_IMAGE_BASE}/crocs-rust-brown.jpg`,
     label: "Café Óxido",
   },
+  nb_530_beige_brown: {
+    src: `${SUPABASE_IMAGE_BASE}/nb-530-beige-brown.jpeg`,
+    label: "Crocs Fucsia",
+  },
+  nb_1906r_grey_black: {
+    src: `${SUPABASE_IMAGE_BASE}/nb-1906r-grey-black.jpeg`,
+    label: "Café Óxido",
+  },
 } as const;
 
 type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
@@ -281,6 +289,8 @@ function getPhotoForColor(
     return CROCS_PHOTOS.light_pink;
   if (key === "fuchsia") return CROCS_PHOTOS.fuchsia;
   if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
+  if (key === "beige brown") return CROCS_PHOTOS.nb_530_beige_brown;
+  if (key === "grey black") return CROCS_PHOTOS.nb_1906r_grey_black;
   if (key.includes("shimmer")) return CROCS_PHOTOS.gem;
 
   return null;
