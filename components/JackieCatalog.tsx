@@ -345,7 +345,7 @@ const WHATSAPP_NUMBER_MEXICALI_B =
 const WHATSAPP_NUMBER_HERMOSILLO =
   process.env.NEXT_PUBLIC_WHATSAPP_PHONE_HERMOSILLO || "";
 
-const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "mexicali_b", "hermosillo_sonora"];
+const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"];
 
 // Delivery spots per location
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
