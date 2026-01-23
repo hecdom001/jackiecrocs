@@ -131,11 +131,11 @@ function FloatingTopRightBack({
     if (!show) return null;
 
     return (
-        <div className="fixed top-16 right-3 z-[70] lg:hidden">
+        <div className="fixed top-20 right-4 z-[70]">
             <button
                 type="button"
                 onClick={onClick}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 backdrop-blur px-4 py-2 text-[12px] font-semibold text-slate-900 shadow-[0_14px_38px_rgba(15,23,42,0.18)]"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 backdrop-blur px-4 py-2 text-[12px] font-semibold text-slate-900 shadow-[0_14px_38px_rgba(15,23,42,0.18)] hover:bg-white"
             >
                 ← {label}
             </button>
@@ -594,7 +594,7 @@ export function JackieCatalog() {
                     </section>
 
                     {/* spacer so fixed button never covers content */}
-                    <div className="h-16 lg:hidden" />
+                    <div className="h-16" />
                 </>
             )}
 
