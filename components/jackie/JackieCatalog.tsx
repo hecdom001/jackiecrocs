@@ -59,6 +59,7 @@ const CROCS_PHOTOS = {
     camo: { src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`, label: "Crocs camuflaje" },
     fuchsia: { src: `${SUPABASE_IMAGE_BASE}/crocs-fuchsia.jpg`, label: "Crocs fucsia" },
     rust_brown: { src: `${SUPABASE_IMAGE_BASE}/crocs-rust-brown.jpg`, label: "Crocs café óxido" },
+    leopard: { src: `${SUPABASE_IMAGE_BASE}/croc-leopard.JPG`, label: "Crocs de leopardo" },
 
     barbie: { src: `${SUPABASE_IMAGE_BASE}/croc-barbie.jpeg`, label: "Crocs Barbie" },
     batman: { src: `${SUPABASE_IMAGE_BASE}/croc-batman.jpeg`, label: "Crocs Batman" },
@@ -102,6 +103,7 @@ function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey]
     if (key === "grey white") return CROCS_PHOTOS.nb_740_grey_white;
     if (key === "rose sugar") return CROCS_PHOTOS.nb_740_rose_sugar;
     if (key === "crystal white") return CROCS_PHOTOS.adidas_samba_cristales;
+    if (key === "leopard") return CROCS_PHOTOS.leopard;
     if (key.includes("shimmer")) return CROCS_PHOTOS.light_pink_shimmer;
 
     if (key === "barbie") return CROCS_PHOTOS.barbie;

@@ -56,6 +56,7 @@ export function translateColor(colorEn: string, lang: Lang) {
         case "camo": return "Camuflaje";
         case "light pink shimmer": return "Rosa Claro con Brillo";
         case "fuchsia": return "Fucsia";
+        case "leopard": return "Leopardo";
         case "rust brown": return "Ladrillo";
         case "grey black": return "Gris / Negro";
         case "beige brown": return "Beige / Café";
