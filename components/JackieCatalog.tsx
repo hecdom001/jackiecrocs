@@ -436,6 +436,7 @@ function getPhotoForColor(
   if (key === "grey black") return CROCS_PHOTOS.nb_1906r_grey_black;
   if (key === "grey white") return CROCS_PHOTOS.nb_740_grey_white;
   if (key === "rose sugar") return CROCS_PHOTOS.nb_740_rose_sugar;
+  if (key === "crystal white") return CROCS_PHOTOS.adidas_samba_cristales;
   if (key.includes("shimmer")) return CROCS_PHOTOS.light_pink_shimmer;
 
   // ⭐ themed crocs
