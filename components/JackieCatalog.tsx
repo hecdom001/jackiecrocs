@@ -74,6 +74,10 @@ function translateColor(colorEn: string, lang: Lang) {
       return "Gris / Negro";
     case "beige brown":
       return "Beige / Café";
+    case "grey white":
+      return "Gris / Blanco";
+    case "rose sugar":
+      return "Rosa Azúcar";
 
       // ⭐ themed crocs
     case "barbie":
@@ -392,12 +396,12 @@ const CROCS_PHOTOS = {
     src: `${SUPABASE_IMAGE_BASE}/nb-530-beige-brown.jpeg`,
     label: "New Balance 530 beige / café",
   },
-  nb_beige: {
-    src: `${SUPABASE_IMAGE_BASE}/NB-Beige.jpeg`,
+  nb_740_grey_white: {
+    src: `${SUPABASE_IMAGE_BASE}/nb_740_grey_white.jpeg`,
     label: "New Balance beige",
   },
-  nb_pink: {
-    src: `${SUPABASE_IMAGE_BASE}/NB-Pink.jpeg`,
+  nb_740_rose_sugar: {
+    src: `${SUPABASE_IMAGE_BASE}/nb_740_rose_sugar.jpeg`,
     label: "New Balance rosa",
   },
 
@@ -430,6 +434,8 @@ function getPhotoForColor(
   if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
   if (key === "beige brown") return CROCS_PHOTOS.nb_530_beige_brown;
   if (key === "grey black") return CROCS_PHOTOS.nb_1906r_grey_black;
+  if (key === "grey white") return CROCS_PHOTOS.nb_740_grey_white;
+  if (key === "rose sugar") return CROCS_PHOTOS.nb_740_rose_sugar;
   if (key.includes("shimmer")) return CROCS_PHOTOS.light_pink_shimmer;
 
   // ⭐ themed crocs

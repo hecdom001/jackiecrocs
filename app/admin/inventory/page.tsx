@@ -59,6 +59,10 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Gris / Negro";
     case "beige brown":
       return "Beige / Café";
+    case "grey white":
+      return "Gris / Blanco";
+    case "rose sugar":
+      return "Rosa Azúcar";
 
       // ⭐ themed crocs
     case "barbie":
