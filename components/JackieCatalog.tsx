@@ -43,7 +43,9 @@ function translateColor(colorEn: string, lang: Lang) {
   if (lang === "en") return colorEn;
 
   const key = colorEn.trim().toLowerCase();
+
   switch (key) {
+      // 🎨 basic colors
     case "black":
       return "Negro";
     case "white":
@@ -69,30 +71,65 @@ function translateColor(colorEn: string, lang: Lang) {
     case "rust brown":
       return "Ladrillo";
     case "grey black":
-      return "Gris/Negro";
+      return "Gris / Negro";
     case "beige brown":
-      return "Beige/Café";
+      return "Beige / Café";
+
+      // ⭐ themed crocs
+    case "barbie":
+      return "Barbie";
+    case "batman":
+      return "Batman";
+    case "buzz lightyear":
+      return "Buzz Lightyear";
+    case "dragon ball":
+      return "Dragon Ball";
+    case "hello kitty":
+      return "Hello Kitty";
+    case "simpsons":
+      return "Los Simpson";
+    case "stranger things":
+      return "Stranger Things";
+    case "superman":
+      return "Superman";
+    case "toy story":
+      return "Toy Story";
+    case "yoda":
+      return "Yoda";
+    case "egg":
+      return "Huevito";
+
     default:
       return colorEn;
   }
 }
+
 
 function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   if (!modelEn) return "";
   if (lang === "en") return modelEn;
 
   const key = modelEn.trim().toLowerCase();
+
   switch (key) {
     case "classic crocs":
       return "Crocs Clásico";
+
     case "classic platform crocs":
       return "Crocs Plataforma Clásica";
+
     case "classic shimmer gemstone crocs":
       return "Crocs Clásico Shimmer Gemstone";
+
+    case "special edition crocs":
+      return "Crocs Edición Especial";
+
     default:
       return modelEn;
   }
 }
+
+
 
 function colorLineClass(colorEn: string) {
   switch (colorEn.trim().toLowerCase()) {
@@ -279,41 +316,107 @@ const CROCS_PHOTOS = {
   },
   arctic: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-arctic.png`,
-    label: "Crocs Azul Ártico",
+    label: "Crocs azul ártico",
   },
   camo: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`,
-    label: "Crocs Camuflaje",
-  },
-  gem: {
-    src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`,
-    label: "Rosa Claro con Brillo",
+    label: "Crocs camuflaje",
   },
   fuchsia: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-fuchsia.jpg`,
-    label: "Crocs Fucsia",
+    label: "Crocs fucsia",
   },
   rust_brown: {
     src: `${SUPABASE_IMAGE_BASE}/crocs-rust-brown.jpg`,
-    label: "Café Óxido",
+    label: "Crocs café óxido",
+  },
+
+  // ⭐ Special / themed Crocs
+  barbie: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-barbie.jpeg`,
+    label: "Crocs Barbie",
+  },
+  batman: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-batman.jpeg`,
+    label: "Crocs Batman",
+  },
+  buzz_lightyear: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-buzzlightyear.jpeg`,
+    label: "Crocs Buzz Lightyear",
+  },
+  dragon_ball: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-dragonball.jpeg`,
+    label: "Crocs Dragon Ball",
+  },
+  hello_kitty: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-hellokitty.jpeg`,
+    label: "Crocs Hello Kitty",
+  },
+  huevitos: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-huevitos.jpeg`,
+    label: "Crocs Huevitos",
+  },
+  simpson: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-simpson.jpeg`,
+    label: "Crocs Los Simpson",
+  },
+  stranger_things: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-strangerthings.jpeg`,
+    label: "Crocs Stranger Things",
+  },
+  superman: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-superman.jpeg`,
+    label: "Crocs Superman",
+  },
+  toy_story: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-toystory.jpeg`,
+    label: "Crocs Toy Story",
+  },
+  yoda: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-yoda.jpeg`,
+    label: "Crocs Yoda",
+  },
+
+  // ✨ Shimmer
+  light_pink_shimmer: {
+    src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`,
+    label: "Crocs rosa con brillo",
+  },
+
+  // 👟 New Balance
+  nb_1906r_grey_black: {
+    src: `${SUPABASE_IMAGE_BASE}/nb-1906r-grey-black.jpeg`,
+    label: "New Balance 1906R gris / negro",
   },
   nb_530_beige_brown: {
     src: `${SUPABASE_IMAGE_BASE}/nb-530-beige-brown.jpeg`,
-    label: "Crocs Fucsia",
+    label: "New Balance 530 beige / café",
   },
-  nb_1906r_grey_black: {
-    src: `${SUPABASE_IMAGE_BASE}/nb-1906r-grey-black.jpeg`,
-    label: "Café Óxido",
+  nb_beige: {
+    src: `${SUPABASE_IMAGE_BASE}/NB-Beige.jpeg`,
+    label: "New Balance beige",
+  },
+  nb_pink: {
+    src: `${SUPABASE_IMAGE_BASE}/NB-Pink.jpeg`,
+    label: "New Balance rosa",
+  },
+
+  // 👟 Adidas
+  adidas_samba_cristales: {
+    src: `${SUPABASE_IMAGE_BASE}/Adidas-Samba-Cristales.jpeg`,
+    label: "Adidas Samba Cristales",
   },
 } as const;
+
 
 type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
 
 function getPhotoForColor(
-  colorEn: string
+    colorEn: string
 ): (typeof CROCS_PHOTOS)[CrocsPhotoKey] | null {
   const key = colorEn.trim().toLowerCase();
 
+  // basic colors
   if (key === "black") return CROCS_PHOTOS.black;
   if (key === "white") return CROCS_PHOTOS.white;
   if (key === "beige") return CROCS_PHOTOS.beige;
@@ -327,10 +430,25 @@ function getPhotoForColor(
   if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
   if (key === "beige brown") return CROCS_PHOTOS.nb_530_beige_brown;
   if (key === "grey black") return CROCS_PHOTOS.nb_1906r_grey_black;
-  if (key.includes("shimmer")) return CROCS_PHOTOS.gem;
+  if (key.includes("shimmer")) return CROCS_PHOTOS.light_pink_shimmer;
+
+  // ⭐ themed crocs
+  if (key === "barbie") return CROCS_PHOTOS.barbie;
+  if (key === "batman") return CROCS_PHOTOS.batman;
+  if (key === "buzz lightyear") return CROCS_PHOTOS.buzz_lightyear;
+  if (key === "dragon ball") return CROCS_PHOTOS.dragon_ball;
+  if (key === "hello kitty") return CROCS_PHOTOS.hello_kitty;
+  if (key === "simpsons") return CROCS_PHOTOS.simpson; // note: photo key is simpson
+  if (key === "stranger things") return CROCS_PHOTOS.stranger_things;
+  if (key === "superman") return CROCS_PHOTOS.superman;
+  if (key === "toy story") return CROCS_PHOTOS.toy_story;
+  if (key === "yoda") return CROCS_PHOTOS.yoda;
+  if (key === "egg" || key === "huevito" || key === "huevitos")
+    return CROCS_PHOTOS.huevitos;
 
   return null;
 }
+
 
 /** WhatsApp numbers */
 const WHATSAPP_NUMBER_TIJUANA =

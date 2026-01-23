@@ -30,6 +30,7 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
   if (lang === "en") return colorEn;
   const key = colorEn.trim().toLowerCase();
   switch (key) {
+      // 🎨 basic colors
     case "black":
       return "Negro";
     case "white":
@@ -55,9 +56,33 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
     case "rust brown":
       return "Ladrillo";
     case "grey black":
-      return "Gris/Negro";
+      return "Gris / Negro";
     case "beige brown":
-      return "Beige/Café";
+      return "Beige / Café";
+
+      // ⭐ themed crocs
+    case "barbie":
+      return "Barbie";
+    case "batman":
+      return "Batman";
+    case "buzz lightyear":
+      return "Buzz Lightyear";
+    case "dragon ball":
+      return "Dragon Ball";
+    case "hello kitty":
+      return "Hello Kitty";
+    case "simpsons":
+      return "Los Simpson";
+    case "stranger things":
+      return "Stranger Things";
+    case "superman":
+      return "Superman";
+    case "toy story":
+      return "Toy Story";
+    case "yoda":
+      return "Yoda";
+    case "egg":
+      return "Huevito";
     default:
       return colorEn;
   }
@@ -70,10 +95,15 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   switch (key) {
     case "classic crocs":
       return "Crocs Clásico";
+
     case "classic platform crocs":
       return "Crocs Plataforma Clásica";
+
     case "classic shimmer gemstone crocs":
       return "Crocs Clásico Shimmer Gemstone";
+
+    case "special edition crocs":
+      return "Crocs Edición Especial";
     default:
       return modelEn;
   }
