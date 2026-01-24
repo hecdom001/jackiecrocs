@@ -29,6 +29,10 @@ export function HomeSections({
                                  totalCartPairs,
                                  onOpenCart,
                                  isMixedCart,
+
+                                 locationFilter,
+                                 onSelectLocation,
+                                 visibleLocationSlugs,
                              }: {
     lang: Lang;
     locations: LocationOption[];
@@ -47,7 +51,20 @@ export function HomeSections({
     totalCartPairs: number;
     onOpenCart: () => void;
     isMixedCart: boolean;
+
+    locationFilter: string; // "all" | slug
+    onSelectLocation: (slug: string) => void;
+    visibleLocationSlugs: string[];
 }) {
+    const visibleLocations = locations.filter((l) => visibleLocationSlugs.includes(l.slug));
+
+    const selectedLocationLabel =
+        locationFilter === "all"
+            ? t(lang, "Todas", "All")
+            : visibleLocations.find((l) => l.slug === locationFilter)?.name ||
+            locations.find((l) => l.slug === locationFilter)?.name ||
+            locationFilter;
+
     const renderFeatured = () => {
         if (!featuredGroups.length) {
             return (
@@ -71,11 +88,7 @@ export function HomeSections({
                     const priceText =
                         group.price_mxn_min === group.price_mxn_max
                             ? `$${group.price_mxn_min.toFixed(0)}`
-                            : t(
-                                lang,
-                                `Desde $${group.price_mxn_min.toFixed(0)}`,
-                                `From $${group.price_mxn_min.toFixed(0)}`
-                            );
+                            : t(lang, `Desde $${group.price_mxn_min.toFixed(0)}`, `From $${group.price_mxn_min.toFixed(0)}`);
 
                     return (
                         <button
@@ -87,12 +100,7 @@ export function HomeSections({
                             <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 aspect-square">
                                 {photo ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                        src={photo.src}
-                                        alt={photo.label}
-                                        className="h-full w-full object-cover"
-                                        loading="lazy"
-                                    />
+                                    <img src={photo.src} alt={photo.label} className="h-full w-full object-cover" loading="lazy" />
                                 ) : (
                                     <div className="h-full w-full flex items-center justify-center text-3xl">👟</div>
                                 )}
@@ -110,9 +118,7 @@ export function HomeSections({
                             </div>
 
                             <div className="mt-2 space-y-1">
-                                <p className="text-[12px] font-semibold text-slate-900 line-clamp-1">
-                                    {group.model_name || "Classic"}
-                                </p>
+                                <p className="text-[12px] font-semibold text-slate-900 line-clamp-1">{group.model_name || "Classic"}</p>
                                 <p className="text-[11px] text-slate-600 line-clamp-1">{group.color}</p>
 
                                 <div className="flex items-center justify-between">
@@ -154,16 +160,57 @@ export function HomeSections({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-            💵 {t(lang, "Efectivo o transferencia", "Cash or bank transfer")}
-          </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-            🇺🇸 {t(lang, "Tallas US", "US sizing")}
-          </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
-            🔁 {t(lang, "Actualiza cada 3 min", "Updates every 3 min")}
-          </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+                    💵 {t(lang, "Efectivo o transferencia", "Cash or bank transfer")}
+                  </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 border border-slate-200">
+                    🇺🇸 {t(lang, "Tallas US", "US sizing")}
+                  </span>
                 </div>
+
+                {/* ✅ COMPACT LOCATION ROW (good on mobile + desktop) */}
+                <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    {/* left */}
+                    <div className="min-w-0">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            {t(lang, "Ubicación", "Location")}
+                        </p>
+
+                        {/* desktop hint line (hidden on mobile) */}
+                        <p className="hidden sm:block text-[11px] text-slate-600">
+                            {t(lang, "Filtra el stock por ciudad", "Filter stock by city")}
+                        </p>
+                    </div>
+
+                    {/* right */}
+                    <div className="flex items-center gap-2 sm:justify-end">
+                        {/* optional small icon chip for desktop balance */}
+                        <span className="hidden sm:inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
+      📍 {locationFilter === "all" ? t(lang, "Todas", "All") : selectedLocationLabel}
+    </span>
+
+                        <select
+                            value={locationFilter}
+                            onChange={(e) => onSelectLocation(e.target.value)}
+                            className="
+        w-full sm:w-auto
+        rounded-xl border border-slate-200 bg-slate-50
+        px-3 py-2
+        text-[12px] font-semibold text-slate-800
+        focus:outline-none focus:ring-2 focus:ring-emerald-200
+      "
+                            aria-label={t(lang, "Seleccionar ubicación", "Select location")}
+                        >
+                            <option value="all">{t(lang, "Todas", "All")}</option>
+                            {visibleLocations.map((l) => (
+                                <option key={l.slug} value={l.slug}>
+                                    {l.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
 
                 <div className="flex gap-2">
                     <button
@@ -197,14 +244,10 @@ export function HomeSections({
                 {totalCartPairs > 0 && (
                     <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-[11px] text-emerald-900 flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <p className="font-semibold">
-                                {t(lang, "Tienes productos en tu carrito", "You have items in your cart")}
-                            </p>
+                            <p className="font-semibold">{t(lang, "Tienes productos en tu carrito", "You have items in your cart")}</p>
                             <p className="text-emerald-800/80">
                                 {t(lang, `${totalCartPairs} artículo(s)`, `${totalCartPairs} item(s)`)}
-                                {isMixedCart
-                                    ? t(lang, " · Mezclado por ciudad", " · Mixed by city")
-                                    : ""}
+                                {isMixedCart ? t(lang, " · Mezclado por ciudad", " · Mixed by city") : ""}
                             </p>
                         </div>
                         <button
@@ -285,9 +328,7 @@ export function HomeSections({
                             track("whatsapp_click_support", { lang, location: "storefront_sections" });
                         }}
                         className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                            hasSupportWhatsApp
-                                ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                                : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                            hasSupportWhatsApp ? "bg-emerald-500 text-white hover:bg-emerald-400" : "bg-slate-200 text-slate-500 cursor-not-allowed"
                         }`}
                     >
                         📲 {t(lang, "Abrir WhatsApp", "Open WhatsApp")}
@@ -314,8 +355,7 @@ export function HomeSections({
                             <span className="font-medium">{t(lang, "Cuenta:", "Number:")}</span> {MEX_BANK_INFO.accountNumber}
                         </p>
                         <p>
-                            <span className="font-medium">{t(lang, "Concepto:", "Reference:")}</span>{" "}
-                            {t(lang, "Tu Nombre", "Your Name")}
+                            <span className="font-medium">{t(lang, "Concepto:", "Reference:")}</span> {t(lang, "Tu Nombre", "Your Name")}
                         </p>
                     </div>
                 </section>

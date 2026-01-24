@@ -533,6 +533,12 @@ export function JackieCatalog() {
                     featuredGroups={featuredGroups}
                     quickColorChips={quickColorChips}
                     getPhotoForColor={getPhotoForColor}
+                    locationFilter={locationFilter}
+                    onSelectLocation={(slug) => {
+                        setLocationFilter(slug);
+                        persistLocation(slug);
+                    }}
+                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
                     onBrowseCatalog={() => {
                         setView("catalog");
                         requestAnimationFrame(() => {
