@@ -261,26 +261,6 @@ export function HomeSections({
                 )}
             </section>
 
-            {/* QUICK COLORS */}
-            {quickColorChips.length > 0 && (
-                <section className="rounded-3xl bg-white border border-slate-100 shadow-sm p-4 space-y-2">
-                    <h2 className="text-sm font-semibold">{t(lang, "Colores rápidos", "Quick colors")}</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {quickColorChips.map((c) => (
-                            <button
-                                key={c}
-                                type="button"
-                                onClick={() => onSelectColor(c)}
-                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
-                            >
-                                <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
-                                <span className="line-clamp-1">{c}</span>
-                            </button>
-                        ))}
-                    </div>
-                </section>
-            )}
-
             {/* NEW ARRIVALS */}
             <section className="rounded-3xl bg-white border border-slate-100 shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
