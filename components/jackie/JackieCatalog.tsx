@@ -11,6 +11,7 @@ import {
     buildWhatsAppLink,
     buildWhatsAppSupportLink,
     getCartLocationInfo,
+    t,
     type CartLine,
     type ColorGroup,
     type Lang,
@@ -121,29 +122,102 @@ function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey]
     return null;
 }
 
-function FloatingTopRightBack({
-                                  show,
-                                  label,
-                                  onClick,
-                              }: {
+/** ✅ Mobile app-like bottom nav (only shows on mobile) */
+// ✅ REPLACE your MobileBottomNav with this version (it can hide itself when modals are open)
+function MobileBottomNav({
+                             show,
+                             view,
+                             lang,
+                             cartCount,
+                             onHome,
+                             onCatalog,
+                             onCart,
+                         }: {
     show: boolean;
-    label: string;
-    onClick: () => void;
+    view: "home" | "catalog";
+    lang: Lang;
+    cartCount: number;
+    onHome: () => void;
+    onCatalog: () => void;
+    onCart: () => void;
 }) {
     if (!show) return null;
 
+    const Item = ({
+                      active,
+                      label,
+                      icon,
+                      onClick,
+                      badge,
+                  }: {
+        active: boolean;
+        label: string;
+        icon: React.ReactNode;
+        onClick: () => void;
+        badge?: number;
+    }) => (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-semibold transition ${
+                active ? "text-emerald-700" : "text-slate-500"
+            }`}
+            aria-current={active ? "page" : undefined}
+        >
+      <span
+          className={`grid h-9 w-9 place-items-center rounded-2xl border transition ${
+              active ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-200"
+          }`}
+      >
+        <span className="text-lg leading-none">{icon}</span>
+      </span>
+            <span>{label}</span>
+
+            {typeof badge === "number" && badge > 0 && (
+                <span className="absolute top-1 right-6 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold grid place-items-center">
+          {badge > 99 ? "99+" : badge}
+        </span>
+            )}
+        </button>
+    );
+
     return (
-        <div className="fixed top-20 right-4 z-[70]">
-            <button
-                type="button"
-                onClick={onClick}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 backdrop-blur px-4 py-2 text-[12px] font-semibold text-slate-900 shadow-[0_14px_38px_rgba(15,23,42,0.18)] hover:bg-white"
-            >
-                ← {label}
-            </button>
-        </div>
+        <>
+            {/* ✅ spacer only when nav is visible */}
+            <div className="h-24 lg:hidden" />
+
+            {/* ✅ pinned bottom, safe-area aware */}
+            <div className="fixed inset-x-0 bottom-0 z-[60] lg:hidden pb-[env(safe-area-inset-bottom)]">
+                <div className="mx-auto max-w-md px-4">
+                    <div className="rounded-t-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-[0_-12px_40px_rgba(15,23,42,0.16)]">
+                        <div className="flex items-stretch px-2 py-2">
+                            <Item
+                                active={view === "home"}
+                                label={t(lang, "Inicio", "Home")}
+                                icon="🏠"
+                                onClick={onHome}
+                            />
+                            <Item
+                                active={view === "catalog"}
+                                label={t(lang, "Catálogo", "Catalog")}
+                                icon="🛍️"
+                                onClick={onCatalog}
+                            />
+                            <Item
+                                active={false}
+                                label={t(lang, "Carrito", "Cart")}
+                                icon="🧺"
+                                onClick={onCart}
+                                badge={cartCount}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
+
 
 export function JackieCatalog() {
     const [lang, setLang] = useState<Lang>("es");
@@ -168,7 +242,6 @@ export function JackieCatalog() {
     const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
     const [visibleCount, setVisibleCount] = useState<number>(MOBILE_INITIAL_VISIBLE);
 
-    // ✅ simple: just home vs catalog, plus a fixed back button
     const [view, setView] = useState<"home" | "catalog">("home");
 
     useEffect(() => {
@@ -218,10 +291,7 @@ export function JackieCatalog() {
     };
 
     async function loadLocations() {
-        const { data, error } = await supabase
-            .from("locations")
-            .select("slug, name")
-            .order("name", { ascending: true });
+        const { data, error } = await supabase.from("locations").select("slug, name").order("name", { ascending: true });
         if (error) return;
 
         const list: LocationOption[] = (data ?? [])
@@ -337,7 +407,6 @@ export function JackieCatalog() {
         setColorFilter("all");
     }, [locationFilter]);
 
-    // if user searches, jump to catalog
     useEffect(() => {
         if (!query.trim()) return;
         setView("catalog");
@@ -354,15 +423,11 @@ export function JackieCatalog() {
     }, [items, locationFilter]);
 
     const allSizes = useMemo(() => {
-        return Array.from(new Set(scopedForOptions.map((i) => i.size))).sort(
-            (a, b) => sizeRank(a) - sizeRank(b)
-        );
+        return Array.from(new Set(scopedForOptions.map((i) => i.size))).sort((a, b) => sizeRank(a) - sizeRank(b));
     }, [scopedForOptions]);
 
     const allColors = useMemo(() => {
-        return Array.from(new Set(scopedForOptions.map((i) => i.color)))
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b));
+        return Array.from(new Set(scopedForOptions.map((i) => i.color))).filter(Boolean).sort((a, b) => a.localeCompare(b));
     }, [scopedForOptions]);
 
     const inventoryScoped = useMemo(() => {
@@ -417,8 +482,8 @@ export function JackieCatalog() {
         }
 
         list.sort((a, b) => {
-            const t = b.latest_created_at.localeCompare(a.latest_created_at);
-            if (t !== 0) return t;
+            const tt = b.latest_created_at.localeCompare(a.latest_created_at);
+            if (tt !== 0) return tt;
             const c = a.color.localeCompare(b.color);
             if (c !== 0) return c;
             const m = (a.model_name || "").localeCompare(b.model_name || "");
@@ -430,16 +495,10 @@ export function JackieCatalog() {
     }, [inventoryScoped, sizeFilter, query]);
 
     const totalPairsFiltered = useMemo(() => {
-        return groupsFiltered.reduce(
-            (sum, g) => sum + g.variants.reduce((s, v) => s + v.availableCount, 0),
-            0
-        );
+        return groupsFiltered.reduce((sum, g) => sum + g.variants.reduce((s, v) => s + v.availableCount, 0), 0);
     }, [groupsFiltered]);
 
-    const limitedGroups = useMemo(
-        () => groupsFiltered.slice(0, visibleCount),
-        [groupsFiltered, visibleCount]
-    );
+    const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
     const cartLines: CartLine[] = useMemo(() => {
@@ -459,8 +518,7 @@ export function JackieCatalog() {
 
     const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
-    const formattedLastUpdated =
-        lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
+    const formattedLastUpdated = lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
 
     const handleAddToCart = (item: PublicItem) => {
         setQuantities((prev) => {
@@ -491,9 +549,7 @@ export function JackieCatalog() {
     const clearCart = () => setQuantities({});
 
     const pickupGroupedSpots: Record<string, string[]> =
-        locationFilter === "all"
-            ? FILTERED_DELIVERY_SPOTS
-            : { [locationFilter]: FILTERED_DELIVERY_SPOTS[locationFilter] ?? [] };
+        locationFilter === "all" ? FILTERED_DELIVERY_SPOTS : { [locationFilter]: FILTERED_DELIVERY_SPOTS[locationFilter] ?? [] };
 
     const hasAnyPickupSpots = Object.values(pickupGroupedSpots).some((list) => list.length > 0);
 
@@ -512,15 +568,7 @@ export function JackieCatalog() {
                 onCartClick={() => setCartOpen(true)}
             />
 
-            {/* ✅ ONLY: fixed top-right back button (stays visible while scrolling) */}
-            <FloatingTopRightBack
-                show={view === "catalog"}
-                label={lang === "es" ? "Inicio" : "Home"}
-                onClick={() => {
-                    setView("home");
-                    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-            />
+            {/* ✅ REMOVED: top-right Inicio button completely */}
 
             {view === "home" && (
                 <HomeSections
@@ -600,11 +648,28 @@ export function JackieCatalog() {
                         <SizeGuide lang={lang} />
                         <FeedbackBox lang={lang} context="storefront" />
                     </section>
-
-                    {/* spacer so fixed button never covers content */}
-                    <div className="h-16" />
                 </>
             )}
+            
+            <MobileBottomNav
+                show={!cartOpen && !quickView} // ✅ hides behind/under modals
+                view={view}
+                lang={lang}
+                cartCount={totalCartPairs}
+                onHome={() => {
+                    setView("home");
+                    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onCatalog={() => {
+                    setView("catalog");
+                    requestAnimationFrame(() => {
+                        const el = document.getElementById("product-grid");
+                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                }}
+                onCart={() => setCartOpen(true)}
+            />
+
 
             <QuickView
                 open={!!quickView}
@@ -624,7 +689,7 @@ export function JackieCatalog() {
                 cartLines={cartLines}
                 totalCartPairs={totalCartPairs}
                 isMixedCart={isMixedCart}
-                waLinkForCart={waLinkForCart}
+                waLinkForCart={buildWhatsAppLink(cartLines, lang)}
                 hasCartWhatsApp={hasCartWhatsApp}
                 clearCart={clearCart}
                 onAdd={handleAddToCart}
