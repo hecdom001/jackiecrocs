@@ -11,6 +11,7 @@ export function StoreHeader({
                                 setQuery,
                                 totalCartPairs,
                                 onCartClick,
+                                onHomeClick, // ✅ NEW
                             }: {
     lang: Lang;
     setLang: (l: Lang) => void;
@@ -19,11 +20,18 @@ export function StoreHeader({
     setQuery: (v: string) => void;
     totalCartPairs: number;
     onCartClick: () => void;
+    onHomeClick: () => void; // ✅ NEW
 }) {
     return (
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
-                <div className="flex items-center gap-2 min-w-[150px]">
+                {/* ✅ CLICKABLE LOGO / TITLE */}
+                <button
+                    type="button"
+                    onClick={onHomeClick}
+                    className="flex items-center gap-2 min-w-[150px] text-left rounded-xl hover:bg-slate-100 px-1 py-1 transition focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    aria-label={t(lang, "Ir a inicio", "Go to home")}
+                >
                     <div className="h-9 w-9 rounded-full bg-emerald-500 text-white flex items-center justify-center">
                         👟
                     </div>
@@ -31,8 +39,9 @@ export function StoreHeader({
                         <p className="text-sm font-semibold">Jacky Wear</p>
                         <p className="text-[11px] text-slate-500 line-clamp-1">{subtitle}</p>
                     </div>
-                </div>
+                </button>
 
+                {/* SEARCH */}
                 <div className="flex-1">
                     <input
                         value={query}
@@ -42,6 +51,7 @@ export function StoreHeader({
                     />
                 </div>
 
+                {/* CART */}
                 <button
                     type="button"
                     onClick={onCartClick}
@@ -56,18 +66,27 @@ export function StoreHeader({
                     )}
                 </button>
 
+                {/* LANG SWITCH */}
                 <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 text-[11px]">
                     <button
                         type="button"
                         onClick={() => setLang("es")}
-                        className={`px-2.5 py-1 rounded-full ${lang === "es" ? "bg-white shadow-sm text-slate-900" : "text-slate-600 hover:text-slate-900"}`}
+                        className={`px-2.5 py-1 rounded-full ${
+                            lang === "es"
+                                ? "bg-white shadow-sm text-slate-900"
+                                : "text-slate-600 hover:text-slate-900"
+                        }`}
                     >
                         ES
                     </button>
                     <button
                         type="button"
                         onClick={() => setLang("en")}
-                        className={`px-2.5 py-1 rounded-full ${lang === "en" ? "bg-white shadow-sm text-slate-900" : "text-slate-600 hover:text-slate-900"}`}
+                        className={`px-2.5 py-1 rounded-full ${
+                            lang === "en"
+                                ? "bg-white shadow-sm text-slate-900"
+                                : "text-slate-600 hover:text-slate-900"
+                        }`}
                     >
                         EN
                     </button>

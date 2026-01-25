@@ -566,7 +566,14 @@ export function JackieCatalog() {
                 setQuery={setQuery}
                 totalCartPairs={totalCartPairs}
                 onCartClick={() => setCartOpen(true)}
+                onHomeClick={() => {
+                    setView("home");
+                    if (typeof window !== "undefined") {
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                }}
             />
+
 
             {/* ✅ REMOVED: top-right Inicio button completely */}
 
@@ -650,7 +657,7 @@ export function JackieCatalog() {
                     </section>
                 </>
             )}
-            
+
             <MobileBottomNav
                 show={!cartOpen && !quickView} // ✅ hides behind/under modals
                 view={view}
