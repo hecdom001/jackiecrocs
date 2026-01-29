@@ -337,6 +337,55 @@ export default function AdminInventoryPage() {
   const showingFrom = totalFiltered === 0 ? 0 : startIndex + 1;
   const showingTo = Math.min(endIndex, totalFiltered);
 
+  // inside AdminInventoryPage component
+
+  const [exporting, setExporting] = useState(false);
+
+  async function exportExcel() {
+    try {
+      setExporting(true);
+
+      // Export ALL filtered results (not only paginated)
+      const ids = filteredItems.map((i) => i.id);
+
+      const res = await fetch("/api/admin/inventory/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids,
+          lang, // optional (for translated headers)
+        }),
+      });
+
+      if (!res.ok) {
+        // try read json error
+        let msg = "Failed to export";
+        try {
+          const data = await res.json();
+          msg = data?.error || msg;
+        } catch {}
+        alert(msg);
+        return;
+      }
+
+      // download as file
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `inventory_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+
   return (
     <div className="space-y-4">
       {/* HEADER */}
@@ -360,6 +409,18 @@ export default function AdminInventoryPage() {
             >
               {loading ? t("Actualizando…", "Refreshing…") : t("Actualizar datos", "Refresh data")}
             </button>
+
+            {/* Desktop actions (Refresh + Export) */}
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                  type="button"
+                  onClick={exportExcel}
+                  disabled={exporting || filteredItems.length === 0}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-800 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              >
+                {exporting ? t("Exportando…", "Exporting…") : t("Descargar Excel", "Download Excel")}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -431,6 +492,7 @@ export default function AdminInventoryPage() {
               {showFilters ? t("Ocultar filtros", "Hide filters") : t("Mostrar filtros", "Show filters")}
             </button>
           </div>
+
 
           {/* Desktop filter bar */}
           <div className="hidden sm:grid sm:grid-cols-6 gap-2 w-full sm:w-auto sm:min-w-[800px] text-[11px]">
