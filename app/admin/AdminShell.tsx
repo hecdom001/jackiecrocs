@@ -16,7 +16,7 @@ const navItems = [
   },
   {
     href: "/admin/inventory/add",
-    label: { es: "Agregar pares", en: "Add pairs" },
+    label: { es: "Operaciones", en: "Operations" },
   },
   {
     href: "/admin/feedback",
@@ -131,7 +131,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const pageTitle: string =
     pathname === "/admin/inventory/add"
-      ? t("Agregar inventario", "Add inventory")
+      ? t("Operaciones de inventario", "Inventory operations")
       : pathname === "/admin/inventory"
       ? t("Inventario", "Inventory")
       : pathname === "/admin/history"

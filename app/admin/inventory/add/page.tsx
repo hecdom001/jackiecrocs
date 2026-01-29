@@ -24,12 +24,25 @@ type LocationOption = {
 
 type Lang = "es" | "en";
 
+type InventoryItemDTO = {
+  id: string;
+  model_name: string | null;
+  color: string | null;
+  size: string;
+  size_id: string;
+  location_id: string | null;
+  location: { id: string; slug: string; name: string } | null;
+  status: "available" | "reserved" | "paid_complete" | "cancelled";
+  price_mxn: number;
+  customer_name?: string | null;
+  notes?: string | null;
+};
+
 function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
   if (!colorEn) return "";
   if (lang === "en") return colorEn;
   const key = colorEn.trim().toLowerCase();
   switch (key) {
-      // 🎨 basic colors
     case "black":
       return "Negro";
     case "white":
@@ -64,8 +77,6 @@ function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
       return "Rosa Azúcar";
     case "crystal white":
       return "Blanco Cristal";
-
-      // ⭐ themed crocs
     case "barbie":
       return "Barbie";
     case "batman":
@@ -100,13 +111,10 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
   switch (key) {
     case "classic crocs":
       return "Crocs Clásico";
-
     case "classic platform crocs":
       return "Crocs Plataforma Clásica";
-
     case "classic shimmer gemstone crocs":
       return "Crocs Clásico Shimmer Gemstone";
-
     case "special edition crocs":
       return "Crocs Edición Especial";
     default:
@@ -116,18 +124,15 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
 
 function slugifyLocation(input: string) {
   return input
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
 }
 
-function formatSizeCategory(
-  cat: SizeCategory | string | null | undefined,
-  lang: Lang,
-) {
+function formatSizeCategory(cat: SizeCategory | string | null | undefined, lang: Lang) {
   const key = String(cat || "").trim().toLowerCase();
   if (!key) return "";
 
@@ -146,7 +151,6 @@ function formatSizeCategory(
     }
   }
 
-  // Spanish
   switch (key) {
     case "adult":
       return "Adulto";
@@ -164,61 +168,57 @@ function formatSizeCategory(
 /* ------------------------ Small UI primitives ------------------------ */
 
 function FieldHeader({
-  label,
-  helper,
-  action,
-}: {
+                       label,
+                       helper,
+                       action,
+                     }: {
   label: React.ReactNode;
   helper?: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <label className="block text-[11px] font-medium text-slate-700">
-          {label}
-        </label>
-        {helper ? (
-          <p className="mt-1 text-[10px] text-slate-500">{helper}</p>
-        ) : null}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <label className="block text-[11px] font-medium text-slate-700">{label}</label>
+          {helper ? <p className="mt-1 text-[10px] text-slate-500">{helper}</p> : null}
+        </div>
+        {action ? <div className="flex-shrink-0">{action}</div> : null}
       </div>
-      {action ? <div className="flex-shrink-0">{action}</div> : null}
-    </div>
   );
 }
 
 function MiniButton({
-  children,
-  onClick,
-  disabled,
-}: {
+                      children,
+                      onClick,
+                      disabled,
+                    }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-        disabled
-          ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-          : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-      }`}
-    >
-      {children}
-    </button>
+      <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              disabled
+                  ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          }`}
+      >
+        {children}
+      </button>
   );
 }
 
 function Modal({
-  open,
-  title,
-  subtitle,
-  children,
-  onClose,
-}: {
+                 open,
+                 title,
+                 subtitle,
+                 children,
+                 onClose,
+               }: {
   open: boolean;
   title: string;
   subtitle?: string;
@@ -228,35 +228,29 @@ function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200">
-        <div className="p-4 border-b border-slate-100">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-              {subtitle ? (
-                <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p>
-              ) : null}
+      <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
+        <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200">
+          <div className="p-4 border-b border-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+                {subtitle ? <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p> : null}
+              </div>
+              <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                  aria-label="Close"
+              >
+                ✕
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              aria-label="Close"
-            >
-              ✕
-            </button>
           </div>
-        </div>
 
-        <div className="p-4">{children}</div>
+          <div className="p-4">{children}</div>
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -267,55 +261,51 @@ export default function AddInventoryPage() {
   const { lang, t } = useAdminLang();
 
   return (
-    <div className="space-y-4">
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-base font-semibold text-slate-900">
-              {t("Agregar inventario", "Add inventory")}
-            </h1>
-            <p className="text-xs text-slate-500">
-              {t(
-                "Crea nuevos pares desde esta pantalla.",
-                "Create new pairs from this screen."
-              )}
-            </p>
-          </div>
+      <div className="space-y-4">
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-base font-semibold text-slate-900">{t("Operaciones de inventario", "Inventory operations")}</h1>
+              <p className="text-xs text-slate-500">
+                {t(
+                    "Agrega y mueve pares entre ubicaciones.",
+                    "Add and move pairs between locations."
+                )}
+              </p>
+            </div>
 
-          <div className="flex flex-col gap-2 items-end">
-            <button
-              type="button"
-              onClick={() => router.push("/admin/inventory")}
-              className="inline-flex justify-center items-center rounded-full border border-slate-300 bg-white text-[11px] font-semibold px-4 py-2 text-slate-700 hover:border-emerald-400 hover:text-emerald-700"
-            >
-              {t("Ver inventario", "View inventory")}
-            </button>
+            <div className="flex flex-col gap-2 items-end">
+              <button
+                  type="button"
+                  onClick={() => router.push("/admin/inventory")}
+                  className="inline-flex justify-center items-center rounded-full border border-slate-300 bg-white text-[11px] font-semibold px-4 py-2 text-slate-700 hover:border-emerald-400 hover:text-emerald-700"
+              >
+                {t("Ver inventario", "View inventory")}
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <AddInventorySection
-        t={t}
-        lang={lang}
-        onAdded={() => {
-          // stay on page after adding
-        }}
-        onUnauthorized={() =>
-          router.push("/admin/login?redirect=/admin/inventory/add")
-        }
-      />
-    </div>
+        <AddInventorySection
+            t={t}
+            lang={lang}
+            onAdded={() => {
+              // stay on page after adding
+            }}
+            onUnauthorized={() => router.push("/admin/login?redirect=/admin/inventory/add")}
+        />
+      </div>
   );
 }
 
 /* ------------------------ AddInventorySection ------------------------ */
 
 function AddInventorySection({
-  t,
-  lang,
-  onAdded,
-  onUnauthorized,
-}: {
+                               t,
+                               lang,
+                               onAdded,
+                               onUnauthorized,
+                             }: {
   t: (es: string, en: string) => string;
   lang: Lang;
   onAdded: () => void;
@@ -358,9 +348,7 @@ function AddInventorySection({
   const [newLocationName, setNewLocationName] = useState("");
   const [newLocationSlug, setNewLocationSlug] = useState("");
 
-  const [creatingLookup, setCreatingLookup] = useState<
-    "model" | "color" | "size" | "location" | null
-  >(null);
+  const [creatingLookup, setCreatingLookup] = useState<"model" | "color" | "size" | "location" | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupSuccess, setLookupSuccess] = useState<string | null>(null);
 
@@ -369,17 +357,67 @@ function AddInventorySection({
     setLookupSuccess(null);
   };
 
-  // ---------- Loaders ----------
+  /* ------------------------ Transfer state (IDs-based) ------------------------ */
+
+  const [allInventory, setAllInventory] = useState<InventoryItemDTO[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [invError, setInvError] = useState<string | null>(null);
+
+  const [transferFrom, setTransferFrom] = useState("");
+  const [transferTo, setTransferTo] = useState("");
+  const [transferModel, setTransferModel] = useState<string>("all");
+  const [transferColor, setTransferColor] = useState<string>("all");
+  const [transferSizeId, setTransferSizeId] = useState<string>("all");
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferMsg, setTransferMsg] = useState<string | null>(null);
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function selectAllFiltered() {
+    setSelectedIds(new Set(transferFiltered.map((x) => x.id)));
+  }
+
+  async function loadInventoryForTransfer() {
+    setInvLoading(true);
+    setInvError(null);
+    try {
+      const res = await fetch("/api/admin/inventory", { cache: "no-store" });
+      if (res.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      const data = await res.json();
+      setAllInventory(Array.isArray(data?.items) ? data.items : []);
+    } catch (e) {
+      console.error(e);
+      setInvError("Error loading inventory");
+    } finally {
+      setInvLoading(false);
+    }
+  }
+
+  /* ------------------------ Loaders ------------------------ */
+
   async function loadSizes() {
     setSizesLoading(true);
     setSizesError(null);
 
-    // Order by category (alphabetically), then sort_order (numeric)
     const { data, error } = await supabase
-      .from("sizes")
-      .select("id, label, category, sort_order")
-      .order("category", { ascending: true, nullsFirst: true })
-      .order("sort_order", { ascending: true, nullsFirst: true });
+        .from("sizes")
+        .select("id, label, category, sort_order")
+        .order("category", { ascending: true, nullsFirst: true })
+        .order("sort_order", { ascending: true, nullsFirst: true });
 
     if (error) {
       console.error("Error loading sizes:", error);
@@ -393,11 +431,7 @@ function AddInventorySection({
   }
 
   async function loadColors() {
-    const { data, error } = await supabase
-      .from("colors")
-      .select("name_en")
-      .order("name_en");
-
+    const { data, error } = await supabase.from("colors").select("name_en").order("name_en");
     if (error) {
       console.error("Error loading colors:", error);
       return;
@@ -407,11 +441,7 @@ function AddInventorySection({
   }
 
   async function loadModels() {
-    const { data, error } = await supabase
-      .from("models")
-      .select("name")
-      .order("name");
-
+    const { data, error } = await supabase.from("models").select("name").order("name");
     if (error) {
       console.error("Error loading models:", error);
       return;
@@ -424,10 +454,7 @@ function AddInventorySection({
     setLocationsLoading(true);
     setLocationsError(null);
 
-    const { data, error } = await supabase
-      .from("locations")
-      .select("id, slug, name")
-      .order("name");
+    const { data, error } = await supabase.from("locations").select("id, slug, name").order("name");
 
     if (error) {
       console.error("Error loading locations:", error);
@@ -440,7 +467,18 @@ function AddInventorySection({
     setLocations(list);
 
     const tijuana = list.find((l) => l.slug?.toLowerCase() === "tijuana");
-    setLocationId((prev) => prev || tijuana?.id || list[0]?.id || "");
+    const defaultLoc = tijuana?.id || list[0]?.id || "";
+
+    // Add new pairs default
+    setLocationId((prev) => prev || defaultLoc);
+
+    // Transfer defaults
+    setTransferFrom((prev) => prev || defaultLoc);
+    setTransferTo((prev) => {
+      if (prev) return prev;
+      const firstDifferent = list.find((x) => x.id !== defaultLoc);
+      return firstDifferent?.id || defaultLoc;
+    });
 
     setLocationsLoading(false);
   }
@@ -450,6 +488,7 @@ function AddInventorySection({
     loadColors();
     loadModels();
     loadLocations();
+    loadInventoryForTransfer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -458,10 +497,86 @@ function AddInventorySection({
     return l?.name || "";
   }, [locations, locationId]);
 
-  // ---------- Create Lookups (Model/Color/Size/Location) ----------
+  /* ------------------------ Transfer filtered list (AVAILABLE ONLY) ------------------------ */
+
+  const transferFiltered = useMemo(() => {
+    const from = transferFrom || "";
+    return allInventory.filter((it) => {
+      // ✅ only available
+      if (it.status !== "available") return false;
+
+      const itLocId = String(it.location?.id || it.location_id || "");
+      const matchFrom = !from ? true : itLocId === from;
+
+      const matchModel = transferModel === "all" ? true : (it.model_name || "") === transferModel;
+      const matchColor = transferColor === "all" ? true : (it.color || "") === transferColor;
+      const matchSize = transferSizeId === "all" ? true : it.size_id === transferSizeId;
+
+      return matchFrom && matchModel && matchColor && matchSize;
+    });
+  }, [allInventory, transferFrom, transferModel, transferColor, transferSizeId]);
+
+  async function submitTransferSelected() {
+    setTransferMsg(null);
+
+    if (!transferTo) {
+      setTransferMsg(t("Selecciona destino.", "Select destination."));
+      return;
+    }
+    if (transferFrom === transferTo) {
+      setTransferMsg(t("El origen y destino deben ser diferentes.", "From/To must be different."));
+      return;
+    }
+    if (selectedIds.size === 0) {
+      setTransferMsg(t("Selecciona al menos un par.", "Select at least one item."));
+      return;
+    }
+
+    // safety: only allow transferring ids that are currently in filtered list (available + from location)
+    const allowed = new Set(transferFiltered.map((x) => x.id));
+    const ids = Array.from(selectedIds).filter((id) => allowed.has(id));
+    if (ids.length === 0) {
+      setTransferMsg(t("No hay pares válidos seleccionados.", "No valid selected items."));
+      return;
+    }
+
+    setTransferSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/inventory/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_location_id: transferTo,
+          item_ids: ids,
+        }),
+      });
+
+      if (res.status === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        setTransferMsg(data?.error || t("Error al transferir.", "Transfer failed."));
+        return;
+      }
+
+      setTransferMsg(t(`Transferidos ${data.transferred} ✅`, `Transferred ${data.transferred} ✅`));
+      clearSelection();
+      loadInventoryForTransfer();
+    } catch (err) {
+      console.error(err);
+      setTransferMsg(t("Error al transferir.", "Transfer failed."));
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
+
+  /* ------------------------ Create Lookups (Model/Color/Size/Location) ------------------------ */
+
   async function createModel() {
     resetLookupFeedback();
-
     const name = newModelName.trim();
     if (!name) {
       setLookupError(t("Escribe el nombre del modelo.", "Enter the model name."));
@@ -470,18 +585,11 @@ function AddInventorySection({
 
     setCreatingLookup("model");
     try {
-      const { data: existing, error: exErr } = await supabase
-        .from("models")
-        .select("name")
-        .ilike("name", name)
-        .limit(1);
-
+      const { data: existing, error: exErr } = await supabase.from("models").select("name").ilike("name", name).limit(1);
       if (exErr) throw exErr;
 
       if (existing && existing.length > 0) {
-        setLookupSuccess(
-          t("Ese modelo ya existe. Seleccionado ✅", "Model already exists. Selected ✅")
-        );
+        setLookupSuccess(t("Ese modelo ya existe. Seleccionado ✅", "Model already exists. Selected ✅"));
         await loadModels();
         setModelName(existing[0].name);
         setOpenAddModel(false);
@@ -499,12 +607,7 @@ function AddInventorySection({
       setNewModelName("");
     } catch (err) {
       console.error(err);
-      setLookupError(
-        t(
-          "No se pudo crear el modelo. Revisa la tabla/permiso.",
-          "Could not create model. Check table/permission."
-        )
-      );
+      setLookupError(t("No se pudo crear el modelo. Revisa la tabla/permiso.", "Could not create model. Check table/permission."));
     } finally {
       setCreatingLookup(null);
     }
@@ -521,18 +624,11 @@ function AddInventorySection({
 
     setCreatingLookup("color");
     try {
-      const { data: existing, error: exErr } = await supabase
-        .from("colors")
-        .select("name_en")
-        .ilike("name_en", name_en)
-        .limit(1);
-
+      const { data: existing, error: exErr } = await supabase.from("colors").select("name_en").ilike("name_en", name_en).limit(1);
       if (exErr) throw exErr;
 
       if (existing && existing.length > 0) {
-        setLookupSuccess(
-          t("Ese color ya existe. Seleccionado ✅", "Color already exists. Selected ✅")
-        );
+        setLookupSuccess(t("Ese color ya existe. Seleccionado ✅", "Color already exists. Selected ✅"));
         await loadColors();
         setColor(existing[0].name_en);
         setOpenAddColor(false);
@@ -550,12 +646,7 @@ function AddInventorySection({
       setNewColorNameEn("");
     } catch (err) {
       console.error(err);
-      setLookupError(
-        t(
-          "No se pudo crear el color. Revisa la tabla/permiso.",
-          "Could not create color. Check table/permission."
-        )
-      );
+      setLookupError(t("No se pudo crear el color. Revisa la tabla/permiso.", "Could not create color. Check table/permission."));
     } finally {
       setCreatingLookup(null);
     }
@@ -578,20 +669,17 @@ function AddInventorySection({
 
     setCreatingLookup("size");
     try {
-      // Duplicate check: (label + category)
       const { data: existing, error: exErr } = await supabase
-        .from("sizes")
-        .select("id, label, category")
-        .eq("label", label)
-        .eq("category", category)
-        .limit(1);
+          .from("sizes")
+          .select("id, label, category")
+          .eq("label", label)
+          .eq("category", category)
+          .limit(1);
 
       if (exErr) throw exErr;
 
       if (existing && existing.length > 0) {
-        setLookupSuccess(
-          t("Esa talla ya existe. Seleccionada ✅", "Size already exists. Selected ✅")
-        );
+        setLookupSuccess(t("Esa talla ya existe. Seleccionada ✅", "Size already exists. Selected ✅"));
         await loadSizes();
         setSizeId(existing[0].id);
         setOpenAddSize(false);
@@ -600,13 +688,12 @@ function AddInventorySection({
         return;
       }
 
-      // Next sort_order INSIDE the same category (best effort)
       const { data: maxRow, error: maxErr } = await supabase
-        .from("sizes")
-        .select("sort_order")
-        .eq("category", category)
-        .order("sort_order", { ascending: false })
-        .limit(1);
+          .from("sizes")
+          .select("sort_order")
+          .eq("category", category)
+          .order("sort_order", { ascending: false })
+          .limit(1);
 
       if (maxErr) throw maxErr;
 
@@ -614,10 +701,10 @@ function AddInventorySection({
       const nextSort = Number.isFinite(max) ? max + 1 : 1;
 
       const { data: inserted, error } = await supabase
-        .from("sizes")
-        .insert({ label, category, sort_order: nextSort })
-        .select("id, label, category")
-        .single();
+          .from("sizes")
+          .insert({ label, category, sort_order: nextSort })
+          .select("id, label, category")
+          .single();
 
       if (error) throw error;
 
@@ -630,10 +717,10 @@ function AddInventorySection({
     } catch (err) {
       console.error(err);
       setLookupError(
-        t(
-          "No se pudo crear la talla. Revisa la tabla/permiso/columnas requeridas.",
-          "Could not create size. Check table/permission/required columns."
-        )
+          t(
+              "No se pudo crear la talla. Revisa la tabla/permiso/columnas requeridas.",
+              "Could not create size. Check table/permission/required columns."
+          )
       );
     } finally {
       setCreatingLookup(null);
@@ -657,18 +744,11 @@ function AddInventorySection({
 
     setCreatingLookup("location");
     try {
-      const { data: existing, error: exErr } = await supabase
-        .from("locations")
-        .select("id, slug, name")
-        .eq("slug", slug)
-        .limit(1);
-
+      const { data: existing, error: exErr } = await supabase.from("locations").select("id, slug, name").eq("slug", slug).limit(1);
       if (exErr) throw exErr;
 
       if (existing && existing.length > 0) {
-        setLookupSuccess(
-          t("Ese slug ya existe. Seleccionado ✅", "That slug already exists. Selected ✅")
-        );
+        setLookupSuccess(t("Ese slug ya existe. Seleccionado ✅", "That slug already exists. Selected ✅"));
         await loadLocations();
         setLocationId(existing[0].id);
         setOpenAddLocation(false);
@@ -677,12 +757,7 @@ function AddInventorySection({
         return;
       }
 
-      const { data: inserted, error } = await supabase
-        .from("locations")
-        .insert({ name, slug })
-        .select("id, slug, name")
-        .single();
-
+      const { data: inserted, error } = await supabase.from("locations").insert({ name, slug }).select("id, slug, name").single();
       if (error) throw error;
 
       await loadLocations();
@@ -693,32 +768,20 @@ function AddInventorySection({
       setNewLocationSlug("");
     } catch (err) {
       console.error(err);
-      setLookupError(
-        t(
-          "No se pudo crear la ubicación. Revisa la tabla/permiso.",
-          "Could not create location. Check table/permission."
-        )
-      );
+      setLookupError(t("No se pudo crear la ubicación. Revisa la tabla/permiso.", "Could not create location. Check table/permission."));
     } finally {
       setCreatingLookup(null);
     }
   }
 
-  // ---------- Inventory submit ----------
+  /* ------------------------ Inventory submit ------------------------ */
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
 
-    if (
-      !modelName.trim() ||
-      !color.trim() ||
-      !sizeId.trim() ||
-      !price.trim() ||
-      !locationId.trim()
-    ) {
-      setMessage(
-        t("Completa todos los campos antes de guardar.", "Please fill in all fields before saving.")
-      );
+    if (!modelName.trim() || !color.trim() || !sizeId.trim() || !price.trim() || !locationId.trim()) {
+      setMessage(t("Completa todos los campos antes de guardar.", "Please fill in all fields before saving."));
       return;
     }
 
@@ -751,10 +814,10 @@ function AddInventorySection({
       }
 
       setMessage(t("Pares agregados correctamente ✅", "Pairs added successfully ✅"));
-
       setSizeId("");
       setQuantity("1");
       onAdded();
+      loadInventoryForTransfer();
     } catch (err) {
       console.error(err);
       setMessage(t("Error al agregar inventario.", "Error adding inventory."));
@@ -763,7 +826,8 @@ function AddInventorySection({
     }
   }
 
-  // Keep slug suggestion when opening location modal
+  /* ------------------------ Modals helpers ------------------------ */
+
   useEffect(() => {
     if (!openAddLocation) return;
     resetLookupFeedback();
@@ -773,450 +837,609 @@ function AddInventorySection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAddLocation]);
 
-  // Clear modal feedback when opening other modals
   useEffect(() => {
     if (openAddModel || openAddColor || openAddSize) resetLookupFeedback();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAddModel, openAddColor, openAddSize]);
 
+  /* ------------------------ UI ------------------------ */
+
   return (
-    <>
-      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
-              {t("Agregar nuevos pares", "Add new pairs")}
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              {t(
-                "Se crearán varios registros si pones cantidad mayor a 1.",
-                "Multiple records will be created if quantity is greater than 1."
-              )}
-            </p>
+      <>
+        {/* ------------------------ Add new pairs ------------------------ */}
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-slate-900">{t("Agregar nuevos pares", "Add new pairs")}</h2>
+              <p className="text-[11px] text-slate-500">
+                {t("Se crearán varios registros si pones cantidad mayor a 1.", "Multiple records will be created if quantity is greater than 1.")}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Location */}
-          <div className="space-y-2">
-            <FieldHeader
-              label={t("Ubicación", "Location")}
-              helper={t(
-                "Esto define en qué ciudad está físicamente este par.",
-                "This defines which city this pair is physically in."
+          <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Location */}
+            <div className="space-y-2">
+              <FieldHeader
+                  label={t("Ubicación", "Location")}
+                  helper={t("Esto define en qué ciudad está físicamente este par.", "This defines which city this pair is physically in.")}
+                  action={
+                    <MiniButton onClick={() => setOpenAddLocation(true)}>
+                      + {t("Nueva", "New")}
+                    </MiniButton>
+                  }
+              />
+
+              {locationsLoading ? (
+                  <div className="text-[11px] text-slate-500">{t("Cargando ubicaciones…", "Loading locations…")}</div>
+              ) : locationsError ? (
+                  <div className="text-[11px] text-rose-600">{locationsError}</div>
+              ) : (
+                  <select
+                      value={locationId}
+                      onChange={(e) => setLocationId(e.target.value)}
+                      className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      required
+                  >
+                    <option value="" disabled>
+                      {t("Selecciona una ubicación", "Select a location")}
+                    </option>
+                    {locations.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name} ({l.slug})
+                        </option>
+                    ))}
+                  </select>
               )}
-              action={
-                <MiniButton onClick={() => setOpenAddLocation(true)}>
-                  + {t("Nueva", "New")}
-                </MiniButton>
-              }
-            />
 
-            {locationsLoading ? (
-              <div className="text-[11px] text-slate-500">{t("Cargando ubicaciones…", "Loading locations…")}</div>
-            ) : locationsError ? (
-              <div className="text-[11px] text-rose-600">{locationsError}</div>
-            ) : (
+              {selectedLocationName ? (
+                  <p className="text-[10px] text-slate-500">
+                    {t("Seleccionado:", "Selected:")} <span className="font-semibold text-slate-700">{selectedLocationName}</span>
+                  </p>
+              ) : null}
+            </div>
+
+            {/* Model */}
+            <div className="space-y-2">
+              <FieldHeader
+                  label={t("Modelo", "Model")}
+                  action={
+                    <MiniButton onClick={() => setOpenAddModel(true)}>
+                      + {t("Nuevo", "New")}
+                    </MiniButton>
+                  }
+              />
               <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                required
+                  value={modelName}
+                  onChange={(e) => setModelName(e.target.value)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  required
               >
                 <option value="" disabled>
-                  {t("Selecciona una ubicación", "Select a location")}
+                  {t("Selecciona un modelo", "Select a model")}
                 </option>
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name} ({l.slug})
-                  </option>
+                {models.map((m) => (
+                    <option key={m} value={m}>
+                      {translateModelLabel(m, lang)}
+                    </option>
                 ))}
               </select>
-            )}
+            </div>
 
-            {selectedLocationName ? (
-              <p className="text-[10px] text-slate-500">
-                {t("Seleccionado:", "Selected:")}{" "}
-                <span className="font-semibold text-slate-700">{selectedLocationName}</span>
-              </p>
-            ) : null}
-          </div>
-
-          {/* Model */}
-          <div className="space-y-2">
-            <FieldHeader
-              label={t("Modelo", "Model")}
-              action={
-                <MiniButton onClick={() => setOpenAddModel(true)}>
-                  + {t("Nuevo", "New")}
-                </MiniButton>
-              }
-            />
-            <select
-              value={modelName}
-              onChange={(e) => setModelName(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              required
-            >
-              <option value="" disabled>
-                {t("Selecciona un modelo", "Select a model")}
-              </option>
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {translateModelLabel(m, lang)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Color */}
-          <div className="space-y-2">
-            <FieldHeader
-              label={t("Color", "Color")}
-              helper={t(
-                "Modelo y color se guardan en inglés; el público lo ve traducido.",
-                "Model and color are stored in English; the public page will translate them."
-              )}
-              action={
-                <MiniButton onClick={() => setOpenAddColor(true)}>
-                  + {t("Nuevo", "New")}
-                </MiniButton>
-              }
-            />
-            <select
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              required
-            >
-              <option value="" disabled>
-                {t("Selecciona un color", "Select a color")}
-              </option>
-              {colors.map((c) => (
-                <option key={c} value={c}>
-                  {translateColorLabel(c, lang)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Size */}
-          <div className="space-y-2">
-            <FieldHeader
-              label={t("Talla", "Size")}
-              action={
-                <MiniButton onClick={() => setOpenAddSize(true)}>
-                  + {t("Nueva", "New")}
-                </MiniButton>
-              }
-            />
-
-            {sizesLoading ? (
-              <div className="text-[11px] text-slate-500">{t("Cargando tallas…", "Loading sizes…")}</div>
-            ) : sizesError ? (
-              <div className="text-[11px] text-rose-600">{sizesError}</div>
-            ) : (
+            {/* Color */}
+            <div className="space-y-2">
+              <FieldHeader
+                  label={t("Color", "Color")}
+                  helper={t("Modelo y color se guardan en inglés; el público lo ve traducido.", "Model and color are stored in English; the public page will translate them.")}
+                  action={
+                    <MiniButton onClick={() => setOpenAddColor(true)}>
+                      + {t("Nuevo", "New")}
+                    </MiniButton>
+                  }
+              />
               <select
-                value={sizeId}
-                onChange={(e) => setSizeId(e.target.value)}
-                className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                required
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  required
               >
                 <option value="" disabled>
-                  {t("Selecciona una talla", "Select a size")}
+                  {t("Selecciona un color", "Select a color")}
                 </option>
-                {sizes.map((s) => {
-                  const catLabel = formatSizeCategory(s.category, lang);
-                  const suffix = catLabel ? ` • ${catLabel}` : "";
-                  return (
+                {colors.map((c) => (
+                    <option key={c} value={c}>
+                      {translateColorLabel(c, lang)}
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Size */}
+            <div className="space-y-2">
+              <FieldHeader
+                  label={t("Talla", "Size")}
+                  action={
+                    <MiniButton onClick={() => setOpenAddSize(true)}>
+                      + {t("Nueva", "New")}
+                    </MiniButton>
+                  }
+              />
+
+              {sizesLoading ? (
+                  <div className="text-[11px] text-slate-500">{t("Cargando tallas…", "Loading sizes…")}</div>
+              ) : sizesError ? (
+                  <div className="text-[11px] text-rose-600">{sizesError}</div>
+              ) : (
+                  <select
+                      value={sizeId}
+                      onChange={(e) => setSizeId(e.target.value)}
+                      className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      required
+                  >
+                    <option value="" disabled>
+                      {t("Selecciona una talla", "Select a size")}
+                    </option>
+                    {sizes.map((s) => {
+                      const catLabel = formatSizeCategory(s.category, lang);
+                      const suffix = catLabel ? ` • ${catLabel}` : "";
+                      return (
+                          <option key={s.id} value={s.id}>
+                            {s.label}
+                            {suffix}
+                          </option>
+                      );
+                    })}
+                  </select>
+              )}
+            </div>
+
+            {/* Price */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Precio MXN", "Price MXN")} />
+              <input
+                  type="number"
+                  min={0}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  required
+              />
+            </div>
+
+            {/* Quantity */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Cantidad", "Quantity")} />
+              <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  required
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="sm:col-span-2 lg:col-span-3 flex justify-end items-end">
+              <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              >
+                {submitting ? t("Guardando…", "Saving…") : t("Agregar pares", "Add pairs")}
+              </button>
+            </div>
+          </form>
+
+          {message && <p className="text-[11px] text-right text-emerald-700">{message}</p>}
+        </section>
+
+        {/* ------------------------ Transfer (select items) ------------------------ */}
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-slate-900">{t("Transferir", "Transfer")}</h2>
+              <p className="text-[11px] text-slate-500">
+                {t("Solo pares DISPONIBLES. Selecciona cuáles mover.", "Only AVAILABLE pairs. Select which ones to move.")}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <MiniButton onClick={selectAllFiltered} disabled={transferFiltered.length === 0}>
+                {t("Seleccionar todos", "Select all")}
+              </MiniButton>
+              <MiniButton onClick={clearSelection} disabled={selectedIds.size === 0}>
+                {t("Limpiar", "Clear")}
+              </MiniButton>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* From */}
+            <div className="space-y-2">
+              <FieldHeader label={t("De (origen)", "From (source)")} />
+              <select
+                  value={transferFrom}
+                  onChange={(e) => {
+                    setTransferFrom(e.target.value);
+                    clearSelection();
+                  }}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.slug})
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            {/* To */}
+            <div className="space-y-2">
+              <FieldHeader label={t("A (destino)", "To (destination)")} />
+              <select
+                  value={transferTo}
+                  onChange={(e) => setTransferTo(e.target.value)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.slug})
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Model filter */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Modelo", "Model")} />
+              <select
+                  value={transferModel}
+                  onChange={(e) => {
+                    setTransferModel(e.target.value);
+                    clearSelection();
+                  }}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                <option value="all">{t("Todos", "All")}</option>
+                {models.map((m) => (
+                    <option key={m} value={m}>
+                      {translateModelLabel(m, lang)}
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Color filter */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Color", "Color")} />
+              <select
+                  value={transferColor}
+                  onChange={(e) => {
+                    setTransferColor(e.target.value);
+                    clearSelection();
+                  }}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                <option value="all">{t("Todos", "All")}</option>
+                {colors.map((c) => (
+                    <option key={c} value={c}>
+                      {translateColorLabel(c, lang)}
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Size filter */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Talla", "Size")} />
+              <select
+                  value={transferSizeId}
+                  onChange={(e) => {
+                    setTransferSizeId(e.target.value);
+                    clearSelection();
+                  }}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              >
+                <option value="all">{t("Todas", "All")}</option>
+                {sizes.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.label}
-                      {suffix}
                     </option>
-                  );
-                })}
+                ))}
               </select>
+            </div>
+
+            {/* Refresh */}
+            <div className="space-y-2">
+              <FieldHeader label={t("Acciones", "Actions")} />
+              <button
+                  type="button"
+                  onClick={loadInventoryForTransfer}
+                  disabled={invLoading}
+                  className="w-full inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {invLoading ? t("Cargando…", "Loading…") : t("Actualizar lista", "Refresh list")}
+              </button>
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] text-slate-600 flex items-center justify-between">
+            <span>
+              {invLoading
+                  ? t("Cargando…", "Loading…")
+                  : t(`${transferFiltered.length} disponibles`, `${transferFiltered.length} available`)}
+            </span>
+              <span>
+              {t("Seleccionados:", "Selected:")} {selectedIds.size}
+            </span>
+            </div>
+
+            {invError ? (
+                <div className="p-3 text-[11px] text-rose-600">{invError}</div>
+            ) : transferFiltered.length === 0 ? (
+                <div className="p-3 text-[11px] text-slate-500">
+                  {t("No hay pares disponibles con esos filtros.", "No available items with those filters.")}
+                </div>
+            ) : (
+                <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                  {transferFiltered.map((it) => {
+                    const checked = selectedIds.has(it.id);
+                    return (
+                        <label key={it.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                          <input type="checkbox" checked={checked} onChange={() => toggleSelected(it.id)} className="h-4 w-4" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {translateModelLabel(it.model_name, lang)} · {it.size}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {translateColorLabel(it.color, lang)} · {it.location?.name || "—"}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono">ID: {it.id.slice(0, 8)}…</p>
+                          </div>
+                          <div className="ml-auto text-sm font-semibold text-slate-900 whitespace-nowrap">
+                            ${Number(it.price_mxn || 0).toFixed(0)}
+                          </div>
+                        </label>
+                    );
+                  })}
+                </div>
             )}
           </div>
 
-          {/* Price */}
-          <div className="space-y-2">
-            <FieldHeader label={t("Precio MXN", "Price MXN")} />
-            <input
-              type="number"
-              min={0}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              required
-            />
-          </div>
-
-          {/* Quantity */}
-          <div className="space-y-2">
-            <FieldHeader label={t("Cantidad", "Quantity")} />
-            <input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              required
-            />
-          </div>
-
-          {/* Submit */}
-          <div className="sm:col-span-2 lg:col-span-3 flex justify-end items-end">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
-            >
-              {submitting ? t("Guardando…", "Saving…") : t("Agregar pares", "Add pairs")}
-            </button>
-          </div>
-        </form>
-
-        {message && <p className="text-[11px] text-right text-emerald-700">{message}</p>}
-      </section>
-
-      {/* ------------------------ Add Location Modal ------------------------ */}
-      <Modal
-        open={openAddLocation}
-        title={t("Agregar ubicación", "Add location")}
-        subtitle={t("Se guarda como locations.name y locations.slug.", "Saved as locations.name and locations.slug.")}
-        onClose={() => setOpenAddLocation(false)}
-      >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-700">{t("Nombre", "Name")}</label>
-            <input
-              value={newLocationName}
-              onChange={(e) => {
-                const v = e.target.value;
-                setNewLocationName(v);
-                if (!newLocationSlug.trim()) setNewLocationSlug(slugifyLocation(v));
-              }}
-              placeholder={t("Ej: Tijuana", "Example: Tijuana")}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-700">{t("Slug", "Slug")}</label>
-            <input
-              value={newLocationSlug}
-              onChange={(e) => setNewLocationSlug(e.target.value)}
-              placeholder="tijuana"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            />
-            <p className="text-[10px] text-slate-500">
-              {t("Solo minúsculas, sin espacios (usa _).", "Lowercase, no spaces (use _).")}
-            </p>
-          </div>
-
-          {(lookupError || lookupSuccess) && (
-            <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>
-              {lookupError || lookupSuccess}
-            </p>
-          )}
-
           <div className="flex items-center justify-end gap-2">
             <button
-              type="button"
-              onClick={() => setOpenAddLocation(false)}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
+                type="button"
+                onClick={submitTransferSelected}
+                disabled={transferSubmitting || selectedIds.size === 0 || !transferTo || transferFrom === transferTo}
+                className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
-              {t("Cancelar", "Cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={createLocation}
-              disabled={creatingLookup === "location"}
-              className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {creatingLookup === "location" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
+              {transferSubmitting ? t("Transfiriendo…", "Transferring…") : t("Transferir seleccionados", "Transfer selected")}
             </button>
           </div>
-        </div>
-      </Modal>
 
-      {/* ------------------------ Add Model Modal ------------------------ */}
-      <Modal
-        open={openAddModel}
-        title={t("Agregar modelo", "Add model")}
-        subtitle={t("Se guarda en inglés (name).", "Stored in English (name).")}
-        onClose={() => setOpenAddModel(false)}
-      >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-700">
-              {t("Nombre del modelo (EN)", "Model name (EN)")}
-            </label>
-            <input
-              value={newModelName}
-              onChange={(e) => setNewModelName(e.target.value)}
-              placeholder="Classic Crocs"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            />
-          </div>
+          {transferMsg && <p className="text-[11px] text-right text-slate-700">{transferMsg}</p>}
+        </section>
 
-          {(lookupError || lookupSuccess) && (
-            <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>
-              {lookupError || lookupSuccess}
-            </p>
-          )}
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpenAddModel(false)}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
-            >
-              {t("Cancelar", "Cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={createModel}
-              disabled={creatingLookup === "model"}
-              className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {creatingLookup === "model" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ------------------------ Add Color Modal ------------------------ */}
-      <Modal
-        open={openAddColor}
-        title={t("Agregar color", "Add color")}
-        subtitle={t("Se guarda en inglés (name_en).", "Stored in English (name_en).")}
-        onClose={() => setOpenAddColor(false)}
-      >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-700">{t("Color (EN)", "Color (EN)")}</label>
-            <input
-              value={newColorNameEn}
-              onChange={(e) => setNewColorNameEn(e.target.value)}
-              placeholder="Grey Black"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            />
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] text-slate-700">
-              {t("Vista en español:", "Spanish preview:")}{" "}
-              <span className="font-semibold">{translateColorLabel(newColorNameEn, "es")}</span>
-            </p>
-          </div>
-
-          {(lookupError || lookupSuccess) && (
-            <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>
-              {lookupError || lookupSuccess}
-            </p>
-          )}
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpenAddColor(false)}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
-            >
-              {t("Cancelar", "Cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={createColor}
-              disabled={creatingLookup === "color"}
-              className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {creatingLookup === "color" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ------------------------ Add Size Modal (WITH CATEGORY) ------------------------ */}
-      <Modal
-        open={openAddSize}
-        title={t("Agregar talla", "Add size")}
-        subtitle={t(
-          "Se guarda como sizes.label + sizes.category (y asigna sort_order automático).",
-          "Saved as sizes.label + sizes.category (with auto sort_order)."
-        )}
-        onClose={() => setOpenAddSize(false)}
-      >
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+        {/* ------------------------ Add Location Modal ------------------------ */}
+        <Modal
+            open={openAddLocation}
+            title={t("Agregar ubicación", "Add location")}
+            subtitle={t("Se guarda como locations.name y locations.slug.", "Saved as locations.name and locations.slug.")}
+            onClose={() => setOpenAddLocation(false)}
+        >
+          <div className="space-y-3">
             <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-700">{t("Categoría", "Category")}</label>
-              <select
-                value={newSizeCategory}
-                onChange={(e) => setNewSizeCategory(e.target.value as SizeCategory)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              >
-                <option value="adult">{t("Adulto", "Adult")}</option>
-                <option value="kids">{t("Niños", "Kids")}</option>
-                <option value="youth">{t("Juvenil", "Youth")}</option>
-                <option value="cm">{t("CM", "CM")}</option>
-                <option value="other">{t("Otro", "Other")}</option>
-              </select>
-              <p className="text-[10px] text-slate-500">
-                {t("Sirve para agrupar tallas en el admin.", "Used to group sizes in admin.")}
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-700">{t("Etiqueta de talla", "Size label")}</label>
+              <label className="block text-[11px] font-medium text-slate-700">{t("Nombre", "Name")}</label>
               <input
-                value={newSizeLabel}
-                onChange={(e) => setNewSizeLabel(e.target.value)}
-                placeholder={t("Ej: M10-W12", "Example: M10-W12")}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  value={newLocationName}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNewLocationName(v);
+                    if (!newLocationSlug.trim()) setNewLocationSlug(slugifyLocation(v));
+                  }}
+                  placeholder={t("Ej: Tijuana", "Example: Tijuana")}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
               />
-              <p className="text-[10px] text-slate-500">
-                {t("Ej: M10-W12, C8, J3, 23.5 cm", "Example: M10-W12, C8, J3, 23.5 cm")}
-              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-[11px] font-medium text-slate-700">{t("Slug", "Slug")}</label>
+              <input
+                  value={newLocationSlug}
+                  onChange={(e) => setNewLocationSlug(e.target.value)}
+                  placeholder="tijuana"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+              <p className="text-[10px] text-slate-500">{t("Solo minúsculas, sin espacios (usa _).", "Lowercase, no spaces (use _).")}</p>
+            </div>
+
+            {(lookupError || lookupSuccess) && (
+                <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>{lookupError || lookupSuccess}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                  type="button"
+                  onClick={() => setOpenAddLocation(false)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                  type="button"
+                  onClick={createLocation}
+                  disabled={creatingLookup === "location"}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {creatingLookup === "location" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
+              </button>
             </div>
           </div>
+        </Modal>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] text-slate-700">
-              {t("Vista:", "Preview:")}{" "}
-              <span className="font-semibold">
-                {newSizeLabel || "—"}{" "}
-                {newSizeCategory ? `• ${formatSizeCategory(newSizeCategory, lang)}` : ""}
+        {/* ------------------------ Add Model Modal ------------------------ */}
+        <Modal
+            open={openAddModel}
+            title={t("Agregar modelo", "Add model")}
+            subtitle={t("Se guarda en inglés (name).", "Stored in English (name).")}
+            onClose={() => setOpenAddModel(false)}
+        >
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-medium text-slate-700">{t("Nombre del modelo (EN)", "Model name (EN)")}</label>
+              <input
+                  value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                  placeholder="Classic Crocs"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+            </div>
+
+            {(lookupError || lookupSuccess) && (
+                <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>{lookupError || lookupSuccess}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                  type="button"
+                  onClick={() => setOpenAddModel(false)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                  type="button"
+                  onClick={createModel}
+                  disabled={creatingLookup === "model"}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {creatingLookup === "model" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ------------------------ Add Color Modal ------------------------ */}
+        <Modal
+            open={openAddColor}
+            title={t("Agregar color", "Add color")}
+            subtitle={t("Se guarda en inglés (name_en).", "Stored in English (name_en).")}
+            onClose={() => setOpenAddColor(false)}
+        >
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-medium text-slate-700">{t("Color (EN)", "Color (EN)")}</label>
+              <input
+                  value={newColorNameEn}
+                  onChange={(e) => setNewColorNameEn(e.target.value)}
+                  placeholder="Grey Black"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] text-slate-700">
+                {t("Vista en español:", "Spanish preview:")}{" "}
+                <span className="font-semibold">{translateColorLabel(newColorNameEn, "es")}</span>
+              </p>
+            </div>
+
+            {(lookupError || lookupSuccess) && (
+                <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>{lookupError || lookupSuccess}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                  type="button"
+                  onClick={() => setOpenAddColor(false)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                  type="button"
+                  onClick={createColor}
+                  disabled={creatingLookup === "color"}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {creatingLookup === "color" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ------------------------ Add Size Modal (WITH CATEGORY) ------------------------ */}
+        <Modal
+            open={openAddSize}
+            title={t("Agregar talla", "Add size")}
+            subtitle={t("Se guarda como sizes.label + sizes.category (y asigna sort_order automático).", "Saved as sizes.label + sizes.category (with auto sort_order).")}
+            onClose={() => setOpenAddSize(false)}
+        >
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-slate-700">{t("Categoría", "Category")}</label>
+                <select
+                    value={newSizeCategory}
+                    onChange={(e) => setNewSizeCategory(e.target.value as SizeCategory)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="adult">{t("Adulto", "Adult")}</option>
+                  <option value="kids">{t("Niños", "Kids")}</option>
+                  <option value="youth">{t("Juvenil", "Youth")}</option>
+                  <option value="cm">{t("CM", "CM")}</option>
+                  <option value="other">{t("Otro", "Other")}</option>
+                </select>
+                <p className="text-[10px] text-slate-500">{t("Sirve para agrupar tallas en el admin.", "Used to group sizes in admin.")}</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-slate-700">{t("Etiqueta de talla", "Size label")}</label>
+                <input
+                    value={newSizeLabel}
+                    onChange={(e) => setNewSizeLabel(e.target.value)}
+                    placeholder={t("Ej: M10-W12", "Example: M10-W12")}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+                <p className="text-[10px] text-slate-500">{t("Ej: M10-W12, C8, J3, 23.5 cm", "Example: M10-W12, C8, J3, 23.5 cm")}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] text-slate-700">
+                {t("Vista:", "Preview:")}{" "}
+                <span className="font-semibold">
+                {newSizeLabel || "—"} {newSizeCategory ? `• ${formatSizeCategory(newSizeCategory, lang)}` : ""}
               </span>
-            </p>
-          </div>
+              </p>
+            </div>
 
-          {(lookupError || lookupSuccess) && (
-            <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>
-              {lookupError || lookupSuccess}
-            </p>
-          )}
+            {(lookupError || lookupSuccess) && (
+                <p className={`text-[11px] ${lookupError ? "text-rose-600" : "text-emerald-700"}`}>{lookupError || lookupSuccess}</p>
+            )}
 
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpenAddSize(false)}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
-            >
-              {t("Cancelar", "Cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={createSize}
-              disabled={creatingLookup === "size"}
-              className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {creatingLookup === "size" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
-            </button>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                  type="button"
+                  onClick={() => setOpenAddSize(false)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300"
+              >
+                {t("Cancelar", "Cancel")}
+              </button>
+              <button
+                  type="button"
+                  onClick={createSize}
+                  disabled={creatingLookup === "size"}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {creatingLookup === "size" ? t("Guardando…", "Saving…") : t("Crear", "Create")}
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
-    </>
+        </Modal>
+      </>
   );
 }
