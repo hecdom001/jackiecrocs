@@ -298,6 +298,64 @@ export default function AddInventoryPage() {
   );
 }
 
+function CollapsibleSection({
+                              title,
+                              subtitle,
+                              defaultOpen = true,
+                              children,
+                              rightAction,
+                            }: {
+  title: string;
+  subtitle?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  rightAction?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+        {/* Header row */}
+        <div className="w-full flex items-start justify-between gap-3 p-4 sm:p-5">
+          {/* Clickable title area (mobile toggles, desktop does nothing) */}
+          <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="min-w-0 flex-1 text-left sm:cursor-default"
+          >
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
+              {title}
+            </h2>
+            {subtitle ? (
+                <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p>
+            ) : null}
+          </button>
+
+          {/* Actions: show on desktop (no nesting now) */}
+          {rightAction ? <div className="hidden sm:block">{rightAction}</div> : null}
+
+          {/* Chevron: only on mobile */}
+          <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="sm:hidden flex-shrink-0 h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              aria-label={open ? "Collapse section" : "Expand section"}
+          >
+            {open ? "▲" : "▼"}
+          </button>
+        </div>
+
+        {/* Content: mobile collapses, desktop always open */}
+        <div className={`${open ? "block" : "hidden"} sm:block px-4 sm:px-5 pb-4 sm:pb-5`}>
+          {/* Optional: show actions on mobile INSIDE when open */}
+          {rightAction ? <div className="sm:hidden mb-3">{rightAction}</div> : null}
+          {children}
+        </div>
+      </section>
+  );
+}
+
+
 /* ------------------------ AddInventorySection ------------------------ */
 
 function AddInventorySection({
@@ -847,15 +905,14 @@ function AddInventorySection({
   return (
       <>
         {/* ------------------------ Add new pairs ------------------------ */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm sm:text-base font-semibold text-slate-900">{t("Agregar nuevos pares", "Add new pairs")}</h2>
-              <p className="text-[11px] text-slate-500">
-                {t("Se crearán varios registros si pones cantidad mayor a 1.", "Multiple records will be created if quantity is greater than 1.")}
-              </p>
-            </div>
-          </div>
+        <CollapsibleSection
+            title={t("Agregar nuevos pares", "Add new pairs")}
+            subtitle={t(
+                "Se crearán varios registros si pones cantidad mayor a 1.",
+                "Multiple records will be created if quantity is greater than 1."
+            )}
+            defaultOpen={false}
+        >
 
           <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Location */}
@@ -1032,28 +1089,28 @@ function AddInventorySection({
           </form>
 
           {message && <p className="text-[11px] text-right text-emerald-700">{message}</p>}
-        </section>
+        </CollapsibleSection>
 
         {/* ------------------------ Transfer (select items) ------------------------ */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm sm:text-base font-semibold text-slate-900">{t("Transferir", "Transfer")}</h2>
-              <p className="text-[11px] text-slate-500">
-                {t("Solo pares DISPONIBLES. Selecciona cuáles mover.", "Only AVAILABLE pairs. Select which ones to move.")}
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <MiniButton onClick={selectAllFiltered} disabled={transferFiltered.length === 0}>
-                {t("Seleccionar todos", "Select all")}
-              </MiniButton>
-              <MiniButton onClick={clearSelection} disabled={selectedIds.size === 0}>
-                {t("Limpiar", "Clear")}
-              </MiniButton>
-            </div>
-          </div>
-
+        <CollapsibleSection
+            title={t("Transferir", "Transfer")}
+            subtitle={t(
+                "Solo pares DISPONIBLES. Selecciona cuáles mover.",
+                "Only AVAILABLE pairs. Select which ones to move."
+            )}
+            defaultOpen={false}
+            rightAction={
+              <div className="flex gap-2">
+                <MiniButton onClick={selectAllFiltered} disabled={transferFiltered.length === 0}>
+                  {t("Seleccionar todos", "Select all")}
+                </MiniButton>
+                <MiniButton onClick={clearSelection} disabled={selectedIds.size === 0}>
+                  {t("Limpiar", "Clear")}
+                </MiniButton>
+              </div>
+            }
+        >
+          {/* everything that was inside the section goes here EXCEPT the old header */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* From */}
             <div className="space-y-2">
@@ -1165,16 +1222,16 @@ function AddInventorySection({
           </div>
 
           {/* Results */}
-          <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <div className="rounded-xl border border-slate-200 overflow-hidden mt-4">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] text-slate-600 flex items-center justify-between">
-            <span>
-              {invLoading
-                  ? t("Cargando…", "Loading…")
-                  : t(`${transferFiltered.length} disponibles`, `${transferFiltered.length} available`)}
-            </span>
+      <span>
+        {invLoading
+            ? t("Cargando…", "Loading…")
+            : t(`${transferFiltered.length} disponibles`, `${transferFiltered.length} available`)}
+      </span>
               <span>
-              {t("Seleccionados:", "Selected:")} {selectedIds.size}
-            </span>
+        {t("Seleccionados:", "Selected:")} {selectedIds.size}
+      </span>
             </div>
 
             {invError ? (
@@ -1209,7 +1266,7 @@ function AddInventorySection({
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 mt-4">
             <button
                 type="button"
                 onClick={submitTransferSelected}
@@ -1220,8 +1277,9 @@ function AddInventorySection({
             </button>
           </div>
 
-          {transferMsg && <p className="text-[11px] text-right text-slate-700">{transferMsg}</p>}
-        </section>
+          {transferMsg && <p className="text-[11px] text-right text-slate-700 mt-2">{transferMsg}</p>}
+        </CollapsibleSection>
+
 
         {/* ------------------------ Add Location Modal ------------------------ */}
         <Modal
