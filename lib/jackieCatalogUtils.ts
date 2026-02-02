@@ -20,8 +20,12 @@ export type PublicItem = {
     created_at: string;
     brand?: string;
     category_id?: string | null;
-    uses_size_color?: boolean;
+
+    // ✅ NEW
+    uses_color?: boolean;
+    uses_size?: boolean;
 };
+
 
 export type CartLine = {
     item: PublicItem;
@@ -300,11 +304,13 @@ export function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
         const modelEs = translateModelLabel(item.model_name || "Classic", "es") || "Crocs";
         const qtyLine = `Cantidad: ${count} ${count === 1 ? "par" : "pares"}`;
         const locLine = item.location_name ? `Ubicación: ${item.location_name}` : "";
+
+        const colorLine = item.uses_color ? `Color: ${colorEs} (${item.color})\n      ` : "";
+        const sizeLine = item.uses_size ? `Talla: ${formatSizeLabel(item.size, lang)}\n      ` : "";
+
         return `• ${idx + 1}:
       ${locLine ? `${locLine}\n      ` : ""}Modelo: ${modelEs} Crocs
-      Color: ${colorEs} (${item.color})
-      Talla: ${formatSizeLabel(item.size, lang)}
-      Precio por par: $${item.price_mxn.toFixed(0)} MXN
+      ${colorLine}${sizeLine}Precio por par: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
     });
 
@@ -312,11 +318,13 @@ export function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
         const modelEn = translateModelLabel(item.model_name || "Classic", "en");
         const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
         const locLine = item.location_name ? `Location: ${item.location_name}` : "";
+
+        const colorLine = item.uses_color ? `Color: ${item.color}\n      ` : "";
+        const sizeLine = item.uses_size ? `Size: ${item.size}\n      ` : "";
+
         return `• ${idx + 1}:
       ${locLine ? `${locLine}\n      ` : ""}Model: ${modelEn} Crocs
-      Color: ${item.color}
-      Size: ${item.size}
-      Price per pair: $${item.price_mxn.toFixed(0)} MXN
+      ${colorLine}${sizeLine}Price per pair: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
     });
 

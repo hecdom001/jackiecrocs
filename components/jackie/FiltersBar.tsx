@@ -3,7 +3,6 @@
 import type { Lang, LocationOption } from "@/lib/jackieCatalogUtils";
 import { formatSizeLabel, translateColor, translateCategory, t } from "@/lib/jackieCatalogUtils";
 
-
 export type CategoryOption = { id: string; name: string; slug: string };
 
 export function FiltersBar({
@@ -19,13 +18,19 @@ export function FiltersBar({
                                brandFilter,
                                setBrandFilter,
                                brands,
-                               showSizeColor,
+
+                               // ✅ NEW
+                               showSize,
+                               showColor,
+
+                               // existing
                                sizeFilter,
                                setSizeFilter,
                                allSizes,
                                colorFilter,
                                setColorFilter,
                                allColors,
+
                                totalPairsFiltered,
                                formattedLastUpdated,
                                onRefresh,
@@ -40,7 +45,6 @@ export function FiltersBar({
     locations: LocationOption[];
     visibleLocationSlugs: string[];
 
-    // ✅ NEW
     categoryFilter: string;
     setCategoryFilter: (v: string) => void;
     categories: CategoryOption[];
@@ -49,12 +53,13 @@ export function FiltersBar({
     setBrandFilter: (v: string) => void;
     brands: string[];
 
-    showSizeColor: boolean;
+    showSize: boolean;
+    showColor: boolean;
 
-    // existing
     sizeFilter: string;
     setSizeFilter: (v: string) => void;
     allSizes: string[];
+
     colorFilter: string;
     setColorFilter: (v: string) => void;
     allColors: string[];
@@ -62,11 +67,16 @@ export function FiltersBar({
     totalPairsFiltered: number;
     formattedLastUpdated: string | null;
 
-    // ✅ allow async
     onRefresh: () => void | Promise<void>;
+    onPersistLocation: (v: string) => void;
 }) {
-    // grid columns adapt based on whether size/color should be shown
-    const gridColsClass = showSizeColor ? "sm:grid-cols-5" : "sm:grid-cols-3";
+    // ✅ columns adapt (3 base + optional size + optional color)
+    const gridColsClass =
+        showSize && showColor
+            ? "sm:grid-cols-5"
+            : showSize || showColor
+                ? "sm:grid-cols-4"
+                : "sm:grid-cols-3";
 
     return (
         <section className="mx-auto max-w-6xl px-4 pt-4">
@@ -78,24 +88,16 @@ export function FiltersBar({
               ·{" "}
                             {loading
                                 ? t(lang, "Cargando…", "Loading…")
-                                : t(
-                                    lang,
-                                    `${totalPairsFiltered} pares`,
-                                    `${totalPairsFiltered} pairs`
-                                )}
+                                : t(lang, `${totalPairsFiltered} pares`, `${totalPairsFiltered} pairs`)}
             </span>
                     </p>
 
                     <button
                         type="button"
-                        onClick={() => {
-                            void onRefresh();
-                        }}
+                        onClick={() => void onRefresh()}
                         className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:border-emerald-400 hover:text-emerald-700 transition"
                     >
-                        {loading
-                            ? t(lang, "Actualizando…", "Refreshing…")
-                            : t(lang, "Actualizar", "Refresh")}
+                        {loading ? t(lang, "Actualizando…", "Refreshing…") : t(lang, "Actualizar", "Refresh")}
                     </button>
                 </div>
 
@@ -112,9 +114,7 @@ export function FiltersBar({
                             }}
                             className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
                         >
-                            <option value="all">
-                                {t(lang, "Todas las ubicaciones", "All locations")}
-                            </option>
+                            <option value="all">{t(lang, "Todas las ubicaciones", "All locations")}</option>
                             {locations
                                 .filter((l) => visibleLocationSlugs.includes(l.slug))
                                 .map((l) => (
@@ -133,9 +133,7 @@ export function FiltersBar({
                             onChange={(e) => setCategoryFilter(e.target.value)}
                             className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
                         >
-                            <option value="all">
-                                {t(lang, "Todas las categorías", "All categories")}
-                            </option>
+                            <option value="all">{t(lang, "Todas las categorías", "All categories")}</option>
                             {categories.map((c) => (
                                 <option key={c.id} value={c.id}>
                                     {translateCategory(c.name || c.slug, lang)}
@@ -161,45 +159,42 @@ export function FiltersBar({
                         </select>
                     </div>
 
-                    {/* Size + Color only when applicable */}
-                    {showSizeColor ? (
-                        <>
-                            <div className="space-y-1">
-                                <p className="text-slate-700">{t(lang, "Talla", "Size")}</p>
-                                <select
-                                    value={sizeFilter}
-                                    onChange={(e) => setSizeFilter(e.target.value)}
-                                    className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                >
-                                    <option value="all">
-                                        {t(lang, "Todas las tallas", "All sizes")}
+                    {/* ✅ Size only when applicable */}
+                    {showSize ? (
+                        <div className="space-y-1">
+                            <p className="text-slate-700">{t(lang, "Talla", "Size")}</p>
+                            <select
+                                value={sizeFilter}
+                                onChange={(e) => setSizeFilter(e.target.value)}
+                                className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            >
+                                <option value="all">{t(lang, "Todas las tallas", "All sizes")}</option>
+                                {allSizes.map((sz) => (
+                                    <option key={sz} value={sz}>
+                                        {formatSizeLabel(sz, lang)}
                                     </option>
-                                    {allSizes.map((sz) => (
-                                        <option key={sz} value={sz}>
-                                            {formatSizeLabel(sz, lang)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                                ))}
+                            </select>
+                        </div>
+                    ) : null}
 
-                            <div className="space-y-1">
-                                <p className="text-slate-700">{t(lang, "Color", "Color")}</p>
-                                <select
-                                    value={colorFilter}
-                                    onChange={(e) => setColorFilter(e.target.value)}
-                                    className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                >
-                                    <option value="all">
-                                        {t(lang, "Todos los colores", "All colors")}
+                    {/* ✅ Color only when applicable */}
+                    {showColor ? (
+                        <div className="space-y-1">
+                            <p className="text-slate-700">{t(lang, "Color", "Color")}</p>
+                            <select
+                                value={colorFilter}
+                                onChange={(e) => setColorFilter(e.target.value)}
+                                className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            >
+                                <option value="all">{t(lang, "Todos los colores", "All colors")}</option>
+                                {allColors.map((c) => (
+                                    <option key={c} value={c}>
+                                        {translateColor(c, lang)}
                                     </option>
-                                    {allColors.map((c) => (
-                                        <option key={c} value={c}>
-                                            {translateColor(c, lang)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </>
+                                ))}
+                            </select>
+                        </div>
                     ) : null}
                 </div>
 

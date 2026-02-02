@@ -29,6 +29,9 @@ export function QuickView({
     sizeFilter: string;
     onAdd: (item: PublicItem) => void;
     onRemove: (itemId: string) => void;
+    showSize?: boolean;
+    showColor?: boolean;
+
 }) {
     if (!open || !group) return null;
 

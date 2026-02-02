@@ -184,9 +184,9 @@ export function JackieCatalog() {
     const [view, setView] = useState<"home" | "catalog">("home");
 
     // ✅ DB image map: key = "model__color" (lowercase)
-    const [productImageMap, setProductImageMap] = useState<
-        Record<string, ProductImageRow>
-    >({});
+    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>(
+        {}
+    );
 
     // ✅ Load product images once
     useEffect(() => {
@@ -325,7 +325,7 @@ export function JackieCatalog() {
         price_mxn,
         status,
         created_at,
-        models ( name, brand, uses_size_color, category_id ),
+        models ( name, brand, uses_size, uses_color, category_id ),
         colors ( name_en ),
         sizes ( id, label ),
         locations ( slug, name )
@@ -345,10 +345,12 @@ export function JackieCatalog() {
         (data ?? []).forEach((row: any) => {
             const model_name: string = row.models?.name ?? "";
             const brand: string = row.models?.brand ?? "";
-            const uses_size_color: boolean = !!row.models?.uses_size_color;
-            const category_id: string | null = row.models?.category_id
-                ? String(row.models.category_id)
-                : null;
+
+            // ✅ NEW FLAGS
+            const uses_size: boolean = !!row.models?.uses_size;
+            const uses_color: boolean = !!row.models?.uses_color;
+
+            const category_id: string | null = row.models?.category_id ? String(row.models.category_id) : null;
 
             const color: string = row.colors?.name_en ?? "";
             const size_id: string = row.size_id as string;
@@ -358,7 +360,7 @@ export function JackieCatalog() {
             const price_mxn: number = Number(row.price_mxn);
             const created_at: string = row.created_at ?? new Date(0).toISOString();
 
-            // ✅ for now: still require size_id+sizeLabel (since your schema is footwear-only today)
+            // ✅ keep requiring size_id+label because you always store a size row (including N/A)
             if (!size_id || !sizeLabel) return;
 
             const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
@@ -372,7 +374,8 @@ export function JackieCatalog() {
                     id: row.id as string,
                     model_name,
                     brand,
-                    uses_size_color,
+                    uses_size,
+                    uses_color,
                     category_id,
                     color,
                     size: sizeLabel,
@@ -432,9 +435,14 @@ export function JackieCatalog() {
         });
     }, [items, locationFilter, categoryFilter, brandFilter]);
 
-    // ✅ show size/color only if any item in scope uses it
-    const showSizeColor = useMemo(() => {
-        return scopedForOptions.some((it) => !!it.uses_size_color);
+    // ✅ NEW: show size filter only if any item in scope uses size
+    const showSize = useMemo(() => {
+        return scopedForOptions.some((it) => !!it.uses_size);
+    }, [scopedForOptions]);
+
+    // ✅ NEW: show color filter only if any item in scope uses color
+    const showColor = useMemo(() => {
+        return scopedForOptions.some((it) => !!it.uses_color);
     }, [scopedForOptions]);
 
     // ✅ dropdown options
@@ -449,20 +457,21 @@ export function JackieCatalog() {
         return ids.map((id) => categoryById.get(id)).filter(Boolean) as CategoryOption[];
     }, [items, categoryById]);
 
-    // ✅ sizes/colors based on current scoped options (and only when showSizeColor)
+    // ✅ sizes only when showSize (and only from items that use size)
     const allSizes = useMemo(() => {
-        if (!showSizeColor) return [];
-        return Array.from(new Set(scopedForOptions.map((i) => i.size)))
+        if (!showSize) return [];
+        return Array.from(new Set(scopedForOptions.filter((i) => i.uses_size).map((i) => i.size)))
             .filter(Boolean)
             .sort((a, b) => sizeRank(a) - sizeRank(b));
-    }, [scopedForOptions, showSizeColor]);
+    }, [scopedForOptions, showSize]);
 
+    // ✅ colors only when showColor (and only from items that use color)
     const allColors = useMemo(() => {
-        if (!showSizeColor) return [];
-        return Array.from(new Set(scopedForOptions.map((i) => i.color)))
+        if (!showColor) return [];
+        return Array.from(new Set(scopedForOptions.filter((i) => i.uses_color).map((i) => i.color)))
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b));
-    }, [scopedForOptions, showSizeColor]);
+    }, [scopedForOptions, showColor]);
 
     // ✅ apply filters to inventory
     const inventoryScoped = useMemo(() => {
@@ -470,19 +479,22 @@ export function JackieCatalog() {
             const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
             const byCategory = categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
             const byBrand = brandFilter === "all" || (item.brand ?? "") === brandFilter;
-            const byColor = !showSizeColor || colorFilter === "all" || item.color === colorFilter;
+
+            // ✅ only filter by color if color is meaningful in this scope
+            const byColor = !showColor || colorFilter === "all" || item.color === colorFilter;
 
             return byLoc && byCategory && byBrand && byColor;
         });
-    }, [items, locationFilter, categoryFilter, brandFilter, colorFilter, showSizeColor]);
+    }, [items, locationFilter, categoryFilter, brandFilter, colorFilter, showColor]);
 
-    // ✅ reset size/color when they don't apply OR when "scope" changes
+    // ✅ reset size/color when they don't apply
     useEffect(() => {
-        if (!showSizeColor) {
-            setSizeFilter("all");
-            setColorFilter("all");
-        }
-    }, [showSizeColor]);
+        if (!showSize) setSizeFilter("all");
+    }, [showSize]);
+
+    useEffect(() => {
+        if (!showColor) setColorFilter("all");
+    }, [showColor]);
 
     useEffect(() => {
         // when changing loc/category/brand, don't keep old size/color selections around
@@ -544,8 +556,9 @@ export function JackieCatalog() {
 
         let list = Array.from(map.values());
 
-        if (showSizeColor && sizeFilter !== "all") {
-            list = list.filter((g) => g.variants.some((v: any) => v.size === sizeFilter));
+        // ✅ only apply sizeFilter if the scope actually uses size
+        if (showSize && sizeFilter !== "all") {
+            list = list.filter((g) => g.variants.some((v: any) => v.uses_size && v.size === sizeFilter));
         }
 
         const q = query.trim().toLowerCase();
@@ -569,7 +582,7 @@ export function JackieCatalog() {
         });
 
         return list;
-    }, [inventoryScoped, showSizeColor, sizeFilter, query]);
+    }, [inventoryScoped, showSize, sizeFilter, query]);
 
     const totalPairsFiltered = useMemo(() => {
         return groupsFiltered.reduce(
@@ -706,15 +719,14 @@ export function JackieCatalog() {
                         onPersistLocation={persistLocation}
                         locations={locations}
                         visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
-                        // ✅ new
                         categoryFilter={categoryFilter}
                         setCategoryFilter={setCategoryFilter}
                         categories={categoryOptions}
                         brandFilter={brandFilter}
                         setBrandFilter={setBrandFilter}
                         brands={allBrands}
-                        // ✅ conditional
-                        showSizeColor={showSizeColor}
+                        showSize={showSize}
+                        showColor={showColor}
                         sizeFilter={sizeFilter}
                         setSizeFilter={setSizeFilter}
                         allSizes={allSizes}
@@ -776,6 +788,9 @@ export function JackieCatalog() {
                 sizeFilter={sizeFilter}
                 onAdd={handleAddToCart}
                 onRemove={handleRemoveFromCart}
+                // ✅ NEW (QuickView can hide size UI when false)
+                showSize={showSize}
+                showColor={showColor}
             />
 
             <CartDrawer
