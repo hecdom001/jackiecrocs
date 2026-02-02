@@ -265,12 +265,11 @@ export default function AddInventoryPage() {
         <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-base font-semibold text-slate-900">{t("Operaciones de inventario", "Inventory operations")}</h1>
+              <h1 className="text-base font-semibold text-slate-900">
+                {t("Operaciones de inventario", "Inventory operations")}
+              </h1>
               <p className="text-xs text-slate-500">
-                {t(
-                    "Agrega y mueve pares entre ubicaciones.",
-                    "Add and move pairs between locations."
-                )}
+                {t("Agrega y mueve pares entre ubicaciones.", "Add and move pairs between locations.")}
               </p>
             </div>
 
@@ -315,26 +314,18 @@ function CollapsibleSection({
 
   return (
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-        {/* Header row */}
         <div className="w-full flex items-start justify-between gap-3 p-4 sm:p-5">
-          {/* Clickable title area (mobile toggles, desktop does nothing) */}
           <button
               type="button"
               onClick={() => setOpen((v) => !v)}
               className="min-w-0 flex-1 text-left sm:cursor-default"
           >
-            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
-              {title}
-            </h2>
-            {subtitle ? (
-                <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p>
-            ) : null}
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900">{title}</h2>
+            {subtitle ? <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p> : null}
           </button>
 
-          {/* Actions: show on desktop (no nesting now) */}
           {rightAction ? <div className="hidden sm:block">{rightAction}</div> : null}
 
-          {/* Chevron: only on mobile */}
           <button
               type="button"
               onClick={() => setOpen((v) => !v)}
@@ -345,16 +336,13 @@ function CollapsibleSection({
           </button>
         </div>
 
-        {/* Content: mobile collapses, desktop always open */}
         <div className={`${open ? "block" : "hidden"} sm:block px-4 sm:px-5 pb-4 sm:pb-5`}>
-          {/* Optional: show actions on mobile INSIDE when open */}
           {rightAction ? <div className="sm:hidden mb-3">{rightAction}</div> : null}
           {children}
         </div>
       </section>
   );
 }
-
 
 /* ------------------------ AddInventorySection ------------------------ */
 
@@ -415,7 +403,88 @@ function AddInventorySection({
     setLookupSuccess(null);
   };
 
-  /* ------------------------ Transfer state (IDs-based) ------------------------ */
+  // ------------------------ Product images (Admin) ------------------------
+  const SUPABASE_IMAGE_BASE =
+      "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
+  const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/placeholderV2.png`;
+
+  type InvPair = { model: string; color_en: string; inventory_rows: number };
+  type ProductImageRow = { model: string; color_en: string; storage_path: string; updated_at?: string | null };
+
+  const [invPairs, setInvPairs] = useState<InvPair[]>([]);
+  const [invPairsLoading, setInvPairsLoading] = useState(false);
+
+  // map: "model__color" -> {storage_path, updated_at}
+  const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
+  const [imgModel, setImgModel] = useState<string>("");
+  const [imgColor, setImgColor] = useState<string>("");
+  const [imgFile, setImgFile] = useState<File | null>(null);
+  const [imgSaving, setImgSaving] = useState(false);
+  const [imgMsg, setImgMsg] = useState<string | null>(null);
+  const [imgPreviewUrl, setImgPreviewUrl] = useState<string | null>(null);
+  const [imgLoadingPreview, setImgLoadingPreview] = useState(false);
+
+  const fileInputId = "jw-product-image-file";
+
+  const keyOf = (m: string, c: string) => `${(m || "").trim()}__${(c || "").trim()}`.toLowerCase();
+
+  const currentImage = useMemo(() => {
+    if (!imgModel || !imgColor) return null;
+    const row = productImageMap[keyOf(imgModel, imgColor)];
+    if (!row?.storage_path) return null;
+    return row;
+  }, [imgModel, imgColor, productImageMap]);
+
+  const currentImageUrl = useMemo(() => {
+    // Cache-bust using updated_at if present
+    if (!currentImage?.storage_path) return null;
+    const base = `${SUPABASE_IMAGE_BASE}/${currentImage.storage_path}`;
+    const v = currentImage.updated_at ? encodeURIComponent(String(currentImage.updated_at)) : "1";
+    return `${base}?v=${v}`;
+  }, [currentImage]);
+
+  useEffect(() => {
+    // show preview from selected file
+    if (!imgFile) {
+      setImgPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imgFile);
+    setImgPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imgFile]);
+
+  useEffect(() => {
+    // When selection changes, show loading state briefly to avoid "flash"
+    if (!imgModel || !imgColor) return;
+    setImgLoadingPreview(true);
+    const tm = setTimeout(() => setImgLoadingPreview(false), 80);
+    return () => clearTimeout(tm);
+  }, [imgModel, imgColor, currentImageUrl]);
+
+  const imgModelOptions = useMemo(() => {
+    const set = new Set(invPairs.map((p) => p.model));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [invPairs]);
+
+  const imgColorOptions = useMemo(() => {
+    if (!imgModel) return [];
+    const set = new Set(invPairs.filter((p) => p.model === imgModel).map((p) => p.color_en));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [invPairs, imgModel]);
+
+  useEffect(() => {
+    // keep selected color valid when model changes
+    if (!imgModel) {
+      setImgColor("");
+      return;
+    }
+    if (imgColor && imgColorOptions.includes(imgColor)) return;
+    setImgColor(imgColorOptions[0] || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgModel, invPairs]);
+
+  // ------------------------ Transfer state (IDs-based) ------------------------
 
   const [allInventory, setAllInventory] = useState<InventoryItemDTO[]>([]);
   const [invLoading, setInvLoading] = useState(false);
@@ -464,6 +533,109 @@ function AddInventorySection({
       setInvLoading(false);
     }
   }
+
+  async function loadInventoryPairs() {
+    setInvPairsLoading(true);
+    try {
+      const { data, error } = await supabase.from("inventory_items").select(`models(name), colors(name_en)`).limit(5000);
+      if (error) throw error;
+
+      const map = new Map<string, InvPair>();
+
+      for (const row of data ?? []) {
+        const model = String((row as any)?.models?.name || "").trim();
+        const color_en = String((row as any)?.colors?.name_en || "").trim();
+        if (!model || !color_en) continue;
+
+        const k = keyOf(model, color_en);
+        const prev = map.get(k);
+        if (!prev) map.set(k, { model, color_en, inventory_rows: 1 });
+        else prev.inventory_rows += 1;
+      }
+
+      const list = Array.from(map.values()).sort((a, b) => {
+        const m = a.model.localeCompare(b.model);
+        if (m !== 0) return m;
+        return a.color_en.localeCompare(b.color_en);
+      });
+
+      setInvPairs(list);
+
+      // also set defaults for image selector (first available pair)
+      if (!imgModel && list.length > 0) {
+        setImgModel(list[0].model);
+        setImgColor(list[0].color_en);
+      }
+    } catch (e) {
+      console.error("loadInventoryPairs error:", e);
+      setInvPairs([]);
+    } finally {
+      setInvPairsLoading(false);
+    }
+  }
+
+  async function loadProductImagesMap() {
+    try {
+      // Join through models + colors to build a fast map for UI
+      const { data, error } = await supabase
+          .from("product_images")
+          .select(`storage_path, updated_at, models(name), colors(name_en)`)
+          .limit(5000);
+
+      if (error) throw error;
+
+      const next: Record<string, ProductImageRow> = {};
+      for (const row of (data ?? []) as any[]) {
+        const model = String(row?.models?.name || "").trim();
+        const color_en = String(row?.colors?.name_en || "").trim();
+        const storage_path = String(row?.storage_path || "").trim();
+        if (!model || !color_en || !storage_path) continue;
+
+        next[keyOf(model, color_en)] = {
+          model,
+          color_en,
+          storage_path,
+          updated_at: row?.updated_at ?? null,
+        };
+      }
+
+      setProductImageMap(next);
+    } catch (e) {
+      console.error("loadProductImagesMap error:", e);
+      setProductImageMap({});
+    }
+  }
+
+  async function uploadAndSaveProductImage() {
+    setImgMsg(null);
+
+    if (!imgModel || !imgColor || !imgFile) {
+      setImgMsg(t("Selecciona modelo, color y archivo.", "Pick model, color, and file."));
+      return;
+    }
+
+    setImgSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("model", imgModel);
+      fd.append("color", imgColor);
+      fd.append("file", imgFile);
+
+      const res = await fetch("/api/admin/product-images", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data?.error || "Upload failed");
+
+      setImgMsg(t("Imagen guardada ✅", "Image saved ✅"));
+      setImgFile(null);
+    } catch (err: any) {
+      console.error(err);
+      setImgMsg(err?.message || t("Error guardando imagen.", "Error saving image."));
+    } finally {
+      setImgSaving(false);
+    }
+  }
+
 
   /* ------------------------ Loaders ------------------------ */
 
@@ -527,10 +699,8 @@ function AddInventorySection({
     const tijuana = list.find((l) => l.slug?.toLowerCase() === "tijuana");
     const defaultLoc = tijuana?.id || list[0]?.id || "";
 
-    // Add new pairs default
     setLocationId((prev) => prev || defaultLoc);
 
-    // Transfer defaults
     setTransferFrom((prev) => prev || defaultLoc);
     setTransferTo((prev) => {
       if (prev) return prev;
@@ -547,6 +717,10 @@ function AddInventorySection({
     loadModels();
     loadLocations();
     loadInventoryForTransfer();
+
+    // For image admin
+    loadInventoryPairs();
+    loadProductImagesMap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -560,7 +734,6 @@ function AddInventorySection({
   const transferFiltered = useMemo(() => {
     const from = transferFrom || "";
     return allInventory.filter((it) => {
-      // ✅ only available
       if (it.status !== "available") return false;
 
       const itLocId = String(it.location?.id || it.location_id || "");
@@ -590,7 +763,6 @@ function AddInventorySection({
       return;
     }
 
-    // safety: only allow transferring ids that are currently in filtered list (available + from location)
     const allowed = new Set(transferFiltered.map((x) => x.id));
     const ids = Array.from(selectedIds).filter((id) => allowed.has(id));
     if (ids.length === 0) {
@@ -876,6 +1048,9 @@ function AddInventorySection({
       setQuantity("1");
       onAdded();
       loadInventoryForTransfer();
+
+      // inventory changed -> refresh pairs list
+      loadInventoryPairs();
     } catch (err) {
       console.error(err);
       setMessage(t("Error al agregar inventario.", "Error adding inventory."));
@@ -913,7 +1088,6 @@ function AddInventorySection({
             )}
             defaultOpen={false}
         >
-
           <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Location */}
             <div className="space-y-2">
@@ -987,7 +1161,10 @@ function AddInventorySection({
             <div className="space-y-2">
               <FieldHeader
                   label={t("Color", "Color")}
-                  helper={t("Modelo y color se guardan en inglés; el público lo ve traducido.", "Model and color are stored in English; the public page will translate them.")}
+                  helper={t(
+                      "Modelo y color se guardan en inglés; el público lo ve traducido.",
+                      "Model and color are stored in English; the public page will translate them."
+                  )}
                   action={
                     <MiniButton onClick={() => setOpenAddColor(true)}>
                       + {t("Nuevo", "New")}
@@ -1091,13 +1268,173 @@ function AddInventorySection({
           {message && <p className="text-[11px] text-right text-emerald-700">{message}</p>}
         </CollapsibleSection>
 
+        {/* ------------------------ Product Images (Admin) ------------------------ */}
+        <CollapsibleSection
+            title={t("Imágenes de producto", "Product images")}
+            subtitle={t("Sube/actualiza la imagen por modelo+color.", "Upload/update image by model+color.")}
+            defaultOpen={false}
+        >
+          <div className="space-y-3">
+            {/* Row: Model / Color / File */}
+            <div className="grid gap-3 lg:grid-cols-3 items-end">
+              <div className="space-y-2">
+                <FieldHeader
+                    label={t("Modelo", "Model")}
+                    helper={t("Solo combos que existen en inventario.", "Only combinations that exist in inventory.")}
+                />
+                <select
+                    value={imgModel}
+                    onChange={(e) => setImgModel(e.target.value)}
+                    className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  <option value="">{invPairsLoading ? t("Cargando…", "Loading…") : t("Selecciona un modelo", "Select a model")}</option>
+                  {imgModelOptions.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <FieldHeader label={t("Color", "Color")} />
+                <select
+                    value={imgColor}
+                    onChange={(e) => setImgColor(e.target.value)}
+                    className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    disabled={!imgModel}
+                >
+                  <option value="">{t("Selecciona un color", "Select a color")}</option>
+                  {imgColorOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <FieldHeader label={t("Archivo", "File")} helper={t("PNG/JPG recomendado.", "PNG/JPG recommended.")} />
+
+                {/* Custom file picker */}
+                <div className="flex items-center gap-2">
+                  <input
+                      id={fileInputId}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setImgFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                  />
+                  <label
+                      htmlFor={fileInputId}
+                      className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-[11px] font-semibold border transition cursor-pointer ${
+                          imgModel && imgColor
+                              ? "border-slate-300 bg-white text-slate-800 hover:border-emerald-400 hover:text-emerald-700"
+                              : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                      }`}
+                      aria-disabled={!(imgModel && imgColor)}
+                      onClick={(e) => {
+                        if (!(imgModel && imgColor)) e.preventDefault();
+                      }}
+                  >
+                    {t("Elegir imagen", "Choose image")}
+                  </label>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-slate-600 truncate">
+                      {imgFile ? imgFile.name : t("Ningún archivo seleccionado", "No file selected")}
+                    </p>
+                  </div>
+
+                  {imgFile ? (
+                      <button
+                          type="button"
+                          onClick={() => setImgFile(null)}
+                          className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                          aria-label="Clear selected file"
+                      >
+                        ✕
+                      </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview card */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center gap-3">
+                <div className="h-14 w-14 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center">
+                  {/* show selected-file preview first, else current image, else placeholder */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                      src={imgPreviewUrl || currentImageUrl || PLACEHOLDER_IMAGE}
+                      alt="Current product image"
+                      className="h-full w-full object-cover"
+                      loading="eager"
+                      decoding="async"
+                      onLoad={() => setImgLoadingPreview(false)}
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-slate-900">
+                    {t("Imagen actual", "Current image")}
+                  </p>
+                  <p className="text-[11px] text-slate-600 truncate">
+                    {imgModel && imgColor ? (
+                        <>
+                          <span className="font-medium">{imgModel}</span> · {imgColor}
+                          {currentImage?.storage_path ? (
+                              <span className="text-slate-400"> · {currentImage.storage_path}</span>
+                          ) : (
+                              <span className="text-slate-400"> · {t("Sin imagen", "No image")}</span>
+                          )}
+                        </>
+                    ) : (
+                        <span className="text-slate-500">{t("Selecciona modelo y color.", "Select model and color.")}</span>
+                    )}
+                  </p>
+
+                  {imgLoadingPreview ? (
+                      <p className="text-[10px] text-slate-400 mt-1">{t("Cargando vista previa…", "Loading preview…")}</p>
+                  ) : null}
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                      loadProductImagesMap();
+                      setImgMsg(t("Actualizado ✅", "Refreshed ✅"));
+                    }}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:border-emerald-400 hover:text-emerald-700"
+                >
+                  {t("Actualizar", "Refresh")}
+                </button>
+              </div>
+            </div>
+
+            {/* Save action */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] text-slate-600">
+                {imgMsg ? <span className="text-slate-800">{imgMsg}</span> : <span>&nbsp;</span>}
+              </div>
+
+              <button
+                  type="button"
+                  onClick={uploadAndSaveProductImage}
+                  disabled={imgSaving || !imgModel || !imgColor || !imgFile}
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              >
+                {imgSaving ? t("Subiendo…", "Uploading…") : t("Guardar imagen", "Save image")}
+              </button>
+            </div>
+          </div>
+        </CollapsibleSection>
+
         {/* ------------------------ Transfer (select items) ------------------------ */}
         <CollapsibleSection
             title={t("Transferir", "Transfer")}
-            subtitle={t(
-                "Solo pares DISPONIBLES. Selecciona cuáles mover.",
-                "Only AVAILABLE pairs. Select which ones to move."
-            )}
+            subtitle={t("Solo pares DISPONIBLES. Selecciona cuáles mover.", "Only AVAILABLE pairs. Select which ones to move.")}
             defaultOpen={false}
             rightAction={
               <div className="flex gap-2">
@@ -1110,9 +1447,7 @@ function AddInventorySection({
               </div>
             }
         >
-          {/* everything that was inside the section goes here EXCEPT the old header */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {/* From */}
             <div className="space-y-2">
               <FieldHeader label={t("De (origen)", "From (source)")} />
               <select
@@ -1131,7 +1466,6 @@ function AddInventorySection({
               </select>
             </div>
 
-            {/* To */}
             <div className="space-y-2">
               <FieldHeader label={t("A (destino)", "To (destination)")} />
               <select
@@ -1147,7 +1481,6 @@ function AddInventorySection({
               </select>
             </div>
 
-            {/* Model filter */}
             <div className="space-y-2">
               <FieldHeader label={t("Modelo", "Model")} />
               <select
@@ -1167,7 +1500,6 @@ function AddInventorySection({
               </select>
             </div>
 
-            {/* Color filter */}
             <div className="space-y-2">
               <FieldHeader label={t("Color", "Color")} />
               <select
@@ -1187,7 +1519,6 @@ function AddInventorySection({
               </select>
             </div>
 
-            {/* Size filter */}
             <div className="space-y-2">
               <FieldHeader label={t("Talla", "Size")} />
               <select
@@ -1207,7 +1538,6 @@ function AddInventorySection({
               </select>
             </div>
 
-            {/* Refresh */}
             <div className="space-y-2">
               <FieldHeader label={t("Acciones", "Actions")} />
               <button
@@ -1221,25 +1551,20 @@ function AddInventorySection({
             </div>
           </div>
 
-          {/* Results */}
           <div className="rounded-xl border border-slate-200 overflow-hidden mt-4">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] text-slate-600 flex items-center justify-between">
-      <span>
-        {invLoading
-            ? t("Cargando…", "Loading…")
-            : t(`${transferFiltered.length} disponibles`, `${transferFiltered.length} available`)}
-      </span>
+            <span>
+              {invLoading ? t("Cargando…", "Loading…") : t(`${transferFiltered.length} disponibles`, `${transferFiltered.length} available`)}
+            </span>
               <span>
-        {t("Seleccionados:", "Selected:")} {selectedIds.size}
-      </span>
+              {t("Seleccionados:", "Selected:")} {selectedIds.size}
+            </span>
             </div>
 
             {invError ? (
                 <div className="p-3 text-[11px] text-rose-600">{invError}</div>
             ) : transferFiltered.length === 0 ? (
-                <div className="p-3 text-[11px] text-slate-500">
-                  {t("No hay pares disponibles con esos filtros.", "No available items with those filters.")}
-                </div>
+                <div className="p-3 text-[11px] text-slate-500">{t("No hay pares disponibles con esos filtros.", "No available items with those filters.")}</div>
             ) : (
                 <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
                   {transferFiltered.map((it) => {
@@ -1256,9 +1581,7 @@ function AddInventorySection({
                             </p>
                             <p className="text-[10px] text-slate-400 font-mono">ID: {it.id.slice(0, 8)}…</p>
                           </div>
-                          <div className="ml-auto text-sm font-semibold text-slate-900 whitespace-nowrap">
-                            ${Number(it.price_mxn || 0).toFixed(0)}
-                          </div>
+                          <div className="ml-auto text-sm font-semibold text-slate-900 whitespace-nowrap">${Number(it.price_mxn || 0).toFixed(0)}</div>
                         </label>
                     );
                   })}
@@ -1279,7 +1602,6 @@ function AddInventorySection({
 
           {transferMsg && <p className="text-[11px] text-right text-slate-700 mt-2">{transferMsg}</p>}
         </CollapsibleSection>
-
 
         {/* ------------------------ Add Location Modal ------------------------ */}
         <Modal
@@ -1433,7 +1755,10 @@ function AddInventorySection({
         <Modal
             open={openAddSize}
             title={t("Agregar talla", "Add size")}
-            subtitle={t("Se guarda como sizes.label + sizes.category (y asigna sort_order automático).", "Saved as sizes.label + sizes.category (with auto sort_order).")}
+            subtitle={t(
+                "Se guarda como sizes.label + sizes.category (y asigna sort_order automático).",
+                "Saved as sizes.label + sizes.category (with auto sort_order)."
+            )}
             onClose={() => setOpenAddSize(false)}
         >
           <div className="space-y-3">

@@ -24,7 +24,7 @@ export function ProductGrid({
     showingCount: number;
     canShowMore: boolean;
     onShowMore: () => void;
-    getPhotoForColor: (color: string) => { src: string; label: string } | null;
+    getPhotoForColor: (colorOrKey: string) => { src: string; label: string };
     onQuickView: (g: ColorGroup) => void;
 }) {
     return (
@@ -34,18 +34,34 @@ export function ProductGrid({
             ) : errorMsg ? (
                 <p className="text-sm text-red-500">{errorMsg}</p>
             ) : groupsFiltered.length === 0 ? (
-                <p className="text-sm text-slate-600">{t(lang, "No hay pares con estos filtros.", "No pairs match these filters.")}</p>
+                <p className="text-sm text-slate-600">
+                    {t(lang, "No hay pares con estos filtros.", "No pairs match these filters.")}
+                </p>
             ) : (
                 <>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                        {limitedGroups.map((g) => (
-                            <ProductCard key={g.key} lang={lang} group={g} photo={getPhotoForColor(g.color)} onQuickView={onQuickView} />
-                        ))}
+                        {limitedGroups.map((g) => {
+                            // ✅ DB-first key: "model__color"
+                            const imageKey = `${g.model_name}__${g.color}`.toLowerCase();
+                            return (
+                                <ProductCard
+                                    key={g.key}
+                                    lang={lang}
+                                    group={g}
+                                    photo={getPhotoForColor(imageKey)}
+                                    onQuickView={onQuickView}
+                                />
+                            );
+                        })}
                     </div>
 
                     <div className="flex flex-col items-center gap-2 mt-4">
                         <p className="text-[10px] text-slate-500">
-                            {t(lang, `Mostrando ${showingCount} de ${groupsFiltered.length}`, `Showing ${showingCount} of ${groupsFiltered.length}`)}
+                            {t(
+                                lang,
+                                `Mostrando ${showingCount} de ${groupsFiltered.length}`,
+                                `Showing ${showingCount} of ${groupsFiltered.length}`
+                            )}
                         </p>
 
                         {canShowMore && (

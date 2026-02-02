@@ -1,7 +1,7 @@
 // components/jackie/JackieCatalog.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 import {
@@ -41,89 +41,23 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
 };
 
 const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
-    Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) =>
-        VISIBLE_LOCATION_SLUGS.includes(slug)
-    )
+    Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) => VISIBLE_LOCATION_SLUGS.includes(slug))
 );
 
 const SUPABASE_IMAGE_BASE =
     "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
 
-const CROCS_PHOTOS = {
-    black: { src: `${SUPABASE_IMAGE_BASE}/crocs-black.png`, label: "Crocs negros" },
-    beige: { src: `${SUPABASE_IMAGE_BASE}/crocs-beige.png`, label: "Crocs beige" },
-    white: { src: `${SUPABASE_IMAGE_BASE}/crocs-white.png`, label: "Crocs blancos" },
-    lila: { src: `${SUPABASE_IMAGE_BASE}/crocs-lila.png`, label: "Crocs lila" },
-    light_pink: { src: `${SUPABASE_IMAGE_BASE}/crocs-light-pink.png`, label: "Crocs rosa pastel" },
-    red: { src: `${SUPABASE_IMAGE_BASE}/crocs-red.png`, label: "Crocs rojos" },
-    arctic: { src: `${SUPABASE_IMAGE_BASE}/crocs-arctic.png`, label: "Crocs azul ártico" },
-    camo: { src: `${SUPABASE_IMAGE_BASE}/crocs-camo.png`, label: "Crocs camuflaje" },
-    fuchsia: { src: `${SUPABASE_IMAGE_BASE}/crocs-fuchsia.jpg`, label: "Crocs fucsia" },
-    rust_brown: { src: `${SUPABASE_IMAGE_BASE}/crocs-rust-brown.jpg`, label: "Crocs café óxido" },
-    leopard: { src: `${SUPABASE_IMAGE_BASE}/croc-leopard.JPG`, label: "Crocs de leopardo" },
+const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/placeholderCominSoon.png`;
 
-    barbie: { src: `${SUPABASE_IMAGE_BASE}/croc-barbie.jpeg`, label: "Crocs Barbie" },
-    batman: { src: `${SUPABASE_IMAGE_BASE}/croc-batman.jpeg`, label: "Crocs Batman" },
-    buzz_lightyear: { src: `${SUPABASE_IMAGE_BASE}/croc-buzzlightyear.jpeg`, label: "Crocs Buzz Lightyear" },
-    dragon_ball: { src: `${SUPABASE_IMAGE_BASE}/croc-dragonball.jpeg`, label: "Crocs Dragon Ball" },
-    hello_kitty: { src: `${SUPABASE_IMAGE_BASE}/croc-hellokitty.jpeg`, label: "Crocs Hello Kitty" },
-    huevitos: { src: `${SUPABASE_IMAGE_BASE}/croc-huevitos.jpeg`, label: "Crocs Huevitos" },
-    simpson: { src: `${SUPABASE_IMAGE_BASE}/croc-simpson.jpeg`, label: "Crocs Los Simpson" },
-    stranger_things: { src: `${SUPABASE_IMAGE_BASE}/croc-strangerthings.jpeg`, label: "Crocs Stranger Things" },
-    superman: { src: `${SUPABASE_IMAGE_BASE}/croc-superman.jpeg`, label: "Crocs Superman" },
-    toy_story: { src: `${SUPABASE_IMAGE_BASE}/croc-toystory.jpeg`, label: "Crocs Toy Story" },
-    yoda: { src: `${SUPABASE_IMAGE_BASE}/croc-yoda.jpeg`, label: "Crocs Yoda" },
+type ProductImageRow = {
+    key: string;
+    src: string;
+    alt: string | null;
+    storage_path?: string;
+    model?: string;
+    color?: string;
+};
 
-    light_pink_shimmer: { src: `${SUPABASE_IMAGE_BASE}/croc-light-pink-shimmer.png`, label: "Crocs rosa con brillo" },
-
-    nb_1906r_grey_black: { src: `${SUPABASE_IMAGE_BASE}/nb-1906r-grey-black.jpeg`, label: "New Balance 1906R gris / negro" },
-    nb_530_beige_brown: { src: `${SUPABASE_IMAGE_BASE}/nb-530-beige-brown.jpeg`, label: "New Balance 530 beige / café" },
-    nb_740_grey_white: { src: `${SUPABASE_IMAGE_BASE}/nb_740_grey_white.jpeg`, label: "New Balance beige" },
-    nb_740_rose_sugar: { src: `${SUPABASE_IMAGE_BASE}/nb_740_rose_sugar.jpeg`, label: "New Balance rosa" },
-
-    adidas_samba_cristales: { src: `${SUPABASE_IMAGE_BASE}/Adidas-Samba-Cristales.jpeg`, label: "Adidas Samba Cristales" },
-} as const;
-
-type CrocsPhotoKey = keyof typeof CROCS_PHOTOS;
-
-function getPhotoForColor(colorEn: string): (typeof CROCS_PHOTOS)[CrocsPhotoKey] | null {
-    const key = colorEn.trim().toLowerCase();
-
-    if (key === "black") return CROCS_PHOTOS.black;
-    if (key === "white") return CROCS_PHOTOS.white;
-    if (key === "beige") return CROCS_PHOTOS.beige;
-    if (key === "lilac" || key === "lila") return CROCS_PHOTOS.lila;
-    if (key === "red") return CROCS_PHOTOS.red;
-    if (key === "arctic") return CROCS_PHOTOS.arctic;
-    if (key === "camo" || key === "camuflaje") return CROCS_PHOTOS.camo;
-    if (key === "baby pink" || key === "light pink") return CROCS_PHOTOS.light_pink;
-    if (key === "fuchsia") return CROCS_PHOTOS.fuchsia;
-    if (key === "rust brown") return CROCS_PHOTOS.rust_brown;
-    if (key === "beige brown") return CROCS_PHOTOS.nb_530_beige_brown;
-    if (key === "grey black") return CROCS_PHOTOS.nb_1906r_grey_black;
-    if (key === "grey white") return CROCS_PHOTOS.nb_740_grey_white;
-    if (key === "rose sugar") return CROCS_PHOTOS.nb_740_rose_sugar;
-    if (key === "crystal white") return CROCS_PHOTOS.adidas_samba_cristales;
-    if (key === "leopard") return CROCS_PHOTOS.leopard;
-    if (key.includes("shimmer")) return CROCS_PHOTOS.light_pink_shimmer;
-
-    if (key === "barbie") return CROCS_PHOTOS.barbie;
-    if (key === "batman") return CROCS_PHOTOS.batman;
-    if (key === "buzz lightyear") return CROCS_PHOTOS.buzz_lightyear;
-    if (key === "dragon ball") return CROCS_PHOTOS.dragon_ball;
-    if (key === "hello kitty") return CROCS_PHOTOS.hello_kitty;
-    if (key === "simpsons") return CROCS_PHOTOS.simpson;
-    if (key === "stranger things") return CROCS_PHOTOS.stranger_things;
-    if (key === "superman") return CROCS_PHOTOS.superman;
-    if (key === "toy story") return CROCS_PHOTOS.toy_story;
-    if (key === "yoda") return CROCS_PHOTOS.yoda;
-    if (key === "egg" || key === "huevito" || key === "huevitos") return CROCS_PHOTOS.huevitos;
-
-    return null;
-}
-
-/** ✅ Mobile app-like bottom nav (only shows on mobile) */
-// ✅ REPLACE your MobileBottomNav with this version (it can hide itself when modals are open)
 function MobileBottomNav({
                              show,
                              view,
@@ -183,33 +117,15 @@ function MobileBottomNav({
 
     return (
         <>
-            {/* ✅ spacer only when nav is visible */}
             <div className="h-24 lg:hidden" />
 
-            {/* ✅ pinned bottom, safe-area aware */}
             <div className="fixed inset-x-0 bottom-0 z-[60] lg:hidden pb-[env(safe-area-inset-bottom)]">
                 <div className="mx-auto max-w-md px-4">
                     <div className="rounded-t-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-[0_-12px_40px_rgba(15,23,42,0.16)]">
                         <div className="flex items-stretch px-2 py-2">
-                            <Item
-                                active={view === "home"}
-                                label={t(lang, "Inicio", "Home")}
-                                icon="🏠"
-                                onClick={onHome}
-                            />
-                            <Item
-                                active={view === "catalog"}
-                                label={t(lang, "Catálogo", "Catalog")}
-                                icon="🛍️"
-                                onClick={onCatalog}
-                            />
-                            <Item
-                                active={false}
-                                label={t(lang, "Carrito", "Cart")}
-                                icon="🧺"
-                                onClick={onCart}
-                                badge={cartCount}
-                            />
+                            <Item active={view === "home"} label={t(lang, "Inicio", "Home")} icon="🏠" onClick={onHome} />
+                            <Item active={view === "catalog"} label={t(lang, "Catálogo", "Catalog")} icon="🛍️" onClick={onCatalog} />
+                            <Item active={false} label={t(lang, "Carrito", "Cart")} icon="🧺" onClick={onCart} badge={cartCount} />
                         </div>
                     </div>
                 </div>
@@ -217,7 +133,6 @@ function MobileBottomNav({
         </>
     );
 }
-
 
 export function JackieCatalog() {
     const [lang, setLang] = useState<Lang>("es");
@@ -243,6 +158,54 @@ export function JackieCatalog() {
     const [visibleCount, setVisibleCount] = useState<number>(MOBILE_INITIAL_VISIBLE);
 
     const [view, setView] = useState<"home" | "catalog">("home");
+
+    // ✅ DB image map: key = "model__color" (lowercase)
+    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
+
+    // ✅ Load product images once
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/product-images", { cache: "no-store" });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!Array.isArray(data?.rows)) return;
+
+                const next: Record<string, ProductImageRow> = {};
+                for (const r of data.rows) {
+                    if (r?.key && r?.src) next[String(r.key).toLowerCase()] = r;
+                }
+
+                if (!cancelled) setProductImageMap(next);
+            } catch {
+                // ignore
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    /**
+     * ✅ DB-only image resolver.
+     * Accepts either:
+     * - "model__color"
+     * - or (model, color) via getPhotoForGroup below
+     */
+    const getPhotoByKey = (keyInput: string): { src: string; label: string } => {
+        const key = String(keyInput || "").trim().toLowerCase();
+        if (!key) return { src: PLACEHOLDER_IMAGE, label: "" };
+        const hit = productImageMap[key];
+        if (hit?.src) return { src: hit.src, label: "" };
+        return { src: PLACEHOLDER_IMAGE, label: "" };
+    };
+
+    const getPhotoForGroup = (modelName: string, colorEn: string): { src: string; label: string } => {
+        const key = `${String(modelName || "").trim()}__${String(colorEn || "").trim()}`.toLowerCase();
+        return getPhotoByKey(key);
+    };
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -391,11 +354,13 @@ export function JackieCatalog() {
     useEffect(() => {
         loadLocations();
         loadInventory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         const id = setInterval(() => loadInventory(), 3 * 60_000);
         return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -427,7 +392,9 @@ export function JackieCatalog() {
     }, [scopedForOptions]);
 
     const allColors = useMemo(() => {
-        return Array.from(new Set(scopedForOptions.map((i) => i.color))).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        return Array.from(new Set(scopedForOptions.map((i) => i.color)))
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
     }, [scopedForOptions]);
 
     const inventoryScoped = useMemo(() => {
@@ -502,9 +469,7 @@ export function JackieCatalog() {
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
     const cartLines: CartLine[] = useMemo(() => {
-        return items
-            .map((item) => ({ item, count: quantities[item.id] ?? 0 }))
-            .filter((line) => line.count > 0);
+        return items.map((item) => ({ item, count: quantities[item.id] ?? 0 })).filter((line) => line.count > 0);
     }, [items, quantities]);
 
     const cartLocationInfo = getCartLocationInfo(cartLines);
@@ -574,9 +539,6 @@ export function JackieCatalog() {
                 }}
             />
 
-
-            {/* ✅ REMOVED: top-right Inicio button completely */}
-
             {view === "home" && (
                 <HomeSections
                     lang={lang}
@@ -587,7 +549,7 @@ export function JackieCatalog() {
                     hasSupportWhatsApp={hasSupportWhatsApp}
                     featuredGroups={featuredGroups}
                     quickColorChips={quickColorChips}
-                    getPhotoForColor={getPhotoForColor}
+                    getPhotoForGroup={getPhotoForGroup}
                     locationFilter={locationFilter}
                     onSelectLocation={(slug) => {
                         setLocationFilter(slug);
@@ -646,7 +608,8 @@ export function JackieCatalog() {
                             showingCount={showingCount}
                             canShowMore={groupsFiltered.length > limitedGroups.length}
                             onShowMore={() => setVisibleCount((p) => p + pageSize)}
-                            getPhotoForColor={getPhotoForColor}
+                            // ✅ ProductGrid must pass "model__color" (we already updated it)
+                            getPhotoForColor={(key) => getPhotoByKey(key)}
                             onQuickView={(g) => setQuickView(g)}
                         />
                     </div>
@@ -659,7 +622,7 @@ export function JackieCatalog() {
             )}
 
             <MobileBottomNav
-                show={!cartOpen && !quickView} // ✅ hides behind/under modals
+                show={!cartOpen && !quickView}
                 view={view}
                 lang={lang}
                 cartCount={totalCartPairs}
@@ -676,7 +639,6 @@ export function JackieCatalog() {
                 }}
                 onCart={() => setCartOpen(true)}
             />
-
 
             <QuickView
                 open={!!quickView}
