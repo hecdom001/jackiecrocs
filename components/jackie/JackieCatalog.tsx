@@ -41,7 +41,9 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
 };
 
 const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
-    Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) => VISIBLE_LOCATION_SLUGS.includes(slug))
+    Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) =>
+        VISIBLE_LOCATION_SLUGS.includes(slug)
+    )
 );
 
 const SUPABASE_IMAGE_BASE =
@@ -57,6 +59,8 @@ type ProductImageRow = {
     model?: string;
     color?: string;
 };
+
+type CategoryOption = { id: string; name: string; slug: string };
 
 function MobileBottomNav({
                              show,
@@ -123,9 +127,25 @@ function MobileBottomNav({
                 <div className="mx-auto max-w-md px-4">
                     <div className="rounded-t-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-[0_-12px_40px_rgba(15,23,42,0.16)]">
                         <div className="flex items-stretch px-2 py-2">
-                            <Item active={view === "home"} label={t(lang, "Inicio", "Home")} icon="🏠" onClick={onHome} />
-                            <Item active={view === "catalog"} label={t(lang, "Catálogo", "Catalog")} icon="🛍️" onClick={onCatalog} />
-                            <Item active={false} label={t(lang, "Carrito", "Cart")} icon="🧺" onClick={onCart} badge={cartCount} />
+                            <Item
+                                active={view === "home"}
+                                label={t(lang, "Inicio", "Home")}
+                                icon="🏠"
+                                onClick={onHome}
+                            />
+                            <Item
+                                active={view === "catalog"}
+                                label={t(lang, "Catálogo", "Catalog")}
+                                icon="🛍️"
+                                onClick={onCatalog}
+                            />
+                            <Item
+                                active={false}
+                                label={t(lang, "Carrito", "Cart")}
+                                icon="🧺"
+                                onClick={onCart}
+                                badge={cartCount}
+                            />
                         </div>
                     </div>
                 </div>
@@ -145,6 +165,10 @@ export function JackieCatalog() {
     const [locations, setLocations] = useState<LocationOption[]>([]);
     const [locationFilter, setLocationFilter] = useState<string>("all");
 
+    const [categories, setCategories] = useState<CategoryOption[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState<string>("all");
+    const [brandFilter, setBrandFilter] = useState<string>("all");
+
     const [sizeFilter, setSizeFilter] = useState<string>("all");
     const [colorFilter, setColorFilter] = useState<string>("all");
 
@@ -160,7 +184,9 @@ export function JackieCatalog() {
     const [view, setView] = useState<"home" | "catalog">("home");
 
     // ✅ DB image map: key = "model__color" (lowercase)
-    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
+    const [productImageMap, setProductImageMap] = useState<
+        Record<string, ProductImageRow>
+    >({});
 
     // ✅ Load product images once
     useEffect(() => {
@@ -188,12 +214,6 @@ export function JackieCatalog() {
         };
     }, []);
 
-    /**
-     * ✅ DB-only image resolver.
-     * Accepts either:
-     * - "model__color"
-     * - or (model, color) via getPhotoForGroup below
-     */
     const getPhotoByKey = (keyInput: string): { src: string; label: string } => {
         const key = String(keyInput || "").trim().toLowerCase();
         if (!key) return { src: PLACEHOLDER_IMAGE, label: "" };
@@ -254,7 +274,11 @@ export function JackieCatalog() {
     };
 
     async function loadLocations() {
-        const { data, error } = await supabase.from("locations").select("slug, name").order("name", { ascending: true });
+        const { data, error } = await supabase
+            .from("locations")
+            .select("slug, name")
+            .order("name", { ascending: true });
+
         if (error) return;
 
         const list: LocationOption[] = (data ?? [])
@@ -268,6 +292,23 @@ export function JackieCatalog() {
             const ok = list.some((l) => l.slug === prev);
             return ok ? prev : "all";
         });
+    }
+
+    async function loadCategories() {
+        const { data, error } = await supabase
+            .from("categories")
+            .select("id, slug, name")
+            .order("name", { ascending: true });
+
+        if (error) return;
+
+        setCategories(
+            (data ?? []).map((c: any) => ({
+                id: String(c.id),
+                slug: String(c.slug),
+                name: String(c.name),
+            }))
+        );
     }
 
     async function loadInventory() {
@@ -284,7 +325,7 @@ export function JackieCatalog() {
         price_mxn,
         status,
         created_at,
-        models ( name ),
+        models ( name, brand, uses_size_color, category_id ),
         colors ( name_en ),
         sizes ( id, label ),
         locations ( slug, name )
@@ -303,6 +344,12 @@ export function JackieCatalog() {
 
         (data ?? []).forEach((row: any) => {
             const model_name: string = row.models?.name ?? "";
+            const brand: string = row.models?.brand ?? "";
+            const uses_size_color: boolean = !!row.models?.uses_size_color;
+            const category_id: string | null = row.models?.category_id
+                ? String(row.models.category_id)
+                : null;
+
             const color: string = row.colors?.name_en ?? "";
             const size_id: string = row.size_id as string;
             const sizeLabel: string = row.sizes?.label ?? "";
@@ -311,6 +358,7 @@ export function JackieCatalog() {
             const price_mxn: number = Number(row.price_mxn);
             const created_at: string = row.created_at ?? new Date(0).toISOString();
 
+            // ✅ for now: still require size_id+sizeLabel (since your schema is footwear-only today)
             if (!size_id || !sizeLabel) return;
 
             const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
@@ -323,6 +371,9 @@ export function JackieCatalog() {
                 variantMap.set(key, {
                     id: row.id as string,
                     model_name,
+                    brand,
+                    uses_size_color,
+                    category_id,
                     color,
                     size: sizeLabel,
                     size_id,
@@ -353,6 +404,7 @@ export function JackieCatalog() {
 
     useEffect(() => {
         loadLocations();
+        loadCategories();
         loadInventory();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -363,14 +415,94 @@ export function JackieCatalog() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // ✅ category lookup
+    const categoryById = useMemo(() => {
+        const m = new Map<string, CategoryOption>();
+        for (const c of categories) m.set(c.id, c);
+        return m;
+    }, [categories]);
+
+    // ✅ scope used for filter dropdown options (responds to current loc/category/brand)
+    const scopedForOptions = useMemo(() => {
+        return items.filter((it) => {
+            const byLoc = locationFilter === "all" || it.location_slug === locationFilter;
+            const byCategory = categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
+            const byBrand = brandFilter === "all" || (it.brand ?? "") === brandFilter;
+            return byLoc && byCategory && byBrand;
+        });
+    }, [items, locationFilter, categoryFilter, brandFilter]);
+
+    // ✅ show size/color only if any item in scope uses it
+    const showSizeColor = useMemo(() => {
+        return scopedForOptions.some((it) => !!it.uses_size_color);
+    }, [scopedForOptions]);
+
+    // ✅ dropdown options
+    const allBrands = useMemo(() => {
+        return Array.from(new Set(items.map((i) => i.brand).filter(Boolean) as string[])).sort((a, b) =>
+            a.localeCompare(b)
+        );
+    }, [items]);
+
+    const categoryOptions = useMemo(() => {
+        const ids = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
+        return ids.map((id) => categoryById.get(id)).filter(Boolean) as CategoryOption[];
+    }, [items, categoryById]);
+
+    // ✅ sizes/colors based on current scoped options (and only when showSizeColor)
+    const allSizes = useMemo(() => {
+        if (!showSizeColor) return [];
+        return Array.from(new Set(scopedForOptions.map((i) => i.size)))
+            .filter(Boolean)
+            .sort((a, b) => sizeRank(a) - sizeRank(b));
+    }, [scopedForOptions, showSizeColor]);
+
+    const allColors = useMemo(() => {
+        if (!showSizeColor) return [];
+        return Array.from(new Set(scopedForOptions.map((i) => i.color)))
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
+    }, [scopedForOptions, showSizeColor]);
+
+    // ✅ apply filters to inventory
+    const inventoryScoped = useMemo(() => {
+        return items.filter((item) => {
+            const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
+            const byCategory = categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
+            const byBrand = brandFilter === "all" || (item.brand ?? "") === brandFilter;
+            const byColor = !showSizeColor || colorFilter === "all" || item.color === colorFilter;
+
+            return byLoc && byCategory && byBrand && byColor;
+        });
+    }, [items, locationFilter, categoryFilter, brandFilter, colorFilter, showSizeColor]);
+
+    // ✅ reset size/color when they don't apply OR when "scope" changes
     useEffect(() => {
-        setVisibleCount(pageSize);
-    }, [sizeFilter, colorFilter, locationFilter, items.length, pageSize, query]);
+        if (!showSizeColor) {
+            setSizeFilter("all");
+            setColorFilter("all");
+        }
+    }, [showSizeColor]);
 
     useEffect(() => {
+        // when changing loc/category/brand, don't keep old size/color selections around
         setSizeFilter("all");
         setColorFilter("all");
-    }, [locationFilter]);
+    }, [locationFilter, categoryFilter, brandFilter]);
+
+    // Pagination reset when filters/search change
+    useEffect(() => {
+        setVisibleCount(pageSize);
+    }, [
+        pageSize,
+        query,
+        locationFilter,
+        categoryFilter,
+        brandFilter,
+        sizeFilter,
+        colorFilter,
+        items.length,
+    ]);
 
     useEffect(() => {
         if (!query.trim()) return;
@@ -382,28 +514,6 @@ export function JackieCatalog() {
         if (locationFilter === "all") return lang === "es" ? "Todas" : "All";
         return locations.find((l) => l.slug === locationFilter)?.name || locationFilter;
     }, [locationFilter, locations, lang]);
-
-    const scopedForOptions = useMemo(() => {
-        return items.filter((i) => locationFilter === "all" || i.location_slug === locationFilter);
-    }, [items, locationFilter]);
-
-    const allSizes = useMemo(() => {
-        return Array.from(new Set(scopedForOptions.map((i) => i.size))).sort((a, b) => sizeRank(a) - sizeRank(b));
-    }, [scopedForOptions]);
-
-    const allColors = useMemo(() => {
-        return Array.from(new Set(scopedForOptions.map((i) => i.color)))
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b));
-    }, [scopedForOptions]);
-
-    const inventoryScoped = useMemo(() => {
-        return items.filter((item) => {
-            const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
-            const byColor = colorFilter === "all" || item.color === colorFilter;
-            return byLoc && byColor;
-        });
-    }, [items, locationFilter, colorFilter]);
 
     const groupsFiltered = useMemo(() => {
         const map = new Map<string, ColorGroup>();
@@ -434,8 +544,8 @@ export function JackieCatalog() {
 
         let list = Array.from(map.values());
 
-        if (sizeFilter !== "all") {
-            list = list.filter((g) => g.variants.some((v) => v.size === sizeFilter));
+        if (showSizeColor && sizeFilter !== "all") {
+            list = list.filter((g) => g.variants.some((v: any) => v.size === sizeFilter));
         }
 
         const q = query.trim().toLowerCase();
@@ -459,17 +569,22 @@ export function JackieCatalog() {
         });
 
         return list;
-    }, [inventoryScoped, sizeFilter, query]);
+    }, [inventoryScoped, showSizeColor, sizeFilter, query]);
 
     const totalPairsFiltered = useMemo(() => {
-        return groupsFiltered.reduce((sum, g) => sum + g.variants.reduce((s, v) => s + v.availableCount, 0), 0);
+        return groupsFiltered.reduce(
+            (sum, g) => sum + g.variants.reduce((s: number, v: any) => s + v.availableCount, 0),
+            0
+        );
     }, [groupsFiltered]);
 
     const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
     const cartLines: CartLine[] = useMemo(() => {
-        return items.map((item) => ({ item, count: quantities[item.id] ?? 0 })).filter((line) => line.count > 0);
+        return items
+            .map((item) => ({ item, count: quantities[item.id] ?? 0 }))
+            .filter((line) => line.count > 0);
     }, [items, quantities]);
 
     const cartLocationInfo = getCartLocationInfo(cartLines);
@@ -483,12 +598,14 @@ export function JackieCatalog() {
 
     const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
-    const formattedLastUpdated = lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
+    const formattedLastUpdated =
+        lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
 
     const handleAddToCart = (item: PublicItem) => {
         setQuantities((prev) => {
             const current = prev[item.id] ?? 0;
-            if (current >= item.availableCount) return prev;
+            // @ts-ignore - item has availableCount in runtime
+            if (current >= (item as any).availableCount) return prev;
             return { ...prev, [item.id]: current + 1 };
         });
     };
@@ -514,7 +631,9 @@ export function JackieCatalog() {
     const clearCart = () => setQuantities({});
 
     const pickupGroupedSpots: Record<string, string[]> =
-        locationFilter === "all" ? FILTERED_DELIVERY_SPOTS : { [locationFilter]: FILTERED_DELIVERY_SPOTS[locationFilter] ?? [] };
+        locationFilter === "all"
+            ? FILTERED_DELIVERY_SPOTS
+            : { [locationFilter]: FILTERED_DELIVERY_SPOTS[locationFilter] ?? [] };
 
     const hasAnyPickupSpots = Object.values(pickupGroupedSpots).some((list) => list.length > 0);
 
@@ -587,6 +706,15 @@ export function JackieCatalog() {
                         onPersistLocation={persistLocation}
                         locations={locations}
                         visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                        // ✅ new
+                        categoryFilter={categoryFilter}
+                        setCategoryFilter={setCategoryFilter}
+                        categories={categoryOptions}
+                        brandFilter={brandFilter}
+                        setBrandFilter={setBrandFilter}
+                        brands={allBrands}
+                        // ✅ conditional
+                        showSizeColor={showSizeColor}
                         sizeFilter={sizeFilter}
                         setSizeFilter={setSizeFilter}
                         allSizes={allSizes}
@@ -608,7 +736,6 @@ export function JackieCatalog() {
                             showingCount={showingCount}
                             canShowMore={groupsFiltered.length > limitedGroups.length}
                             onShowMore={() => setVisibleCount((p) => p + pageSize)}
-                            // ✅ ProductGrid must pass "model__color" (we already updated it)
                             getPhotoForColor={(key) => getPhotoByKey(key)}
                             onQuickView={(g) => setQuickView(g)}
                         />

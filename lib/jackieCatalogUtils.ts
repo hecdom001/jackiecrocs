@@ -18,6 +18,9 @@ export type PublicItem = {
     price_mxn: number;
     availableCount: number;
     created_at: string;
+    brand?: string;
+    category_id?: string | null;
+    uses_size_color?: boolean;
 };
 
 export type CartLine = {
@@ -113,6 +116,37 @@ export function colorLineClass(colorEn: string) {
         default: return "bg-slate-300";
     }
 }
+
+export function translateCategory(labelOrSlug: string, lang: Lang) {
+    if (!labelOrSlug) return "";
+    if (lang === "en") return labelOrSlug;
+
+    const key = labelOrSlug.trim().toLowerCase();
+
+    // You can match either the category name OR slug
+    switch (key) {
+        case "footwear":
+            return "Calzado";
+
+        case "bags":
+        case "handbags":
+            return "Bolsas";
+
+        case "perfume":
+        case "perfumes":
+        case "fragrance":
+        case "fragrances":
+            return "Perfumes";
+
+        case "accessories":
+            return "Accesorios";
+
+        default:
+            // fallback: show as-is
+            return labelOrSlug;
+    }
+}
+
 
 // ---------------- size helpers ----------------
 
