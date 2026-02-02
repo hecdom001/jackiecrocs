@@ -10,20 +10,16 @@ function requireAdmin(req: NextRequest) {
 
 /**
  * GET /api/admin/inventory
- * Returns: { items: InventoryItemDTO[] }
- * Uses size_id + sizes.label
- * NOW includes location info.
  */
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Join inventory_items with models + colors + sizes + locations
   const { data, error } = await supabase
-    .from("inventory_items")
-    .select(
-      `
+      .from("inventory_items")
+      .select(
+          `
       id,
       model_id,
       color_id,
@@ -48,62 +44,52 @@ export async function GET(req: NextRequest) {
         name
       )
     `
-    )
-    .order("created_at", { ascending: false });
+      )
+      .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching inventory:", error);
     return NextResponse.json(
-      { error: "Error fetching inventory" },
-      { status: 500 }
+        { error: "Error fetching inventory" },
+        { status: 500 }
     );
   }
 
-  // Map into the shape your frontend expects
   const items =
-    data?.map((row: any) => ({
-      id: row.id as string,
-      model_id: row.model_id as string,
-      color_id: row.color_id as string,
+      data?.map((row: any) => ({
+        id: row.id as string,
+        model_id: row.model_id as string,
+        color_id: row.color_id as string,
 
-      model_name: row.models?.name ?? null,
-      color: row.colors?.name_en ?? null,
+        model_name: row.models?.name ?? null,
+        color: row.colors?.name_en ?? null,
 
-      size: row.sizes?.label ?? "",
-      size_id: row.size_id as string,
+        size: row.sizes?.label ?? "",
+        size_id: row.size_id as string,
 
-      // ✅ NEW
-      location_id: row.location_id ? String(row.location_id) : null,
-      location: row.locations
-        ? {
-            id: row.locations.id as string,
-            slug: row.locations.slug as string,
-            name: row.locations.name as string,
-          }
-        : null,
+        location_id: row.location_id ? String(row.location_id) : null,
+        location: row.locations
+            ? {
+              id: row.locations.id as string,
+              slug: row.locations.slug as string,
+              name: row.locations.name as string,
+            }
+            : null,
 
-      price_mxn: Number(row.price_mxn),
-      status: row.status as any,
-      customer_name: (row.customer_name as string) ?? null,
-      customer_whatsapp: (row.customer_whatsapp as string) ?? null,
-      notes: (row.notes as string) ?? null,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
-    })) ?? [];
+        price_mxn: Number(row.price_mxn),
+        status: row.status as any,
+        customer_name: (row.customer_name as string) ?? null,
+        customer_whatsapp: (row.customer_whatsapp as string) ?? null,
+        notes: (row.notes as string) ?? null,
+        created_at: row.created_at as string,
+        updated_at: row.updated_at as string,
+      })) ?? [];
 
   return NextResponse.json({ items });
 }
 
 /**
  * POST /api/admin/inventory
- * Body: { model_name, color, size_id, price_mxn, quantity, location_id }
- * - Ensures model exists in `models`
- * - Ensures color exists in `colors`
- * - Ensures size exists in `sizes`
- * - Ensures location exists in `locations`
- * - Inserts N inventory_items rows with those IDs
- * - Uses size_id as source of truth, but ALSO fills legacy `size` text column
- *   so the NOT NULL constraint is satisfied.
  */
 export async function POST(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -113,10 +99,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { model_name, color, size_id, price_mxn, quantity, location_id } = body;
 
-  if (!model_name || !color || !size_id || !price_mxn || !location_id) {
+  // ✅ allow price_mxn = 0 (so check undefined/null instead of falsy)
+  if (!model_name || !color || !size_id || price_mxn === undefined || price_mxn === null || !location_id) {
     return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
+        { error: "Missing required fields" },
+        { status: 400 }
     );
   }
 
@@ -124,10 +111,10 @@ export async function POST(req: NextRequest) {
 
   // 0) Ensure size exists and get its label (for legacy `size` column)
   const { data: sizeRow, error: sizeError } = await supabase
-    .from("sizes")
-    .select("id, label")
-    .eq("id", size_id)
-    .maybeSingle();
+      .from("sizes")
+      .select("id, label")
+      .eq("id", size_id)
+      .maybeSingle();
 
   if (sizeError) {
     console.error("Error selecting size:", sizeError);
@@ -140,36 +127,36 @@ export async function POST(req: NextRequest) {
 
   const legacySizeLabel = sizeRow.label as string;
 
-  // ✅ 0b) Ensure location exists
+  // ✅ Ensure location exists
   const normalizedLocationId = String(location_id).trim();
   const { data: locationRow, error: locationError } = await supabase
-    .from("locations")
-    .select("id")
-    .eq("id", normalizedLocationId)
-    .maybeSingle();
+      .from("locations")
+      .select("id")
+      .eq("id", normalizedLocationId)
+      .maybeSingle();
 
   if (locationError) {
     console.error("Error selecting location:", locationError);
     return NextResponse.json(
-      { error: "Error checking location" },
-      { status: 500 }
+        { error: "Error checking location" },
+        { status: 500 }
     );
   }
 
   if (!locationRow) {
     return NextResponse.json(
-      { error: "Invalid location_id" },
-      { status: 400 }
+        { error: "Invalid location_id" },
+        { status: 400 }
     );
   }
 
   // 1) Ensure model exists (models.name)
   const normalizedModel = String(model_name).trim();
   let { data: existingModel, error: modelSelectError } = await supabase
-    .from("models")
-    .select("id")
-    .eq("name", normalizedModel)
-    .maybeSingle();
+      .from("models")
+      .select("id")
+      .eq("name", normalizedModel)
+      .maybeSingle();
 
   if (modelSelectError) {
     console.error("Error selecting model:", modelSelectError);
@@ -178,10 +165,10 @@ export async function POST(req: NextRequest) {
 
   if (!existingModel) {
     const { data: newModel, error: modelInsertError } = await supabase
-      .from("models")
-      .insert({ name: normalizedModel })
-      .select("id")
-      .single();
+        .from("models")
+        .insert({ name: normalizedModel })
+        .select("id")
+        .single();
 
     if (modelInsertError || !newModel) {
       console.error("Error inserting model:", modelInsertError);
@@ -195,10 +182,10 @@ export async function POST(req: NextRequest) {
   // 2) Ensure color exists (colors.name_en)
   const normalizedColor = String(color).trim();
   let { data: existingColor, error: colorSelectError } = await supabase
-    .from("colors")
-    .select("id")
-    .eq("name_en", normalizedColor)
-    .maybeSingle();
+      .from("colors")
+      .select("id")
+      .eq("name_en", normalizedColor)
+      .maybeSingle();
 
   if (colorSelectError) {
     console.error("Error selecting color:", colorSelectError);
@@ -207,10 +194,10 @@ export async function POST(req: NextRequest) {
 
   if (!existingColor) {
     const { data: newColor, error: colorInsertError } = await supabase
-      .from("colors")
-      .insert({ name_en: normalizedColor })
-      .select("id")
-      .single();
+        .from("colors")
+        .insert({ name_en: normalizedColor })
+        .select("id")
+        .single();
 
     if (colorInsertError || !newColor) {
       console.error("Error inserting color:", colorInsertError);
@@ -221,28 +208,26 @@ export async function POST(req: NextRequest) {
 
   const color_id = existingColor.id as string;
 
-  // 3) Insert inventory rows (one per pair)
-  //    -> use size_id as FK + keep legacy `size` text column in sync
-  //    -> ✅ include location_id
+  // 3) Insert inventory rows
   const rows = Array.from({ length: qty }).map(() => ({
     model_id,
     color_id,
     size_id: String(size_id),
     size: legacySizeLabel, // keeps NOT NULL column happy
-    location_id: normalizedLocationId, // ✅ NEW
+    location_id: normalizedLocationId,
     price_mxn: Number(price_mxn),
     status: "available",
   }));
 
   const { error: insertError } = await supabase
-    .from("inventory_items")
-    .insert(rows);
+      .from("inventory_items")
+      .insert(rows);
 
   if (insertError) {
     console.error("Error inserting inventory:", insertError);
     return NextResponse.json(
-      { error: "Error inserting inventory" },
-      { status: 500 }
+        { error: "Error inserting inventory" },
+        { status: 500 }
     );
   }
 
@@ -251,9 +236,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * PATCH /api/admin/inventory
- * Body: { id, ...fieldsToUpdate }
- * Only used for status / customer data / notes
- * NOW optionally allows location_id too (useful for corrections).
+ * NOW supports price_mxn updates too.
  */
 export async function PATCH(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -267,13 +250,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Missing item id" }, { status: 400 });
   }
 
-  // Only allow certain fields to be updated from the admin UI
+  // ✅ Allow price_mxn now
   const allowedFields = [
     "status",
     "customer_name",
     "customer_whatsapp",
     "notes",
-    "location_id", // ✅ NEW (optional)
+    "location_id",
+    "price_mxn", // ✅ NEW
   ] as const;
 
   const payload: Record<string, any> = {};
@@ -284,22 +268,25 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (Object.keys(payload).length === 0) {
-    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 }
+    );
   }
 
-  // If location_id is being updated, validate it exists
+  // Validate location_id if updating
   if (payload.location_id) {
     const { data: loc, error: locErr } = await supabase
-      .from("locations")
-      .select("id")
-      .eq("id", String(payload.location_id))
-      .maybeSingle();
+        .from("locations")
+        .select("id")
+        .eq("id", String(payload.location_id))
+        .maybeSingle();
 
     if (locErr) {
       console.error("Error checking location:", locErr);
       return NextResponse.json(
-        { error: "Error checking location" },
-        { status: 500 }
+          { error: "Error checking location" },
+          { status: 500 }
       );
     }
 
@@ -308,10 +295,22 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // ✅ Validate price_mxn if updating
+  if (payload.price_mxn !== undefined) {
+    const n = Number(payload.price_mxn);
+    if (!Number.isFinite(n) || n < 0) {
+      return NextResponse.json(
+          { error: "Invalid price_mxn" },
+          { status: 400 }
+      );
+    }
+    payload.price_mxn = n;
+  }
+
   const { error } = await supabase
-    .from("inventory_items")
-    .update(payload)
-    .eq("id", id);
+      .from("inventory_items")
+      .update(payload)
+      .eq("id", id);
 
   if (error) {
     console.error("Error updating inventory item:", error);
