@@ -426,52 +426,59 @@ export function JackieCatalog() {
     }, [categories]);
 
     // ✅ scope used for filter dropdown options (responds to current loc/category/brand)
+    // ✅ scope used for dropdown options (responds to current loc + category ONLY)
     const scopedForOptions = useMemo(() => {
         return items.filter((it) => {
             const byLoc = locationFilter === "all" || it.location_slug === locationFilter;
             const byCategory = categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
-            const byBrand = brandFilter === "all" || (it.brand ?? "") === brandFilter;
-            return byLoc && byCategory && byBrand;
+            return byLoc && byCategory;
         });
-    }, [items, locationFilter, categoryFilter, brandFilter]);
+    }, [items, locationFilter, categoryFilter]);
 
-    // ✅ NEW: show size filter only if any item in scope uses size
+    // ✅ scope for size/color options (includes brand)
+    const scopedForSizeColor = useMemo(() => {
+        return scopedForOptions.filter((it) => {
+            const byBrand = brandFilter === "all" || (it.brand ?? "") === brandFilter;
+            return byBrand;
+        });
+    }, [scopedForOptions, brandFilter]);
+
+
+
     const showSize = useMemo(() => {
-        return scopedForOptions.some((it) => !!it.uses_size);
-    }, [scopedForOptions]);
+        return scopedForSizeColor.some((it) => !!it.uses_size);
+    }, [scopedForSizeColor]);
 
-    // ✅ NEW: show color filter only if any item in scope uses color
     const showColor = useMemo(() => {
-        return scopedForOptions.some((it) => !!it.uses_color);
-    }, [scopedForOptions]);
+        return scopedForSizeColor.some((it) => !!it.uses_color);
+    }, [scopedForSizeColor]);
 
     // ✅ dropdown options
     const allBrands = useMemo(() => {
-        return Array.from(new Set(items.map((i) => i.brand).filter(Boolean) as string[])).sort((a, b) =>
+        return Array.from(new Set(scopedForOptions.map((i) => i.brand).filter(Boolean) as string[])).sort((a, b) =>
             a.localeCompare(b)
         );
-    }, [items]);
+    }, [scopedForOptions]);
+
 
     const categoryOptions = useMemo(() => {
         const ids = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
         return ids.map((id) => categoryById.get(id)).filter(Boolean) as CategoryOption[];
     }, [items, categoryById]);
 
-    // ✅ sizes only when showSize (and only from items that use size)
     const allSizes = useMemo(() => {
         if (!showSize) return [];
-        return Array.from(new Set(scopedForOptions.filter((i) => i.uses_size).map((i) => i.size)))
+        return Array.from(new Set(scopedForSizeColor.filter((i) => i.uses_size).map((i) => i.size)))
             .filter(Boolean)
             .sort((a, b) => sizeRank(a) - sizeRank(b));
-    }, [scopedForOptions, showSize]);
+    }, [scopedForSizeColor, showSize]);
 
-    // ✅ colors only when showColor (and only from items that use color)
     const allColors = useMemo(() => {
         if (!showColor) return [];
-        return Array.from(new Set(scopedForOptions.filter((i) => i.uses_color).map((i) => i.color)))
+        return Array.from(new Set(scopedForSizeColor.filter((i) => i.uses_color).map((i) => i.color)))
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b));
-    }, [scopedForOptions, showColor]);
+    }, [scopedForSizeColor, showColor]);
 
     // ✅ apply filters to inventory
     const inventoryScoped = useMemo(() => {
@@ -491,6 +498,13 @@ export function JackieCatalog() {
     useEffect(() => {
         if (!showSize) setSizeFilter("all");
     }, [showSize]);
+
+    // ✅ if category/location changes and current brand is no longer valid, reset
+    useEffect(() => {
+        if (brandFilter === "all") return;
+        if (!allBrands.includes(brandFilter)) setBrandFilter("all");
+    }, [allBrands, brandFilter]);
+
 
     useEffect(() => {
         if (!showColor) setColorFilter("all");
