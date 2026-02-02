@@ -68,7 +68,6 @@ export function FiltersBar({
     formattedLastUpdated: string | null;
 
     onRefresh: () => void | Promise<void>;
-    onPersistLocation: (v: string) => void;
 }) {
     // ✅ columns adapt (3 base + optional size + optional color)
     const gridColsClass =
