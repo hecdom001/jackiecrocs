@@ -140,30 +140,23 @@ export function StoreHeader({
     return (
         <header className={`sticky top-0 z-50 bg-white border-b border-slate-200 ${scrolled ? "shadow-sm" : ""}`}>
             {/* Pickup-only moving banner */}
-            <div className={`w-full ${bannerClass} text-white`}>
-                <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-                    <div className="relative overflow-hidden py-2">
-                        {/* top/bottom subtle borders for "ecommerce" vibe */}
-                        <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
-                        <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
+            <div className={`w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] ${bannerClass} text-white`}>
+                <div className="relative overflow-hidden py-2">
+                    {/* top/bottom subtle borders for "ecommerce" vibe */}
+                    <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+                    <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
 
-                        {/* Marquee */}
-                        <div className="whitespace-nowrap">
-                            <div className="inline-flex items-center gap-10 will-change-transform animate-marquee motion-reduce:animate-none">
-          <span className="text-[12px] font-extrabold tracking-wide">
-            {announcement}
-          </span>
-                                <span className="text-[12px] font-extrabold tracking-wide opacity-90">
-            {announcement}
-          </span>
-                                <span className="text-[12px] font-extrabold tracking-wide opacity-80">
-            {announcement}
-          </span>
-                            </div>
+                    {/* Marquee */}
+                    <div className="whitespace-nowrap">
+                        <div className="inline-flex items-center gap-10 will-change-transform animate-marquee motion-reduce:animate-none px-4 sm:px-6 lg:px-8">
+                            <span className="text-[12px] font-extrabold tracking-wide">{announcement}</span>
+                            <span className="text-[12px] font-extrabold tracking-wide opacity-90">{announcement}</span>
+                            <span className="text-[12px] font-extrabold tracking-wide opacity-80">{announcement}</span>
                         </div>
                     </div>
                 </div>
             </div>
+
 
 
             <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">

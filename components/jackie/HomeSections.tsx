@@ -72,8 +72,8 @@ export function HomeSections({
         locationFilter === "all"
             ? t(
                 lang,
-                "Elige tu ciudad arriba · SOLO PICK UP · Aparta por WhatsApp",
-                "Pick your city above · PICK UP ONLY · Reserve on WhatsApp"
+                "Elige tu ciudad · SOLO PICK UP · Aparta por WhatsApp",
+                "Pick your city · PICK UP ONLY · Reserve on WhatsApp"
             )
             : t(
                 lang,
@@ -284,224 +284,254 @@ export function HomeSections({
     };
 
     return (
-        <section className="mx-auto max-w-6xl px-4 pb-12 space-y-6">
+        <section className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 pb-12 space-y-6">
             {/* HERO (mobile-first app vibe, desktop wow storefront) */}
-            <section className="rounded-[30px] border border-slate-200 bg-white shadow-sm overflow-hidden">
-                {/* MOBILE / TABLET (app-like) */}
-                <div className="lg:hidden p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <img
-                                    src="/og-v3.png"
-                                    alt="Aguuacatito.shop"
-                                    className="h-7 w-7 rounded-full"
-                                />
-                                <p className="text-[12px] font-extrabold text-slate-900">
-                                    Aguuacatito.shop
-                                </p>
-                            </div>
-                            <p className="text-[11px] text-slate-600">
-                                {t(lang, "Compra por WhatsApp · Solo pick up", "WhatsApp checkout · Pick up only")}
-                            </p>
-                        </div>
-
-                        <span className="shrink-0 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">
-              📍 {locationFilter === "all" ? t(lang, "Todas", "All") : selectedLocationLabel}
-            </span>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                            {t(lang, "Elige tu ciudad", "Choose your city")}
-                        </p>
-
-                        <select
-                            value={locationFilter}
-                            onChange={(e) => onSelectLocation(e.target.value)}
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                        >
-                            <option value="all">{t(lang, "Todas", "All")}</option>
-                            {visibleLocations.map((l) => (
-                                <option key={l.slug} value={l.slug}>
-                                    {l.name}
-                                </option>
-                            ))}
-                        </select>
-
-                        <p className="mt-2 text-[11px] font-extrabold text-slate-900">{locationAwareLine}</p>
-                    </div>
-
-                    {/* Primary CTA (dominant) */}
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={onBrowseCatalog}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-emerald-600 text-white px-4 py-3 text-sm font-extrabold shadow-sm hover:bg-emerald-700 transition"
-                        >
-                            🛍️ {t(lang, "Ir al catálogo", "Go to catalog")} →
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (hasSupportWhatsApp) {
-                                    track("whatsapp_click_support", { lang, location: "home_hero_mobile" });
-                                    window.open(supportWaLink, "_blank", "noopener,noreferrer");
-                                }
-                            }}
-                            className={`inline-flex items-center justify-center rounded-full px-4 py-3 text-sm font-extrabold border shadow-sm transition ${
-                                hasSupportWhatsApp
-                                    ? "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                            }`}
-                            aria-label={t(lang, "Abrir WhatsApp", "Open WhatsApp")}
-                        >
-                            📲
-                        </button>
-                    </div>
-
-                    {totalCartPairs > 0 && (
-                        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-900 flex items-center justify-between">
-                            <div className="space-y-0.5">
-                                <p className="font-extrabold">{t(lang, "Tu carrito está listo", "Your cart is ready")}</p>
-                                <p className="text-emerald-800/80 font-semibold">
-                                    {t(lang, `${totalCartPairs} artículo(s)`, `${totalCartPairs} item(s)`)}
-                                    {isMixedCart ? t(lang, " · Mezclado por ciudad", " · Mixed by city") : ""}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onOpenCart}
-                                className="rounded-full bg-white px-3 py-2 border border-emerald-200 font-extrabold text-emerald-700 hover:bg-emerald-100 transition"
-                            >
-                                {t(lang, "Ver", "View")}
-                            </button>
-                        </div>
-                    )}
+            <section className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+            {/* soft background glow (NO GREEN) */}
+                <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute -top-24 left-1/2 h-72 w-[720px] -translate-x-1/2 rounded-full bg-slate-100/70 blur-3xl" />
+                    <div className="absolute top-24 left-1/3 h-64 w-[520px] -translate-x-1/2 rounded-full bg-slate-200/35 blur-3xl" />
+                    <div className="absolute -bottom-32 right-[-120px] h-80 w-80 rounded-full bg-slate-100/60 blur-3xl" />
                 </div>
 
-                {/* DESKTOP WOW (storefront) */}
-                <div className="hidden lg:block p-8">
-                    <div className="grid grid-cols-[1.25fr_0.75fr] gap-8 items-start">
-                        <div className="space-y-5">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-extrabold text-slate-900">
-                                  <img
-                                      src="/og-v3.png"
-                                      alt="Aguuacatito.shop"
-                                      className="h-5 w-5 rounded-full"
-                                  />
-                                  Aguuacatito.shop
-                                </span>
-                                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700">
-                                     📲 {t(lang, "Nació en TikTok", "Started on TikTok")}
-                                </span>
-                                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700">
-                                  📍 {t(lang, "Pick up only", "Pick up only")}
-                                </span>
+                {/* content */}
+                <div className="relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+                {/* MOBILE / TABLET */}
+                    <div className="lg:hidden p-4 sm:p-6">
+                        {/* top row */}
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <img
+                                        src="/og-v3.png"
+                                        alt="Aguuacatito.shop"
+                                        className="h-8 w-8 rounded-full ring-2 ring-white"
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="text-[12px] font-extrabold text-slate-900 truncate">
+                                            Aguuacatito.shop
+                                        </p>
+                                        <p className="text-[11px] text-slate-600 truncate">
+                                            {t(lang, "Compra por WhatsApp · Solo pick up", "WhatsApp checkout · Pick up only")}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <h1 className="text-[42px] leading-[1.02] font-extrabold tracking-tight text-slate-900">
-                                    {t(lang, "Compra fácil por WhatsApp", "Order easily via WhatsApp")}
-                                </h1>
-                                <p className="text-[14px] text-slate-600 leading-relaxed max-w-[64ch]">
-                                    {t(
-                                        lang,
-                                        "Elige tu ciudad y aparta por WhatsApp.",
-                                        "Pick your city and reserve via WhatsApp."
-                                    )}
-                                </p>
-                                <p className="text-[14px] font-extrabold text-slate-900">{locationAwareLine}</p>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={onBrowseCatalog}
-                                    className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-white px-7 py-3.5 text-sm font-extrabold shadow-sm hover:bg-emerald-700 transition"
-                                >
-                                    🛍️ {t(lang, "Explorar catálogo", "Explore catalog")} →
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (hasSupportWhatsApp) {
-                                            track("whatsapp_click_support", { lang, location: "home_hero_desktop" });
-                                            window.open(supportWaLink, "_blank", "noopener,noreferrer");
-                                        }
-                                    }}
-                                    className={`inline-flex items-center justify-center rounded-full px-7 py-3.5 text-sm font-extrabold border shadow-sm transition ${
-                                        hasSupportWhatsApp
-                                            ? "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                                            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                                    }`}
-                                >
-                                    📲 {t(lang, "WhatsApp", "WhatsApp")}
-                                </button>
-                            </div>
+                            <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/80 backdrop-blur border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-700">
+          📍 {locationFilter === "all" ? t(lang, "Todas", "All") : selectedLocationLabel}
+        </span>
                         </div>
 
-                        <div className="rounded-[30px] border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="p-5 border-b border-slate-100">
-                                <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Elige tu ciudad", "Choose your city")}</p>
-                                <p className="text-[12px] text-slate-600 mt-1">
-                                    {t(lang, "El catálogo cambia por ubicación.", "Catalog changes by location.")}
-                                </p>
-                            </div>
+                        {/* headline */}
+                        <div className="mt-5 space-y-2">
+                            <h1 className="text-[28px] leading-[1.05] font-extrabold tracking-tight text-slate-900">
+                                {t(lang, "Compra fácil por WhatsApp", "Order easily via WhatsApp")}
+                            </h1>
+                            <p className="text-[12px] text-slate-600">
+                                {t(lang, "Elige tu ciudad y aparta al instante.", "Pick your city and reserve instantly.")}
+                            </p>
+                            <p className="text-[12px] font-extrabold text-slate-900">{locationAwareLine}</p>
+                        </div>
 
-                            <div className="p-5 space-y-3">
-                                <select
-                                    value={locationFilter}
-                                    onChange={(e) => onSelectLocation(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        {/* city picker panel */}
+                        <div className="mt-4 rounded-3xl bg-white/75 backdrop-blur border border-slate-200 p-3 shadow-sm">
+                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                                {t(lang, "Elige tu ciudad", "Choose your city")}
+                            </p>
+
+                            <select
+                                value={locationFilter}
+                                onChange={(e) => onSelectLocation(e.target.value)}
+                                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                <option value="all">{t(lang, "Todas", "All")}</option>
+                                {visibleLocations.map((l) => (
+                                    <option key={l.slug} value={l.slug}>
+                                        {l.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* CTAs */}
+                        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                            <button
+                                type="button"
+                                onClick={onBrowseCatalog}
+                                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-white px-4 py-3 text-sm font-extrabold shadow-sm hover:bg-emerald-700 transition"
+                            >
+                                🛍️ {t(lang, "Ir al catálogo", "Go to catalog")} →
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (hasSupportWhatsApp) {
+                                        track("whatsapp_click_support", { lang, location: "home_hero_mobile" });
+                                        window.open(supportWaLink, "_blank", "noopener,noreferrer");
+                                    }
+                                }}
+                                className={`inline-flex items-center justify-center rounded-full px-4 py-3 text-sm font-extrabold border shadow-sm transition ${
+                                    hasSupportWhatsApp
+                                        ? "bg-white/80 backdrop-blur text-slate-900 border-slate-200 hover:bg-white"
+                                        : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                }`}
+                                aria-label={t(lang, "Abrir WhatsApp", "Open WhatsApp")}
+                            >
+                                📲
+                            </button>
+                        </div>
+
+                        {/* cart banner */}
+                        {totalCartPairs > 0 && (
+                            <div className="mt-4 rounded-3xl border border-slate-200 bg-white/80 backdrop-blur p-3 text-[11px] text-slate-900 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <p className="font-extrabold">{t(lang, "Tu carrito está listo", "Your cart is ready")}</p>
+                                    <p className="text-slate-600 font-semibold">
+                                        {t(lang, `${totalCartPairs} artículo(s)`, `${totalCartPairs} item(s)`)}
+                                        {isMixedCart ? t(lang, " · Mezclado por ciudad", " · Mixed by city") : ""}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={onOpenCart}
+                                    className="rounded-full bg-white px-3 py-2 border border-slate-200 font-extrabold text-slate-900 hover:bg-slate-50 transition"
                                 >
-                                    <option value="all">{t(lang, "Todas", "All")}</option>
-                                    {visibleLocations.map((l) => (
-                                        <option key={l.slug} value={l.slug}>
-                                            {l.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    {t(lang, "Ver", "View")}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    {/* DESKTOP */}
+                    <div className="hidden lg:block py-12">
+                        <div className="grid w-full grid-cols-[minmax(0,1fr)_560px] gap-12 items-start">
+                            {/* left */}
+                                <div className="space-y-6">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="inline-flex items-center gap-2 rounded-full bg-white/90 backdrop-blur border border-slate-200 px-4 py-2 text-[12px] font-extrabold text-slate-900">
+                                        <img src="/og-v3.png" alt="Aguuacatito.shop" className="h-5 w-5 rounded-full" />
+                                        Aguuacatito.shop
+                                      </span>
+                                        <span className="inline-flex items-center gap-2 rounded-full bg-white/90 backdrop-blur border border-slate-200 px-4 py-2 text-[12px] font-semibold text-slate-700">
+                                            📲 {t(lang, "Nació en TikTok", "Started on TikTok")}
+                                          </span>
+                                        <span className="inline-flex items-center gap-2 rounded-full bg-white/90 backdrop-blur border border-slate-200 px-4 py-2 text-[12px] font-semibold text-slate-700">
+                                        📍 {t(lang, "Pick up only", "Pick up only")}
+                                      </span>
+                                    </div>
 
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                    <p className="text-[11px] font-extrabold text-slate-900">{t(lang, "Cómo comprar", "How it works")}</p>
-                                    <ol className="mt-2 space-y-1 text-[12px] text-slate-600">
-                                        <li>1) {t(lang, "Explora catálogo", "Browse catalog")}</li>
-                                        <li>2) {t(lang, "Agrega al carrito", "Add to cart")}</li>
-                                        <li>3) {t(lang, "Envíalo por WhatsApp", "Send via WhatsApp")}</li>
-                                        <li>4) {t(lang, "Pick up", "Pick up")}</li>
-                                    </ol>
+                                    <div className="space-y-3">
+                                        <h1 className="text-[52px] leading-[1.02] font-extrabold tracking-tight text-slate-900">
+                                            {t(lang, "Compra fácil por WhatsApp", "Order easily via WhatsApp")}
+                                        </h1>
+                                        <p className="text-[15px] text-slate-600 leading-relaxed max-w-[68ch]">
+                                            {t(lang, "Elige tu ciudad y aparta por WhatsApp.", "Pick your city and reserve via WhatsApp.")}
+                                        </p>
+                                        <p className="text-[15px] font-extrabold text-slate-900">{locationAwareLine}</p>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={onBrowseCatalog}
+                                            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-white px-9 py-4 text-sm font-extrabold shadow-sm hover:bg-emerald-700 transition"
+                                        >
+                                            🛍️ {t(lang, "Explorar catálogo", "Explore catalog")} →
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (hasSupportWhatsApp) {
+                                                    track("whatsapp_click_support", { lang, location: "home_hero_desktop" });
+                                                    window.open(supportWaLink, "_blank", "noopener,noreferrer");
+                                                }
+                                            }}
+                                            className={`inline-flex items-center justify-center rounded-full px-9 py-4 text-sm font-extrabold border shadow-sm transition ${
+                                                hasSupportWhatsApp
+                                                    ? "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                            }`}
+                                        >
+                                            📲 {t(lang, "WhatsApp", "WhatsApp")}
+                                        </button>
+
+                                        {totalCartPairs > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={onOpenCart}
+                                                className="inline-flex items-center justify-center rounded-full bg-white border border-slate-200 px-6 py-4 text-sm font-extrabold text-slate-900 hover:bg-slate-50 transition"
+                                            >
+                                                🧺 {t(lang, "Carrito", "Cart")} · {totalCartPairs}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {totalCartPairs > 0 ? (
-                                    <button
-                                        type="button"
-                                        onClick={onOpenCart}
-                                        className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-white px-4 py-3 text-sm font-extrabold shadow-sm hover:bg-emerald-700 transition"
-                                    >
-                                        🧺 {t(lang, "Ver carrito", "View cart")} · {totalCartPairs}
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={onBrowseCatalog}
-                                        className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold text-slate-900 hover:bg-slate-50 transition"
-                                    >
-                                        🛍️ {t(lang, "Ir al catálogo", "Go to catalog")}
-                                    </button>
-                                )}
+                                {/* right panel (anchor it to the far right + give it a real width) */}
+                                <div className="justify-self-end w-full max-w-[560px] rounded-[28px] bg-white border border-slate-200 overflow-hidden shadow-sm">
+                                    <div className="p-6 border-b border-slate-200/60">
+                                        <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Elige tu ciudad", "Choose your city")}</p>
+                                        <p className="text-[12px] text-slate-600 mt-1">
+                                            {t(lang, "El catálogo cambia por ubicación.", "Catalog changes by location.")}
+                                        </p>
+                                    </div>
+
+                                    <div className="p-6 space-y-4">
+                                        <select
+                                            value={locationFilter}
+                                            onChange={(e) => onSelectLocation(e.target.value)}
+                                            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                        >
+                                            <option value="all">{t(lang, "Todas", "All")}</option>
+                                            {visibleLocations.map((l) => (
+                                                <option key={l.slug} value={l.slug}>
+                                                    {l.name}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/60">
+                                            <p className="text-[11px] font-extrabold text-slate-900">{t(lang, "Cómo comprar", "How it works")}</p>
+                                            <ol className="mt-2 space-y-1 text-[12px] text-slate-600">
+                                                <li>1) {t(lang, "Explora catálogo", "Browse catalog")}</li>
+                                                <li>2) {t(lang, "Agrega al carrito", "Add to cart")}</li>
+                                                <li>3) {t(lang, "Envíalo por WhatsApp", "Send via WhatsApp")}</li>
+                                                <li>4) {t(lang, "Pick up", "Pick up")}</li>
+                                            </ol>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={totalCartPairs > 0 ? onOpenCart : onBrowseCatalog}
+                                            className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-extrabold shadow-sm transition ${
+                                                totalCartPairs > 0
+                                                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                                    : "bg-white border border-slate-200 text-slate-900 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            {totalCartPairs > 0 ? (
+                                                <>🧺 {t(lang, "Ver carrito", "View cart")} · {totalCartPairs}</>
+                                            ) : (
+                                                <>🛍️ {t(lang, "Ir al catálogo", "Go to catalog")}</>
+                                            )}
+                                        </button>
+                                    </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
+
+
+            <div className="border-t border-slate-200/80" />
+
+
             {/* ONE (and only one) NOVEDADES section — mixed categories */}
-            <section className="rounded-[30px] border border-slate-200 bg-white shadow-sm p-4 sm:p-5">
-                <div className="flex items-end justify-between gap-3">
+            <section className="p-4 sm:p-5">
+            <div className="flex items-end justify-between gap-3">
                     <div>
                         <p className="text-[10px] font-extrabold tracking-[0.18em] text-slate-500 uppercase">
                             {t(lang, "Novedades", "New arrivals")}

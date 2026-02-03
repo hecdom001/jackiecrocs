@@ -875,8 +875,8 @@ export function JackieCatalog() {
     return (
         <div className="min-h-screen bg-white text-slate-900">
             {/* wider desktop container */}
-            <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-                <StoreHeader
+            <div className="mx-auto w-full max-w-none px-3 sm:px-6 lg:px-10 2xl:px-14">
+            <StoreHeader
                     lang={lang}
                     setLang={setLang}
                     query={query}
@@ -905,7 +905,8 @@ export function JackieCatalog() {
 
                 {view === "home" && (
                     <div className="pb-10">
-                        <div className="mt-4 rounded-[32px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+                        {/* Full-bleed area (no max-w, no big outer card) */}
+                        <div className="mt-4 w-full">
                             <HomeSections
                                 lang={lang}
                                 locations={locations}
