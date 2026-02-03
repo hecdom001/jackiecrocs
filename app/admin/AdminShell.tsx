@@ -152,7 +152,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-2 px-4 py-4 border-b border-slate-200">
               <Link href="/admin" className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full overflow-hidden bg-emerald-600" />
-                <span className="text-sm font-semibold">JackyWear</span>
+                <span className="text-sm font-semibold">Aguuacatito.shop</span>
               </Link>
             </div>
 

@@ -39,7 +39,7 @@ export default function AdminTopBar() {
           </div>
           <div className="hidden xs:block">
             <p className="text-xs sm:text-sm font-semibold text-slate-900">
-              JackyWear Admin
+              Aguuacatito.shop Admin
             </p>
             <p className="text-[10px] text-slate-500">
               Panel interno · Admin

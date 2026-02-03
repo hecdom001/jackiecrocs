@@ -16,20 +16,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JackyWear",
+  title: "Aguuacatito.shop",
   description: "Calzado disponibles · Pedido directo por WhatsApp",
 
-  metadataBase: new URL("https://jackywear.shop"),
+  metadataBase: new URL("https://Aguuacatito.shop"),
 
   openGraph: {
     title: "Aguuacatito.shop",
     description:
       "Consulta tallas y colores disponibles. Pedido directo por WhatsApp.",
-    url: "https://jackywear.com",
+    url: "https://Aguuacatito.shop",
     siteName: "Aguuacatito.shop",
     images: [
       {
-        url: "https://jackywear.com/og-v3.png",
+        url: "https://Aguuacatito.shop/og-v3.png",
         width: 1200,
         height: 630,
         alt: "Aguuacatito — Calzado y Estilo",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: "/og-v3.ico",
+    icon: "/og-v3.png",
   },
 };
 

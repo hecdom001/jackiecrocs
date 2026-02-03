@@ -87,10 +87,10 @@ export function FiltersBar({
     const gridColsClass = isFlat
         ? "grid-cols-1"
         : showSize && showColor
-            ? "sm:grid-cols-5"
+            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
             : showSize || showColor
-                ? "sm:grid-cols-4"
-                : "sm:grid-cols-3";
+                ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                : "grid-cols-2 sm:grid-cols-3";
 
     // Outer wrapper
     const sectionClass = isFlat ? "w-full" : "mx-auto max-w-6xl px-4 pt-4";

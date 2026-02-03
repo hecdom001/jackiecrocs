@@ -30,6 +30,7 @@ import { SizeGuide } from "./SizeGuide";
 import { FeedbackBox } from "./FeedbackBox";
 
 const MOBILE_INITIAL_VISIBLE = 8;
+const TABLET_INITIAL_VISIBLE = 9;
 const DESKTOP_INITIAL_VISIBLE = 20;
 
 const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"];
@@ -127,7 +128,7 @@ function MobileBottomNav({
             <div className="h-24 lg:hidden" />
 
             <div className="fixed inset-x-0 bottom-0 z-[60] lg:hidden pb-[env(safe-area-inset-bottom)]">
-                <div className="mx-auto max-w-md px-4">
+                <div className="mx-auto w-full max-w-md md:max-w-2xl px-4">
                     <div className="rounded-t-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-[0_-12px_40px_rgba(15,23,42,0.16)]">
                         <div className="flex items-stretch px-2 py-2">
                             <Item
@@ -324,7 +325,16 @@ export function JackieCatalog() {
 
         const compute = () => {
             const w = window.innerWidth;
-            const next = w >= 1024 ? DESKTOP_INITIAL_VISIBLE : MOBILE_INITIAL_VISIBLE;
+
+            let next: number;
+            if (w >= 1024) {
+                next = DESKTOP_INITIAL_VISIBLE; // desktop
+            } else if (w >= 768) {
+                next = TABLET_INITIAL_VISIBLE; // tablet / iPad
+            } else {
+                next = MOBILE_INITIAL_VISIBLE; // mobile
+            }
+
             setPageSize(next);
         };
 
@@ -976,77 +986,90 @@ export function JackieCatalog() {
                             {/* Bottom sheet modal */}
                             {mobileFiltersOpen && (
                                 <div className="fixed inset-0 z-[70] lg:hidden">
+                                    {/* Backdrop */}
                                     <button
+                                        type="button"
                                         className="absolute inset-0 bg-black/40"
                                         onClick={() => setMobileFiltersOpen(false)}
                                         aria-label={t(lang, "Cerrar", "Close")}
                                     />
-                                    <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-auto rounded-t-3xl bg-white border border-slate-200 shadow-2xl">
-                                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                                            <p className="text-sm font-extrabold">{t(lang, "Filtros", "Filters")}</p>
-                                            <div className="flex items-center gap-2">
-                                                {anyActiveFilters ? (
+
+                                    {/* Bottom sheet */}
+                                    <div className="absolute inset-x-0 bottom-0">
+                                        <div className="mx-auto w-full max-w-md md:max-w-2xl max-h-[85vh] overflow-auto rounded-t-3xl bg-white border border-slate-200 shadow-2xl">
+                                            {/* Header */}
+                                            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                                                <p className="text-sm font-extrabold">{t(lang, "Filtros", "Filters")}</p>
+
+                                                <div className="flex items-center gap-2">
+                                                    {anyActiveFilters ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={clearAllFilters}
+                                                            className="text-xs font-extrabold text-emerald-700 hover:underline"
+                                                        >
+                                                            {t(lang, "Limpiar", "Clear")}
+                                                        </button>
+                                                    ) : null}
+
                                                     <button
                                                         type="button"
-                                                        onClick={clearAllFilters}
-                                                        className="text-xs font-extrabold text-emerald-700 hover:underline"
+                                                        className="h-9 w-9 rounded-full border border-slate-200 bg-white"
+                                                        onClick={() => setMobileFiltersOpen(false)}
+                                                        aria-label={t(lang, "Cerrar", "Close")}
                                                     >
-                                                        {t(lang, "Limpiar", "Clear")}
+                                                        ✕
                                                     </button>
-                                                ) : null}
+                                                </div>
+                                            </div>
 
+                                            {/* Content */}
+                                            <div className="p-4">
+                                                <FiltersBar
+                                                    lang={lang}
+                                                    loading={loading}
+                                                    locationFilter={locationFilter}
+                                                    setLocationFilter={setLocationFilter}
+                                                    onPersistLocation={persistLocation}
+                                                    locations={locations}
+                                                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                                    categoryFilter={categoryFilter}
+                                                    setCategoryFilter={setCategoryFilter}
+                                                    categories={categoryOptions}
+                                                    brandFilter={brandFilter}
+                                                    setBrandFilter={setBrandFilter}
+                                                    brands={allBrands}
+                                                    showSize={showSize}
+                                                    showColor={showColor}
+                                                    sizeFilter={sizeFilter}
+                                                    setSizeFilter={setSizeFilter}
+                                                    allSizes={allSizes}
+                                                    colorFilter={colorFilter}
+                                                    setColorFilter={setColorFilter}
+                                                    allColors={allColors}
+                                                    totalPairsFiltered={totalPairsFiltered}
+                                                    formattedLastUpdated={formattedLastUpdated}
+                                                    onRefresh={loadInventory}
+                                                />
+
+                                                {/* NOTE: Popular colors stays hidden on mobile because we removed that section */}
+                                            </div>
+
+                                            {/* Footer CTA */}
+                                            <div className="p-4 border-t border-slate-100">
                                                 <button
-                                                    className="h-9 w-9 rounded-full border border-slate-200 bg-white"
+                                                    type="button"
                                                     onClick={() => setMobileFiltersOpen(false)}
+                                                    className="w-full rounded-full bg-emerald-600 text-white py-3 text-sm font-extrabold hover:bg-emerald-700"
                                                 >
-                                                    ✕
+                                                    ✅ {t(lang, "Ver resultados", "See results")}
                                                 </button>
                                             </div>
-                                        </div>
-
-                                        <div className="p-4">
-                                            <FiltersBar
-                                                lang={lang}
-                                                loading={loading}
-                                                locationFilter={locationFilter}
-                                                setLocationFilter={setLocationFilter}
-                                                onPersistLocation={persistLocation}
-                                                locations={locations}
-                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
-                                                categoryFilter={categoryFilter}
-                                                setCategoryFilter={setCategoryFilter}
-                                                categories={categoryOptions}
-                                                brandFilter={brandFilter}
-                                                setBrandFilter={setBrandFilter}
-                                                brands={allBrands}
-                                                showSize={showSize}
-                                                showColor={showColor}
-                                                sizeFilter={sizeFilter}
-                                                setSizeFilter={setSizeFilter}
-                                                allSizes={allSizes}
-                                                colorFilter={colorFilter}
-                                                setColorFilter={setColorFilter}
-                                                allColors={allColors}
-                                                totalPairsFiltered={totalPairsFiltered}
-                                                formattedLastUpdated={formattedLastUpdated}
-                                                onRefresh={loadInventory}
-                                            />
-
-                                            {/* Optional: keep Popular colors hidden on mobile (you already asked for this) */}
-                                        </div>
-
-                                        <div className="p-4 border-t border-slate-100">
-                                            <button
-                                                type="button"
-                                                onClick={() => setMobileFiltersOpen(false)}
-                                                className="w-full rounded-full bg-emerald-600 text-white py-3 text-sm font-extrabold hover:bg-emerald-700"
-                                            >
-                                                ✅ {t(lang, "Ver resultados", "See results")}
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             )}
+
                         </div>
 
 
