@@ -3,6 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { StoreFooter } from "./StoreFooter";
 
 import {
     LS_LOCATION_KEY,
@@ -29,7 +30,7 @@ import { SizeGuide } from "./SizeGuide";
 import { FeedbackBox } from "./FeedbackBox";
 
 const MOBILE_INITIAL_VISIBLE = 8;
-const DESKTOP_INITIAL_VISIBLE = 12;
+const DESKTOP_INITIAL_VISIBLE = 20;
 
 const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"];
 
@@ -104,7 +105,9 @@ function MobileBottomNav({
         >
       <span
           className={`grid h-9 w-9 place-items-center rounded-2xl border transition ${
-              active ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-200"
+              active
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-white border-slate-200"
           }`}
       >
         <span className="text-lg leading-none">{icon}</span>
@@ -154,6 +157,92 @@ function MobileBottomNav({
     );
 }
 
+function Chip({
+                  children,
+                  onRemove,
+                  title,
+              }: {
+    children: React.ReactNode;
+    onRemove?: () => void;
+    title?: string;
+}) {
+    return (
+        <span
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
+            title={title}
+        >
+      <span className="truncate max-w-[220px]">{children}</span>
+            {onRemove && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    className="grid h-5 w-5 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    aria-label="Remove filter"
+                >
+                    ✕
+                </button>
+            )}
+    </span>
+    );
+}
+
+function ColorDot({ active }: { active?: boolean }) {
+    return (
+        <span
+            className={`h-3 w-3 rounded-full border ${
+                active ? "border-emerald-400" : "border-slate-300"
+            } bg-gradient-to-br from-slate-200 to-slate-50`}
+        />
+    );
+}
+
+function colorToSwatch(c: string): string {
+    const s = (c || "").toLowerCase();
+
+    // common exact-ish matches
+    if (s.includes("black") || s.includes("negro")) return "#111827";
+    if (s.includes("white") || s.includes("blanco")) return "#ffffff";
+    if (s.includes("grey") || s.includes("gray") || s.includes("gris")) return "#9ca3af";
+
+    if (s.includes("beige")) return "#e7d7b8";
+    if (s.includes("brown") || s.includes("cafe") || s.includes("café")) return "#6b4f3a";
+    if (s.includes("tan")) return "#d2b48c";
+    if (s.includes("camel")) return "#c19a6b";
+
+    if (s.includes("red") || s.includes("rojo")) return "#ef4444";
+    if (s.includes("blue") || s.includes("azul")) return "#3b82f6";
+    if (s.includes("green") || s.includes("verde")) return "#22c55e";
+    if (s.includes("yellow") || s.includes("amarillo")) return "#f59e0b";
+    if (s.includes("orange") || s.includes("naranja")) return "#fb923c";
+    if (s.includes("purple") || s.includes("morado") || s.includes("lila")) return "#a855f7";
+
+    if (s.includes("pink") || s.includes("rosa") || s.includes("barbie")) return "#ec4899";
+    if (s.includes("fuchsia")) return "#d946ef";
+
+    // themed / special
+    if (s.includes("camo")) return "#556b2f";
+    if (s.includes("arctic")) return "#7dd3fc";
+    if (s.includes("crystal")) return "#e5e7eb";
+    if (s.includes("gold") || s.includes("dorado")) return "#d4af37";
+
+    // fallback
+    return "#e5e7eb";
+}
+
+function SwatchDot({ color, active }: { color: string; active?: boolean }) {
+    const hex = colorToSwatch(color);
+    const isWhite = hex.toLowerCase() === "#ffffff";
+
+    return (
+        <span
+            className={`h-3.5 w-3.5 rounded-full border ${
+                active ? "border-emerald-400" : "border-slate-300"
+            } ${isWhite ? "bg-white" : ""}`}
+            style={{ backgroundColor: hex }}
+        />
+    );
+}
+
 export function JackieCatalog() {
     const [lang, setLang] = useState<Lang>("es");
 
@@ -183,12 +272,15 @@ export function JackieCatalog() {
 
     const [view, setView] = useState<"home" | "catalog">("home");
 
-    // ✅ DB image map: key = "model__color" (lowercase)
-    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>(
-        {}
-    );
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-    // ✅ Load product images once
+    const [productImageMap, setProductImageMap] = useState<
+        Record<string, ProductImageRow>
+    >({});
+
+    const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
+
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -346,11 +438,12 @@ export function JackieCatalog() {
             const model_name: string = row.models?.name ?? "";
             const brand: string = row.models?.brand ?? "";
 
-            // ✅ NEW FLAGS
             const uses_size: boolean = !!row.models?.uses_size;
             const uses_color: boolean = !!row.models?.uses_color;
 
-            const category_id: string | null = row.models?.category_id ? String(row.models.category_id) : null;
+            const category_id: string | null = row.models?.category_id
+                ? String(row.models.category_id)
+                : null;
 
             const color: string = row.colors?.name_en ?? "";
             const size_id: string = row.size_id as string;
@@ -360,7 +453,6 @@ export function JackieCatalog() {
             const price_mxn: number = Number(row.price_mxn);
             const created_at: string = row.created_at ?? new Date(0).toISOString();
 
-            // ✅ keep requiring size_id+label because you always store a size row (including N/A)
             if (!size_id || !sizeLabel) return;
 
             const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
@@ -418,24 +510,21 @@ export function JackieCatalog() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ✅ category lookup
     const categoryById = useMemo(() => {
         const m = new Map<string, CategoryOption>();
         for (const c of categories) m.set(c.id, c);
         return m;
     }, [categories]);
 
-    // ✅ scope used for filter dropdown options (responds to current loc/category/brand)
-    // ✅ scope used for dropdown options (responds to current loc + category ONLY)
     const scopedForOptions = useMemo(() => {
         return items.filter((it) => {
             const byLoc = locationFilter === "all" || it.location_slug === locationFilter;
-            const byCategory = categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
+            const byCategory =
+                categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
             return byLoc && byCategory;
         });
     }, [items, locationFilter, categoryFilter]);
 
-    // ✅ scope for size/color options (includes brand)
     const scopedForSizeColor = useMemo(() => {
         return scopedForOptions.filter((it) => {
             const byBrand = brandFilter === "all" || (it.brand ?? "") === brandFilter;
@@ -443,23 +532,14 @@ export function JackieCatalog() {
         });
     }, [scopedForOptions, brandFilter]);
 
+    const showSize = useMemo(() => scopedForSizeColor.some((it) => !!it.uses_size), [scopedForSizeColor]);
+    const showColor = useMemo(() => scopedForSizeColor.some((it) => !!it.uses_color), [scopedForSizeColor]);
 
-
-    const showSize = useMemo(() => {
-        return scopedForSizeColor.some((it) => !!it.uses_size);
-    }, [scopedForSizeColor]);
-
-    const showColor = useMemo(() => {
-        return scopedForSizeColor.some((it) => !!it.uses_color);
-    }, [scopedForSizeColor]);
-
-    // ✅ dropdown options
     const allBrands = useMemo(() => {
         return Array.from(new Set(scopedForOptions.map((i) => i.brand).filter(Boolean) as string[])).sort((a, b) =>
             a.localeCompare(b)
         );
     }, [scopedForOptions]);
-
 
     const categoryOptions = useMemo(() => {
         const ids = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
@@ -480,61 +560,65 @@ export function JackieCatalog() {
             .sort((a, b) => a.localeCompare(b));
     }, [scopedForSizeColor, showColor]);
 
-    // ✅ apply filters to inventory
     const inventoryScoped = useMemo(() => {
         return items.filter((item) => {
             const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
-            const byCategory = categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
+            const byCategory =
+                categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
             const byBrand = brandFilter === "all" || (item.brand ?? "") === brandFilter;
-
-            // ✅ only filter by color if color is meaningful in this scope
             const byColor = !showColor || colorFilter === "all" || item.color === colorFilter;
-
             return byLoc && byCategory && byBrand && byColor;
         });
     }, [items, locationFilter, categoryFilter, brandFilter, colorFilter, showColor]);
 
-    // ✅ reset size/color when they don't apply
     useEffect(() => {
         if (!showSize) setSizeFilter("all");
     }, [showSize]);
 
-    // ✅ if category/location changes and current brand is no longer valid, reset
     useEffect(() => {
         if (brandFilter === "all") return;
         if (!allBrands.includes(brandFilter)) setBrandFilter("all");
     }, [allBrands, brandFilter]);
-
 
     useEffect(() => {
         if (!showColor) setColorFilter("all");
     }, [showColor]);
 
     useEffect(() => {
-        // when changing loc/category/brand, don't keep old size/color selections around
         setSizeFilter("all");
         setColorFilter("all");
     }, [locationFilter, categoryFilter, brandFilter]);
 
-    // Pagination reset when filters/search change
     useEffect(() => {
         setVisibleCount(pageSize);
-    }, [
-        pageSize,
-        query,
-        locationFilter,
-        categoryFilter,
-        brandFilter,
-        sizeFilter,
-        colorFilter,
-        items.length,
-    ]);
+    }, [pageSize, query, locationFilter, categoryFilter, brandFilter, sizeFilter, colorFilter, items.length]);
 
     useEffect(() => {
         if (!query.trim()) return;
         setView("catalog");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query]);
+
+    useEffect(() => {
+        // only close on mobile
+        if (typeof window === "undefined") return;
+        if (window.innerWidth >= 1024) return;
+        setMobileFiltersOpen(false);
+    }, [
+        locationFilter,
+        categoryFilter,
+        brandFilter,
+        sizeFilter,
+        colorFilter,
+    ]);
+
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+        document.body.style.overflow = mobileFiltersOpen ? "hidden" : "";
+        return () => {
+            document.body.style.overflow = "";
+        };
+    }, [mobileFiltersOpen]);
 
     const selectedLocationName = useMemo(() => {
         if (locationFilter === "all") return lang === "es" ? "Todas" : "All";
@@ -570,9 +654,10 @@ export function JackieCatalog() {
 
         let list = Array.from(map.values());
 
-        // ✅ only apply sizeFilter if the scope actually uses size
         if (showSize && sizeFilter !== "all") {
-            list = list.filter((g) => g.variants.some((v: any) => v.uses_size && v.size === sizeFilter));
+            list = list.filter((g) =>
+                g.variants.some((v: any) => v.uses_size && v.size === sizeFilter)
+            );
         }
 
         const q = query.trim().toLowerCase();
@@ -586,6 +671,10 @@ export function JackieCatalog() {
         }
 
         list.sort((a, b) => {
+            if (sortBy === "price_low") return a.price_mxn_min - b.price_mxn_min;
+            if (sortBy === "price_high") return b.price_mxn_min - a.price_mxn_min;
+            if (sortBy === "name") return (a.model_name || "").localeCompare(b.model_name || "");
+            // newest (default)
             const tt = b.latest_created_at.localeCompare(a.latest_created_at);
             if (tt !== 0) return tt;
             const c = a.color.localeCompare(b.color);
@@ -595,8 +684,9 @@ export function JackieCatalog() {
             return a.price_mxn_min - b.price_mxn_min;
         });
 
+
         return list;
-    }, [inventoryScoped, showSize, sizeFilter, query]);
+    }, [inventoryScoped, showSize, sizeFilter, query, sortBy]);
 
     const totalPairsFiltered = useMemo(() => {
         return groupsFiltered.reduce(
@@ -664,164 +754,551 @@ export function JackieCatalog() {
 
     const hasAnyPickupSpots = Object.values(pickupGroupedSpots).some((list) => list.length > 0);
 
-    const featuredGroups = useMemo(() => groupsFiltered.slice(0, 4), [groupsFiltered]);
-    const quickColorChips = useMemo(() => allColors.slice(0, 6), [allColors]);
+    const featuredGroups = useMemo(() => groupsFiltered.slice(0, 30), [groupsFiltered]);
+    const quickColorChips = useMemo(() => allColors.slice(0, 10), [allColors]);
+
+    const clearAllFilters = () => {
+        setLocationFilter("all");
+        persistLocation("all");
+        setCategoryFilter("all");
+        setBrandFilter("all");
+        setSizeFilter("all");
+        setColorFilter("all");
+        setQuery("");
+    };
+
+    const anyActiveFilters =
+        locationFilter !== "all" ||
+        categoryFilter !== "all" ||
+        brandFilter !== "all" ||
+        (showSize && sizeFilter !== "all") ||
+        (showColor && colorFilter !== "all") ||
+        !!query.trim();
+
+    const activeFiltersCount =
+        (locationFilter !== "all" ? 1 : 0) +
+        (categoryFilter !== "all" ? 1 : 0) +
+        (brandFilter !== "all" ? 1 : 0) +
+        (showSize && sizeFilter !== "all" ? 1 : 0) +
+        (showColor && colorFilter !== "all" ? 1 : 0) +
+        (query.trim() ? 1 : 0);
+
+
+    const categoryNameById = useMemo(() => {
+        const m: Record<string, string> = {};
+        for (const c of categoryOptions) m[c.id] = c.name;
+        return m;
+    }, [categoryOptions]);
+
+    const desktopFilterChips = useMemo(() => {
+        const chips: { key: string; label: React.ReactNode; onRemove: () => void }[] = [];
+
+        if (locationFilter !== "all") {
+            chips.push({
+                key: "loc",
+                label: <>📍 {selectedLocationName}</>,
+                onRemove: () => {
+                    setLocationFilter("all");
+                    persistLocation("all");
+                },
+            });
+        }
+
+        if (categoryFilter !== "all") {
+            const catName =
+                categoryOptions.find((c) => c.id === categoryFilter)?.name ?? categoryFilter;
+
+            chips.push({
+                key: "cat",
+                label: <>🗂️ {catName}</>,
+                onRemove: () => setCategoryFilter("all"),
+            });
+        }
+
+        if (brandFilter !== "all") {
+            chips.push({
+                key: "brand",
+                label: <>🏷️ {brandFilter}</>,
+                onRemove: () => setBrandFilter("all"),
+            });
+        }
+
+        if (showSize && sizeFilter !== "all") {
+            chips.push({
+                key: "size",
+                label: <>📏 {sizeFilter}</>,
+                onRemove: () => setSizeFilter("all"),
+            });
+        }
+
+        if (showColor && colorFilter !== "all") {
+            chips.push({
+                key: "color",
+                label: <>🎨 {colorFilter}</>,
+                onRemove: () => setColorFilter("all"),
+            });
+        }
+
+        if (query.trim()) {
+            chips.push({
+                key: "q",
+                label: <>🔎 {query.trim()}</>,
+                onRemove: () => setQuery(""),
+            });
+        }
+
+        return chips;
+    }, [
+        locationFilter,
+        categoryFilter,
+        brandFilter,
+        sizeFilter,
+        colorFilter,
+        query,
+        showSize,
+        showColor,
+        selectedLocationName,
+        categoryOptions,
+    ]);
+
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
-            <StoreHeader
-                lang={lang}
-                setLang={setLang}
-                subtitle={selectedLocationName}
-                query={query}
-                setQuery={setQuery}
-                totalCartPairs={totalCartPairs}
-                onCartClick={() => setCartOpen(true)}
-                onHomeClick={() => {
-                    setView("home");
-                    if (typeof window !== "undefined") {
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                }}
-            />
-
-            {view === "home" && (
-                <HomeSections
+        <div className="min-h-screen bg-white text-slate-900">
+            {/* wider desktop container */}
+            <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+                <StoreHeader
                     lang={lang}
-                    locations={locations}
-                    pickupGroupedSpots={pickupGroupedSpots}
-                    hasAnyPickupSpots={hasAnyPickupSpots}
-                    supportWaLink={supportWaLink}
-                    hasSupportWhatsApp={hasSupportWhatsApp}
-                    featuredGroups={featuredGroups}
-                    quickColorChips={quickColorChips}
-                    getPhotoForGroup={getPhotoForGroup}
-                    locationFilter={locationFilter}
-                    onSelectLocation={(slug) => {
-                        setLocationFilter(slug);
-                        persistLocation(slug);
-                    }}
-                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
-                    onBrowseCatalog={() => {
-                        setView("catalog");
-                        requestAnimationFrame(() => {
-                            const el = document.getElementById("product-grid");
-                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        });
-                    }}
-                    onSelectColor={(c) => {
-                        setColorFilter(c);
-                        setView("catalog");
-                        requestAnimationFrame(() => {
-                            const el = document.getElementById("product-grid");
-                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        });
-                    }}
+                    setLang={setLang}
+                    query={query}
+                    setQuery={setQuery}
                     totalCartPairs={totalCartPairs}
-                    onOpenCart={() => setCartOpen(true)}
-                    isMixedCart={isMixedCart}
+                    onCartClick={() => setCartOpen(true)}
+                    onHomeClick={() => {
+                        setView("home");
+                        if (typeof window !== "undefined") {
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                    }}
+                    view={view}
+                    categories={categoryOptions.map((c) => ({ id: c.id, name: c.name || c.slug }))}
+                    categoryFilter={categoryFilter}
+                    onSelectCategory={(id) => {
+                        setCategoryFilter(id);
+                        setView("catalog");
+                        requestAnimationFrame(() => {
+                            const el = document.getElementById("product-grid");
+                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        });
+                    }}
+                    locationSlug={locationFilter}   // ✅ add this
                 />
-            )}
 
-            {view === "catalog" && (
-                <>
-                    <FiltersBar
-                        lang={lang}
-                        loading={loading}
-                        locationFilter={locationFilter}
-                        setLocationFilter={setLocationFilter}
-                        onPersistLocation={persistLocation}
-                        locations={locations}
-                        visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
-                        categoryFilter={categoryFilter}
-                        setCategoryFilter={setCategoryFilter}
-                        categories={categoryOptions}
-                        brandFilter={brandFilter}
-                        setBrandFilter={setBrandFilter}
-                        brands={allBrands}
-                        showSize={showSize}
-                        showColor={showColor}
-                        sizeFilter={sizeFilter}
-                        setSizeFilter={setSizeFilter}
-                        allSizes={allSizes}
-                        colorFilter={colorFilter}
-                        setColorFilter={setColorFilter}
-                        allColors={allColors}
-                        totalPairsFiltered={totalPairsFiltered}
-                        formattedLastUpdated={formattedLastUpdated}
-                        onRefresh={loadInventory}
-                    />
-
-                    <div id="product-grid" className="scroll-mt-24">
-                        <ProductGrid
-                            lang={lang}
-                            loading={loading}
-                            errorMsg={errorMsg}
-                            groupsFiltered={groupsFiltered}
-                            limitedGroups={limitedGroups}
-                            showingCount={showingCount}
-                            canShowMore={groupsFiltered.length > limitedGroups.length}
-                            onShowMore={() => setVisibleCount((p) => p + pageSize)}
-                            getPhotoForColor={(key) => getPhotoByKey(key)}
-                            onQuickView={(g) => setQuickView(g)}
-                        />
+                {view === "home" && (
+                    <div className="pb-10">
+                        <div className="mt-4 rounded-[32px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <HomeSections
+                                lang={lang}
+                                locations={locations}
+                                pickupGroupedSpots={pickupGroupedSpots}
+                                hasAnyPickupSpots={hasAnyPickupSpots}
+                                supportWaLink={supportWaLink}
+                                hasSupportWhatsApp={hasSupportWhatsApp}
+                                featuredGroups={featuredGroups}
+                                quickColorChips={quickColorChips}
+                                getPhotoForGroup={getPhotoForGroup}
+                                locationFilter={locationFilter}
+                                onSelectLocation={(slug) => {
+                                    setLocationFilter(slug);
+                                    persistLocation(slug);
+                                }}
+                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                onBrowseCatalog={() => {
+                                    setView("catalog");
+                                    requestAnimationFrame(() => {
+                                        const el = document.getElementById("product-grid");
+                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    });
+                                }}
+                                onSelectColor={(c) => {
+                                    setColorFilter(c);
+                                    setView("catalog");
+                                    requestAnimationFrame(() => {
+                                        const el = document.getElementById("product-grid");
+                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    });
+                                }}
+                                totalCartPairs={totalCartPairs}
+                                onOpenCart={() => setCartOpen(true)}
+                                isMixedCart={isMixedCart}
+                                categoryNameById={categoryNameById}
+                            />
+                        </div>
                     </div>
+                )}
 
-                    <section className="mx-auto max-w-6xl px-4 pb-10 space-y-4">
-                        <SizeGuide lang={lang} />
-                        <FeedbackBox lang={lang} context="storefront" />
-                    </section>
-                </>
-            )}
+                {view === "catalog" && (
+                    <div className="pb-10">
+                        {/* Mobile controls (collapsed filters) */}
+                        <div className="lg:hidden mt-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileFiltersOpen(true)}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[12px] font-extrabold text-slate-800 shadow-sm"
+                                >
+                                    ⚙️ {t(lang, "Filtros", "Filters")}
+                                    {activeFiltersCount > 0 ? (
+                                        <span className="ml-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
+                                        {activeFiltersCount}
+                                      </span>
+                                    ) : null}
 
-            <MobileBottomNav
-                show={!cartOpen && !quickView}
-                view={view}
-                lang={lang}
-                cartCount={totalCartPairs}
-                onHome={() => {
-                    setView("home");
-                    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                onCatalog={() => {
-                    setView("catalog");
-                    requestAnimationFrame(() => {
-                        const el = document.getElementById("product-grid");
-                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    });
-                }}
-                onCart={() => setCartOpen(true)}
-            />
+                                </button>
 
-            <QuickView
-                open={!!quickView}
-                group={quickView}
-                lang={lang}
-                onClose={() => setQuickView(null)}
-                quantities={quantities}
-                sizeFilter={sizeFilter}
-                onAdd={handleAddToCart}
-                onRemove={handleRemoveFromCart}
-                // ✅ NEW (QuickView can hide size UI when false)
-                showSize={showSize}
-                showColor={showColor}
-            />
+                                {/* Sort stays visible */}
+                                <div className="flex items-center gap-2">
+                                      <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                        {t(lang, "Ordenar", "Sort")}
+                                      </span>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as any)}
+                                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                                    >
+                                        <option value="newest">{t(lang, "Más nuevo", "Newest")}</option>
+                                        <option value="price_low">{t(lang, "Precio: menor", "Price: low")}</option>
+                                        <option value="price_high">{t(lang, "Precio: mayor", "Price: high")}</option>
+                                        <option value="name">{t(lang, "Nombre", "Name")}</option>
+                                    </select>
+                                </div>
+                            </div>
 
-            <CartDrawer
-                open={cartOpen}
-                onClose={() => setCartOpen(false)}
-                lang={lang}
-                cartLines={cartLines}
-                totalCartPairs={totalCartPairs}
-                isMixedCart={isMixedCart}
-                waLinkForCart={buildWhatsAppLink(cartLines, lang)}
-                hasCartWhatsApp={hasCartWhatsApp}
-                clearCart={clearCart}
-                onAdd={handleAddToCart}
-                onRemove={handleRemoveFromCart}
-                onRemoveItem={removeItemFromCart}
-                cartLocationSlug={cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown")}
-            />
+                            {/* Bottom sheet modal */}
+                            {mobileFiltersOpen && (
+                                <div className="fixed inset-0 z-[70] lg:hidden">
+                                    <button
+                                        className="absolute inset-0 bg-black/40"
+                                        onClick={() => setMobileFiltersOpen(false)}
+                                        aria-label={t(lang, "Cerrar", "Close")}
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-auto rounded-t-3xl bg-white border border-slate-200 shadow-2xl">
+                                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                                            <p className="text-sm font-extrabold">{t(lang, "Filtros", "Filters")}</p>
+                                            <div className="flex items-center gap-2">
+                                                {anyActiveFilters ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearAllFilters}
+                                                        className="text-xs font-extrabold text-emerald-700 hover:underline"
+                                                    >
+                                                        {t(lang, "Limpiar", "Clear")}
+                                                    </button>
+                                                ) : null}
+
+                                                <button
+                                                    className="h-9 w-9 rounded-full border border-slate-200 bg-white"
+                                                    onClick={() => setMobileFiltersOpen(false)}
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4">
+                                            <FiltersBar
+                                                lang={lang}
+                                                loading={loading}
+                                                locationFilter={locationFilter}
+                                                setLocationFilter={setLocationFilter}
+                                                onPersistLocation={persistLocation}
+                                                locations={locations}
+                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                                categoryFilter={categoryFilter}
+                                                setCategoryFilter={setCategoryFilter}
+                                                categories={categoryOptions}
+                                                brandFilter={brandFilter}
+                                                setBrandFilter={setBrandFilter}
+                                                brands={allBrands}
+                                                showSize={showSize}
+                                                showColor={showColor}
+                                                sizeFilter={sizeFilter}
+                                                setSizeFilter={setSizeFilter}
+                                                allSizes={allSizes}
+                                                colorFilter={colorFilter}
+                                                setColorFilter={setColorFilter}
+                                                allColors={allColors}
+                                                totalPairsFiltered={totalPairsFiltered}
+                                                formattedLastUpdated={formattedLastUpdated}
+                                                onRefresh={loadInventory}
+                                            />
+
+                                            {/* Optional: keep Popular colors hidden on mobile (you already asked for this) */}
+                                        </div>
+
+                                        <div className="p-4 border-t border-slate-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => setMobileFiltersOpen(false)}
+                                                className="w-full rounded-full bg-emerald-600 text-white py-3 text-sm font-extrabold hover:bg-emerald-700"
+                                            >
+                                                ✅ {t(lang, "Ver resultados", "See results")}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+
+                        {/* Desktop layout */}
+                        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+                            <aside className="hidden lg:block">
+                                <div className="sticky top-24">
+                                    <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-extrabold tracking-tight text-slate-900">
+                                                {t(lang, "Filtros", "Filters")}
+                                            </div>
+
+                                            {anyActiveFilters ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={clearAllFilters}
+                                                    className="text-xs font-semibold text-emerald-700 hover:underline"
+                                                >
+                                                    {t(lang, "Limpiar", "Clear")}
+                                                </button>
+                                            ) : null}
+                                        </div>
+
+                                        {/* Filters (hide the dropdown color on desktop to avoid duplication) */}
+                                        <div className="mt-3">
+                                            <FiltersBar
+                                                variant="flat"
+                                                lang={lang}
+                                                loading={loading}
+                                                locationFilter={locationFilter}
+                                                setLocationFilter={(v) => {
+                                                    setLocationFilter(v);
+                                                    persistLocation(v);
+                                                }}
+                                                onPersistLocation={persistLocation}
+                                                locations={locations}
+                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                                categoryFilter={categoryFilter}
+                                                setCategoryFilter={setCategoryFilter}
+                                                categories={categoryOptions}
+                                                brandFilter={brandFilter}
+                                                setBrandFilter={setBrandFilter}
+                                                brands={allBrands}
+                                                showSize={showSize}
+                                                showColor={false} // ✅ desktop: we use chips/swatches below instead
+                                                sizeFilter={sizeFilter}
+                                                setSizeFilter={setSizeFilter}
+                                                allSizes={allSizes}
+                                                colorFilter={colorFilter}
+                                                setColorFilter={setColorFilter}
+                                                allColors={allColors}
+                                                totalPairsFiltered={totalPairsFiltered}
+                                                formattedLastUpdated={formattedLastUpdated}
+                                                onRefresh={loadInventory}
+                                            />
+                                        </div>
+
+                                        {/* Collapsible Colors */}
+                                        {showColor && allColors.length > 0 && (
+                                            <div className="mt-4 border-t border-slate-200 pt-4">
+                                                <details className="group" open>
+                                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+                                                        <div className="text-xs font-extrabold text-slate-900">
+                                                            {t(lang, "Colores", "Colors")}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 group-open:hidden">+</div>
+                                                        <div className="text-xs text-slate-500 hidden group-open:block">–</div>
+                                                    </summary>
+
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        {allColors.slice(0, 24).map((c) => {
+                                                            const active = colorFilter === c;
+                                                            return (
+                                                                <button
+                                                                    key={c}
+                                                                    type="button"
+                                                                    onClick={() => setColorFilter(active ? "all" : c)}
+                                                                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                                                                        active
+                                                                            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                                                            : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                                                    }`}
+                                                                    title={c}
+                                                                >
+                                                                    <SwatchDot color={c} active={active} />
+                                                                    <span className="truncate max-w-[160px]">{c}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {colorFilter !== "all" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setColorFilter("all")}
+                                                            className="mt-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline"
+                                                        >
+                                                            {t(lang, "Quitar color", "Remove color")}
+                                                        </button>
+                                                    )}
+                                                </details>
+                                            </div>
+                                        )}
+
+                                        {/* Support row (no extra card) */}
+                                        <div className="mt-4 border-t border-slate-200 pt-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-xs text-slate-600">
+                                                    {t(lang, "¿Necesitas ayuda?", "Need help?")}
+                                                </div>
+                                                <a
+                                                    href={supportWaLink}
+                                                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                                                >
+                                                    WhatsApp
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </aside>
+
+
+                            <main className="min-w-0">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    {/* Left: active chips */}
+                                    <div className="hidden lg:flex flex-wrap items-center gap-2 min-w-0">
+                                        {desktopFilterChips.map((c) => (
+                                            <Chip key={c.key} onRemove={c.onRemove}>
+                                                {c.label}
+                                            </Chip>
+                                        ))}
+
+                                        {desktopFilterChips.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={clearAllFilters}
+                                                className="ml-1 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                                            >
+                                                {t(lang, "Limpiar todo", "Clear all")}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Right: sort */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                          {t(lang, "Ordenar por", "Sort by")}
+                                        </span>
+
+                                        <select
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value as any)}
+                                            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                                        >
+                                            <option value="newest">{t(lang, "Más nuevo", "Newest")}</option>
+                                            <option value="price_low">{t(lang, "Precio: menor", "Price: low")}</option>
+                                            <option value="price_high">{t(lang, "Precio: mayor", "Price: high")}</option>
+                                            <option value="name">{t(lang, "Nombre", "Name")}</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+
+
+
+                                <div id="product-grid" className="scroll-mt-24 mt-4">
+                                    <ProductGrid
+                                        lang={lang}
+                                        loading={loading}
+                                        errorMsg={errorMsg}
+                                        groupsFiltered={groupsFiltered}
+                                        limitedGroups={limitedGroups}
+                                        showingCount={showingCount}
+                                        canShowMore={groupsFiltered.length > limitedGroups.length}
+                                        onShowMore={() => setVisibleCount((p) => p + pageSize)}
+                                        getPhotoForColor={(key) => getPhotoByKey(key)}
+                                        onQuickView={(g) => setQuickView(g)}
+                                    />
+                                </div>
+
+                                <section className="mt-6 space-y-4">
+                                    <SizeGuide lang={lang} />
+                                    <FeedbackBox lang={lang} context="storefront" />
+                                </section>
+                            </main>
+                        </div>
+                    </div>
+                )}
+
+                <StoreFooter
+                    lang={lang}
+                    supportWaLink={supportWaLink}
+                />
+
+                <MobileBottomNav
+                    show={!cartOpen && !quickView}
+                    view={view}
+                    lang={lang}
+                    cartCount={totalCartPairs}
+                    onHome={() => {
+                        setView("home");
+                        if (typeof window !== "undefined")
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    onCatalog={() => {
+                        setView("catalog");
+                        requestAnimationFrame(() => {
+                            const el = document.getElementById("product-grid");
+                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        });
+                    }}
+                    onCart={() => setCartOpen(true)}
+                />
+
+                <QuickView
+                    open={!!quickView}
+                    group={quickView}
+                    lang={lang}
+                    onClose={() => setQuickView(null)}
+                    quantities={quantities}
+                    sizeFilter={sizeFilter}
+                    onAdd={handleAddToCart}
+                    onRemove={handleRemoveFromCart}
+                    showSize={showSize}
+                    showColor={showColor}
+                />
+
+                <CartDrawer
+                    open={cartOpen}
+                    onClose={() => setCartOpen(false)}
+                    lang={lang}
+                    cartLines={cartLines}
+                    totalCartPairs={totalCartPairs}
+                    isMixedCart={isMixedCart}
+                    waLinkForCart={buildWhatsAppLink(cartLines, lang)}
+                    hasCartWhatsApp={hasCartWhatsApp}
+                    clearCart={clearCart}
+                    onAdd={handleAddToCart}
+                    onRemove={handleRemoveFromCart}
+                    onRemoveItem={removeItemFromCart}
+                    cartLocationSlug={cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown")}
+
+                    // ✅ ADD THIS:
+                    getPhotoForCartItem={(item) => {
+                        const key = `${String(item.model_name || "").trim()}__${String(item.color || "").trim()}`.toLowerCase();
+                        return getPhotoByKey(key); // uses your DB-first image map + placeholder fallback
+                    }}
+                />
+            </div>
         </div>
     );
 }

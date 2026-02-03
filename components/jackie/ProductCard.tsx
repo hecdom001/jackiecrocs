@@ -26,46 +26,68 @@ export function ProductCard({
         <button
             type="button"
             onClick={() => onQuickView(group)}
-            className="text-left group rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition overflow-hidden"
+            className={[
+                "text-left group w-full overflow-hidden rounded-3xl border border-slate-200 bg-white",
+                "shadow-sm transition",
+                "hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
         >
-            <div className="relative aspect-square bg-slate-50">
-                {photo ? (
-                    <Image
-                        src={photo.src}
-                        alt={photo.label}
-                        fill
-                        className="object-cover group-hover:scale-[1.02] transition"
-                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                    />
-                ) : (
-                    <div className="h-full w-full flex items-center justify-center text-4xl">👟</div>
-                )}
+            {/* ✅ flex column so content heights match across cards */}
+            <div className="flex h-full flex-col">
+                {/* Image */}
+                <div className="relative aspect-square bg-slate-50">
+                    {photo ? (
+                        <Image
+                            src={photo.src}
+                            alt={photo.label || translateModelLabel(group.model_name || "Classic", lang)}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                            priority={false}
+                        />
+                    ) : (
+                        <div className="h-full w-full flex items-center justify-center text-4xl">👟</div>
+                    )}
 
-                <div className="absolute left-3 top-3 flex gap-2">
-          <span className="rounded-full bg-white/90 border border-slate-200 px-2.5 py-1 text-[10px] font-medium">
-            {translateColor(group.color, lang)}
-          </span>
-                </div>
-            </div>
-
-            <div className="p-3 space-y-1">
-                <p className="text-[12px] font-semibold line-clamp-1">
-                    {translateModelLabel(group.model_name || "Classic", lang)}
-                </p>
-
-                <div className={`h-[4px] w-full rounded-full ${colorLineClass(group.color)} opacity-80`} />
-
-                <p className="text-[11px] text-slate-500 line-clamp-1">📍 {group.location_name}</p>
-
-                <div className="flex items-end justify-between pt-1">
-                    <p className="text-sm font-semibold text-emerald-600">{priceText}</p>
-                    <p className="text-[10px] text-slate-500">{t(lang, `${totalPairs} pares`, `${totalPairs} pairs`)}</p>
+                    {/* Color badge (subtle) */}
+                    <div className="absolute right-3 top-3">
+            <span className="rounded-full bg-white/90 backdrop-blur border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+              {translateColor(group.color, lang)}
+            </span>
+                    </div>
                 </div>
 
-                <div className="pt-2">
-          <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-[10px] font-medium">
-            {t(lang, "Ver tallas", "View sizes")}
-          </span>
+                {/* Content */}
+                <div className="flex flex-1 flex-col p-3">
+                    <div className="min-h-[44px]">
+                        <p className="text-[13px] font-extrabold text-slate-900 leading-snug line-clamp-2">
+                            {translateModelLabel(group.model_name || "Classic", lang)}
+                        </p>
+
+                        <div className={`mt-2 h-[4px] w-full rounded-full ${colorLineClass(group.color)} opacity-80`} />
+
+                        <p className="mt-2 text-[11px] text-slate-500 line-clamp-1">
+                            📍 {group.location_name}
+                        </p>
+                    </div>
+
+                    {/* Price row */}
+                    <div className="mt-3 flex items-end justify-between gap-2">
+                        <p className="text-[14px] font-extrabold text-emerald-700 leading-none">
+                            {priceText}
+                        </p>
+                        <p className="text-[10px] text-slate-500 whitespace-nowrap">
+                            {t(lang, `${totalPairs} pares`, `${totalPairs} pairs`)}
+                        </p>
+                    </div>
+
+                    {/* CTA pinned at bottom */}
+                    <div className="mt-3">
+            <span className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-800 transition group-hover:bg-slate-50">
+              {t(lang, "Ver tallas", "View sizes")}
+            </span>
+                    </div>
                 </div>
             </div>
         </button>
