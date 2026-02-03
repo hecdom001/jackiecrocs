@@ -169,7 +169,6 @@ export function StoreHeader({
             <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
                 {/* Top row */}
                 <div className="relative h-16 flex items-center">
-                    {/* Left (desktop): logo + Aguacatito.shop */}
                     <div className="hidden sm:flex items-center gap-3">
                         <button
                             type="button"
@@ -180,7 +179,7 @@ export function StoreHeader({
                             <div className="relative h-11 w-11">
                                 <Image
                                     src="/og-v3.png"
-                                    alt="Aguacatito"
+                                    alt="Aguuacatito"
                                     fill
                                     priority
                                     className="object-contain"
@@ -190,7 +189,7 @@ export function StoreHeader({
 
                             <div className="flex flex-col leading-tight">
                 <span className="text-[14px] font-black tracking-tight text-slate-900">
-                  Aguacatito<span className="text-emerald-600">.shop</span>
+                  Aguuacatito<span className="text-emerald-600">.shop</span>
                 </span>
                                 <span className="text-[11px] font-semibold text-slate-500">
                   {t(lang, "Compra por WhatsApp", "Shop via WhatsApp")}
@@ -199,7 +198,7 @@ export function StoreHeader({
                         </button>
                     </div>
 
-                    {/* Center (mobile): logo + Aguacatito.shop */}
+                    {/* Center (mobile): logo + Aguuacatito.shop */}
                     <button
                         type="button"
                         onClick={onHomeClick}
@@ -209,7 +208,7 @@ export function StoreHeader({
                         <div className="relative h-10 w-10">
                             <Image
                                 src="/og-v3.png"
-                                alt="Aguacatito"
+                                alt="Aguuacatito"
                                 fill
                                 priority
                                 className="object-contain"
@@ -217,7 +216,7 @@ export function StoreHeader({
                             />
                         </div>
                         <span className="text-[13px] font-black tracking-tight text-slate-900">
-              Aguacatito<span className="text-emerald-600">.shop</span>
+              Aguuacatito<span className="text-emerald-600">.shop</span>
             </span>
                     </button>
 

@@ -45,7 +45,7 @@ export function StoreFooter({
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <div className="text-[14px] font-extrabold text-slate-900">
-                                    Aguacatito.shop
+                                    Aguuacatito.shop
                                 </div>
                                 <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
                                     {t(
@@ -137,7 +137,7 @@ export function StoreFooter({
                     </Section>
 
                     <div className="pt-2 text-center text-[11px] text-slate-500">
-                        © {year} <span className="font-semibold text-slate-700">Aguacatito.shop</span> ·{" "}
+                        © {year} <span className="font-semibold text-slate-700">Aguuacatito.shop</span> ·{" "}
                         {t(lang, "Todos los derechos reservados.", "All rights reserved.")}
                     </div>
                 </div>
@@ -147,7 +147,7 @@ export function StoreFooter({
                     <div className="grid gap-10 md:grid-cols-4">
                         {/* Brand */}
                         <div>
-                            <div className="text-lg font-extrabold text-slate-900">Aguacatito.shop</div>
+                            <div className="text-lg font-extrabold text-slate-900">Aguuacatito.shop</div>
                             <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate-600">
                                 {t(
                                     lang,
@@ -232,7 +232,7 @@ export function StoreFooter({
 
                     <div className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
             <span>
-              © {year} <span className="font-semibold text-slate-700">Aguacatito.shop</span>.{" "}
+              © {year} <span className="font-semibold text-slate-700">Aguuacatito.shop</span>.{" "}
                 {t(lang, "Todos los derechos reservados.", "All rights reserved.")}
             </span>
                     </div>

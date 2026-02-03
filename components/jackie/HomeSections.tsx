@@ -294,11 +294,11 @@ export function HomeSections({
                             <div className="flex items-center gap-2">
                                 <img
                                     src="/og-v3.png"
-                                    alt="Aguacatito.shop"
+                                    alt="Aguuacatito.shop"
                                     className="h-7 w-7 rounded-full"
                                 />
                                 <p className="text-[12px] font-extrabold text-slate-900">
-                                    Aguacatito.shop
+                                    Aguuacatito.shop
                                 </p>
                             </div>
                             <p className="text-[11px] text-slate-600">
@@ -389,10 +389,10 @@ export function HomeSections({
                                 <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-extrabold text-slate-900">
                                   <img
                                       src="/og-v3.png"
-                                      alt="Aguacatito.shop"
+                                      alt="Aguuacatito.shop"
                                       className="h-5 w-5 rounded-full"
                                   />
-                                  Aguacatito.shop
+                                  Aguuacatito.shop
                                 </span>
                                 <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700">
                                      📲 {t(lang, "Nació en TikTok", "Started on TikTok")}

@@ -19,20 +19,20 @@ export const metadata: Metadata = {
   title: "JackyWear",
   description: "Calzado disponibles · Pedido directo por WhatsApp",
 
-  metadataBase: new URL("https://jackywear.com"),
+  metadataBase: new URL("https://jackywear.shop"),
 
   openGraph: {
-    title: "Aguacatito.shop",
+    title: "Aguuacatito.shop",
     description:
       "Consulta tallas y colores disponibles. Pedido directo por WhatsApp.",
     url: "https://jackywear.com",
-    siteName: "Aguacatito.shop",
+    siteName: "Aguuacatito.shop",
     images: [
       {
         url: "https://jackywear.com/og-v3.png",
         width: 1200,
         height: 630,
-        alt: "Aguacatito — Calzado y Estilo",
+        alt: "Aguuacatito — Calzado y Estilo",
       },
     ],
     locale: "es_MX",
