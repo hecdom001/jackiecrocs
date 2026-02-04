@@ -226,8 +226,8 @@ export function HomeSections({
                 </div>
 
                 {/* Desktop grid */}
-                <div className="hidden lg:grid mt-5 grid-cols-3 gap-5">
-                    {mixedNovedades.slice(0, 9).map(({ g, cat }) => {
+                <div className="hidden lg:grid mt-5 grid-cols-3 xl:grid-cols-4 gap-6 xl:gap-8">
+                {mixedNovedades.slice(0, 9).map(({ g, cat }) => {
                         const photo = getPhotoForGroup(g.model_name || "", g.color || "");
                         const totalPairs = g.variants.reduce((s, v) => s + v.availableCount, 0);
 
@@ -236,11 +236,11 @@ export function HomeSections({
                                 key={g.key}
                                 type="button"
                                 onClick={() => onSelectColor(g.color)}
-                                className="group text-left rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] hover:shadow-[0_26px_90px_rgba(15,23,42,0.16)] transition overflow-hidden"
+                                className="group text-left rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] hover:shadow-[0_20px_70px_rgba(15,23,42,0.12)] transition overflow-hidden"
                             >
                                 <div className="relative aspect-[16/11] bg-slate-50">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={photo.src} alt={photo.label || g.color || "Product"} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+                                    <img src={photo.src} alt={photo.label || g.color || "Product"} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]" />
                                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.35),transparent_60%)]" />
                                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/18 to-transparent" />
 
@@ -249,7 +249,7 @@ export function HomeSections({
                                       </span>
                                 </div>
 
-                                <div className="p-5">
+                                <div className="p-6">
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="min-w-0">
                                             <p className="text-[15px] font-extrabold text-slate-900 line-clamp-1">
@@ -524,13 +524,13 @@ export function HomeSections({
                 </div>
             </section>
 
-
-
-            <div className="border-t border-slate-200/80" />
-
+            {/* ultra-tight separator */}
+            <div className="px-4 sm:px-6 lg:px-10 mt-2">
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+            </div>
 
             {/* ONE (and only one) NOVEDADES section — mixed categories */}
-            <section className="p-4 sm:p-5">
+            <section className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-20 pt-0.5 pb-8">
             <div className="flex items-end justify-between gap-3">
                     <div>
                         <p className="text-[10px] font-extrabold tracking-[0.18em] text-slate-500 uppercase">
