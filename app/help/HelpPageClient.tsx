@@ -282,6 +282,15 @@ export default function HelpPageClient() {
                                     document.getElementById("payment")?.scrollIntoView({ behavior: "smooth", block: "start" })
                                 }
                             />
+
+                            <ActionTile
+                                title={t(lang, "Tallas", "Sizing")}
+                                subtitle={t(lang, "Guía de tallas", "Size guide")}
+                                icon={<CreditCard className="h-4 w-4 text-slate-700" />}
+                                onClick={() =>
+                                    document.getElementById("sizing")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                }
+                            />
                         </div>
                     </div>
                 </PremiumCard>
@@ -526,14 +535,14 @@ export default function HelpPageClient() {
 
                         {/* ✅ SIZE GUIDE AT THE END (as requested) */}
                         <PremiumCard>
-                            <div className="p-5 sm:p-6">
+                            <div id="sizing" className="p-5 sm:p-6">
                                 <SectionTitle
                                     eyebrow={t(lang, "Tallas", "Sizing")}
                                     title={t(lang, "Guía de tallas", "Size guide")}
                                     subtitle={t(lang, "Revisa la guía completa aquí.", "See the full guide here.")}
                                     icon={<MapPin className="h-4 w-4 text-slate-800" />}
                                 />
-                                <div className="mt-4">
+                                <div id="size" className="mt-6">
                                     <SizeGuide lang={lang} />
                                 </div>
                             </div>
@@ -581,6 +590,18 @@ export default function HelpPageClient() {
                                             <div className="text-left">
                                                 <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Pago", "Payment")}</p>
                                                 <p className="text-[11px] text-slate-600">{t(lang, "Transferencia", "Transfer")}</p>
+                                            </div>
+                                            <ArrowUpRight className="h-4 w-4 text-slate-500" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => document.getElementById("sizing")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                            className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
+                                        >
+                                            <div className="text-left">
+                                                <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Tallas", "Sizing")}</p>
+                                                <p className="text-[11px] text-slate-600">{t(lang, "Guía de tallas", "Size guide\n")}</p>
                                             </div>
                                             <ArrowUpRight className="h-4 w-4 text-slate-500" />
                                         </button>

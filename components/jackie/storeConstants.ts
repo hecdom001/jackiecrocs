@@ -29,6 +29,12 @@ export const TABLET_INITIAL_VISIBLE = 9;
 export const DESKTOP_INITIAL_VISIBLE = 20;
 
 export const SUPABASE_IMAGE_BASE =
-    "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
+    "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public";
 
-export const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/placeholderCominSoon.png`;
+export const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/product-images/placeholderCominSoon.png`;
+
+export const SIZE_GUIDE_IMAGE_URL_EN =
+    `${SUPABASE_IMAGE_BASE}/site/sizes_en.png`;
+
+export const SIZE_GUIDE_IMAGE_URL_ES =
+    `${SUPABASE_IMAGE_BASE}/site/sizes_es.jpeg`;
