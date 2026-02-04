@@ -103,12 +103,34 @@ export function StoreFooter({
 
                     <Section title={t(lang, "Ayuda", "Help")}>
                         <ul className="space-y-2 text-[12px] font-semibold text-slate-700">
-                            <li className="text-slate-600">{t(lang, "Guía de tallas", "Size guide")}</li>
-                            <li className="text-slate-600">{t(lang, "Solo pick up", "Pick up only")}</li>
+                            {/* Size guide */}
+                            <li>
+                                <a
+                                    href={`/help?lang=${lang}`}
+                                    className="hover:text-slate-900 transition"
+                                >
+                                    {t(lang, "Guía de tallas", "Size guide")}
+                                </a>
+                            </li>
+
+                            {/* Pickup info */}
+                            <li>
+                                <a
+                                    href={`/help?lang=${lang}#pickup`}
+                                    className="hover:text-slate-900 transition"
+                                >
+                                    {t(lang, "Solo pick up", "Pick up only")}
+                                </a>
+                            </li>
+
+                            {/* WhatsApp */}
                             <li>
                                 <a
                                     href={supportWaLink}
-                                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-extrabold text-emerald-800"
+                                    className="inline-flex items-center gap-2 rounded-full
+                   border border-emerald-200 bg-emerald-50
+                   px-3 py-2 text-[12px] font-extrabold
+                   text-emerald-800 hover:bg-emerald-100 transition"
                                 >
                                     📲 WhatsApp
                                 </a>
