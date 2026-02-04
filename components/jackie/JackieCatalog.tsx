@@ -4,6 +4,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { StoreFooter } from "./StoreFooter";
+import { MobileBottomNav } from "./MobileBottomNav";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import {
     LS_LOCATION_KEY,
@@ -20,18 +23,19 @@ import {
     type PublicItem,
 } from "@/lib/jackieCatalogUtils";
 
+import {
+    MOBILE_INITIAL_VISIBLE,
+    TABLET_INITIAL_VISIBLE,
+    DESKTOP_INITIAL_VISIBLE,
+    PLACEHOLDER_IMAGE
+} from "@/components/jackie/storeConstants";
+
 import { StoreHeader } from "./StoreHeader";
 import { FiltersBar } from "./FiltersBar";
 import { ProductGrid } from "./ProductGrid";
 import { QuickView } from "./QuickView";
 import { CartDrawer } from "./CartDrawer";
 import { HomeSections } from "./HomeSections";
-import { SizeGuide } from "./SizeGuide";
-import { FeedbackBox } from "./FeedbackBox";
-
-const MOBILE_INITIAL_VISIBLE = 8;
-const TABLET_INITIAL_VISIBLE = 9;
-const DESKTOP_INITIAL_VISIBLE = 20;
 
 const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"];
 
@@ -48,11 +52,6 @@ const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
     )
 );
 
-const SUPABASE_IMAGE_BASE =
-    "https://axrfkuupjoddsoswowac.supabase.co/storage/v1/object/public/product-images";
-
-const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/placeholderCominSoon.png`;
-
 type ProductImageRow = {
     key: string;
     src: string;
@@ -63,100 +62,6 @@ type ProductImageRow = {
 };
 
 type CategoryOption = { id: string; name: string; slug: string };
-
-function MobileBottomNav({
-                             show,
-                             view,
-                             lang,
-                             cartCount,
-                             onHome,
-                             onCatalog,
-                             onCart,
-                         }: {
-    show: boolean;
-    view: "home" | "catalog";
-    lang: Lang;
-    cartCount: number;
-    onHome: () => void;
-    onCatalog: () => void;
-    onCart: () => void;
-}) {
-    if (!show) return null;
-
-    const Item = ({
-                      active,
-                      label,
-                      icon,
-                      onClick,
-                      badge,
-                  }: {
-        active: boolean;
-        label: string;
-        icon: React.ReactNode;
-        onClick: () => void;
-        badge?: number;
-    }) => (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-semibold transition ${
-                active ? "text-emerald-700" : "text-slate-500"
-            }`}
-            aria-current={active ? "page" : undefined}
-        >
-      <span
-          className={`grid h-9 w-9 place-items-center rounded-2xl border transition ${
-              active
-                  ? "bg-emerald-50 border-emerald-200"
-                  : "bg-white border-slate-200"
-          }`}
-      >
-        <span className="text-lg leading-none">{icon}</span>
-      </span>
-            <span>{label}</span>
-
-            {typeof badge === "number" && badge > 0 && (
-                <span className="absolute top-1 right-6 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold grid place-items-center">
-          {badge > 99 ? "99+" : badge}
-        </span>
-            )}
-        </button>
-    );
-
-    return (
-        <>
-            <div className="h-24 lg:hidden" />
-
-            <div className="fixed inset-x-0 bottom-0 z-[60] lg:hidden pb-[env(safe-area-inset-bottom)]">
-                <div className="mx-auto w-full max-w-md md:max-w-2xl px-4">
-                    <div className="rounded-t-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-[0_-12px_40px_rgba(15,23,42,0.16)]">
-                        <div className="flex items-stretch px-2 py-2">
-                            <Item
-                                active={view === "home"}
-                                label={t(lang, "Inicio", "Home")}
-                                icon="🏠"
-                                onClick={onHome}
-                            />
-                            <Item
-                                active={view === "catalog"}
-                                label={t(lang, "Catálogo", "Catalog")}
-                                icon="🛍️"
-                                onClick={onCatalog}
-                            />
-                            <Item
-                                active={false}
-                                label={t(lang, "Carrito", "Cart")}
-                                icon="🧺"
-                                onClick={onCart}
-                                badge={cartCount}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
-}
 
 function Chip({
                   children,
@@ -184,16 +89,6 @@ function Chip({
                 </button>
             )}
     </span>
-    );
-}
-
-function ColorDot({ active }: { active?: boolean }) {
-    return (
-        <span
-            className={`h-3 w-3 rounded-full border ${
-                active ? "border-emerald-400" : "border-slate-300"
-            } bg-gradient-to-br from-slate-200 to-slate-50`}
-        />
     );
 }
 
@@ -245,6 +140,32 @@ function SwatchDot({ color, active }: { color: string; active?: boolean }) {
 }
 
 export function JackieCatalog() {
+    const router = useRouter();
+    const sp = useSearchParams();
+
+    useEffect(() => {
+        const v = sp.get("view");
+        const l = sp.get("lang");
+        const loc = sp.get("loc");
+
+        if (l === "es" || l === "en") setLang(l);
+        if (loc && (loc === "all" || ["tijuana", "mexicali", "hermosillo_sonora"].includes(loc))) {
+            setLocationFilter(loc);
+            persistLocation(loc);
+        }
+
+        if (v === "catalog" || v === "home") {
+            setView(v);
+            if (v === "catalog") {
+                requestAnimationFrame(() =>
+                    document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                );
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+
     const [lang, setLang] = useState<Lang>("es");
 
     const [items, setItems] = useState<PublicItem[]>([]);
@@ -280,7 +201,6 @@ export function JackieCatalog() {
     >({});
 
     const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
-
 
     useEffect(() => {
         let cancelled = false;
@@ -1253,11 +1173,6 @@ export function JackieCatalog() {
                                         onQuickView={(g) => setQuickView(g)}
                                     />
                                 </div>
-
-                                <section className="mt-6 space-y-4">
-                                    <SizeGuide lang={lang} />
-                                    <FeedbackBox lang={lang} context="storefront" />
-                                </section>
                             </main>
                         </div>
                     </div>
@@ -1275,18 +1190,18 @@ export function JackieCatalog() {
                     cartCount={totalCartPairs}
                     onHome={() => {
                         setView("home");
-                        if (typeof window !== "undefined")
-                            window.scrollTo({ top: 0, behavior: "smooth" });
+                        window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     onCatalog={() => {
                         setView("catalog");
-                        requestAnimationFrame(() => {
-                            const el = document.getElementById("product-grid");
-                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        });
+                        requestAnimationFrame(() =>
+                            document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        );
                     }}
                     onCart={() => setCartOpen(true)}
+                    onHelp={() => router.push(`/help?lang=${lang}&loc=${locationFilter}`)}
                 />
+
 
                 <QuickView
                     open={!!quickView}
@@ -1316,7 +1231,6 @@ export function JackieCatalog() {
                     onRemoveItem={removeItemFromCart}
                     cartLocationSlug={cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown")}
 
-                    // ✅ ADD THIS:
                     getPhotoForCartItem={(item) => {
                         const key = `${String(item.model_name || "").trim()}__${String(item.color || "").trim()}`.toLowerCase();
                         return getPhotoByKey(key); // uses your DB-first image map + placeholder fallback

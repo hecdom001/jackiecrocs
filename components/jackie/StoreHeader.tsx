@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { Lang } from "@/lib/jackieCatalogUtils";
 import { t } from "@/lib/jackieCatalogUtils";
+import Link from "next/link";
 
 export type HeaderCategory = { id: string; name: string };
 
@@ -75,7 +76,7 @@ export function StoreHeader({
     totalCartPairs: number;
     onCartClick: () => void;
     onHomeClick: () => void;
-    view: "home" | "catalog";
+    view: "home" | "catalog" | "help";
 
     categories?: HeaderCategory[];
     categoryFilter?: string; // "all" | categoryId
@@ -283,6 +284,14 @@ export function StoreHeader({
                                 EN
                             </button>
                         </div>
+
+                        {/* Help (desktop) */}
+                        <Link
+                            href="/help"
+                            className="hidden sm:inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-900 shadow-sm hover:bg-slate-50"
+                        >
+                            ❓ {t(lang, "Ayuda", "Help")}
+                        </Link>
 
                         {/* Cart (desktop only) */}
                         <button

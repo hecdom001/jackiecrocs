@@ -5,12 +5,6 @@ import type { ColorGroup, Lang, LocationOption } from "@/lib/jackieCatalogUtils"
 import { t } from "@/lib/jackieCatalogUtils";
 import { track } from "@vercel/analytics";
 
-export const MEX_BANK_INFO = {
-    bankName: "Santander",
-    accountName: "Jackeline Monge",
-    accountNumber: "0140 2026 0401 0725 79",
-} as const;
-
 type Photo = { src: string; label: string };
 
 export function HomeSections({
