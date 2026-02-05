@@ -1,10 +1,10 @@
 // components/catalog/StoreCatalog.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useCart } from "@/components/store/CartProvider";
+import { CartProvider, useCart } from "@/components/store/CartProvider";
 
 import {
     LS_LOCATION_KEY,
@@ -28,6 +28,7 @@ import {
     DESKTOP_INITIAL_VISIBLE,
     PLACEHOLDER_IMAGE,
     VISIBLE_LOCATION_SLUGS,
+    pickupSpotsByLocation,
 } from "@/components/store/storeConstants";
 
 import { StoreHeader } from "@/components/layout/StoreHeader";
@@ -46,16 +47,8 @@ import {
     popCartReturnTo,
 } from "@/components/store/storeClient";
 
-
-const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
-    tijuana: ["Colectivo Paseo del Rio"],
-    mexicali: ["Oaxaca 1820"],
-    mexicali_b: ["Jardin Las Palmas"],
-    hermosillo_sonora: ["Villa Bonita"],
-};
-
 const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
-    Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) =>
+    Object.entries(pickupSpotsByLocation).filter(([slug]) =>
         (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(slug)
     )
 );
@@ -68,6 +61,8 @@ type ProductImageRow = {
     model?: string;
     color?: string;
 };
+
+type ProductImageMap = Record<string, { src: string; label: string }>;
 
 type CategoryOption = { id: string; name: string; slug: string };
 
@@ -100,35 +95,80 @@ function Chip({
     );
 }
 
-function colorToSwatch(c: string): string {
-    const s = (c || "").toLowerCase();
+// ✅ OPTIMIZATION: Create lookup map for O(1) color matching instead of multiple includes() calls
+const COLOR_KEYWORDS = new Map<string, string>([
+    ['black', '#111827'],
+    ['negro', '#111827'],
+    ['white', '#ffffff'],
+    ['blanco', '#ffffff'],
+    ['grey', '#9ca3af'],
+    ['gray', '#9ca3af'],
+    ['gris', '#9ca3af'],
+    ['beige', '#e7d7b8'],
+    ['brown', '#6b4f3a'],
+    ['cafe', '#6b4f3a'],
+    ['café', '#6b4f3a'],
+    ['tan', '#d2b48c'],
+    ['camel', '#c19a6b'],
+    ['red', '#ef4444'],
+    ['rojo', '#ef4444'],
+    ['blue', '#3b82f6'],
+    ['azul', '#3b82f6'],
+    ['green', '#22c55e'],
+    ['verde', '#22c55e'],
+    ['yellow', '#f59e0b'],
+    ['amarillo', '#f59e0b'],
+    ['orange', '#fb923c'],
+    ['naranja', '#fb923c'],
+    ['purple', '#a855f7'],
+    ['morado', '#a855f7'],
+    ['lila', '#a855f7'],
+    ['pink', '#ec4899'],
+    ['rosa', '#ec4899'],
+    ['barbie', '#ec4899'],
+    ['fuchsia', '#d946ef'],
+    ['camo', '#556b2f'],
+    ['arctic', '#7dd3fc'],
+    ['crystal', '#e5e7eb'],
+    ['gold', '#d4af37'],
+    ['dorado', '#d4af37'],
+]);
 
-    if (s.includes("black") || s.includes("negro")) return "#111827";
-    if (s.includes("white") || s.includes("blanco")) return "#ffffff";
-    if (s.includes("grey") || s.includes("gray") || s.includes("gris")) return "#9ca3af";
+// ✅ OPTIMIZATION: Memoized color function with cache
+function createColorSwatchFn() {
+    const cache = new Map<string, string>();
 
-    if (s.includes("beige")) return "#e7d7b8";
-    if (s.includes("brown") || s.includes("cafe") || s.includes("café")) return "#6b4f3a";
-    if (s.includes("tan")) return "#d2b48c";
-    if (s.includes("camel")) return "#c19a6b";
+    return (c: string): string => {
+        const key = (c || "").toLowerCase();
 
-    if (s.includes("red") || s.includes("rojo")) return "#ef4444";
-    if (s.includes("blue") || s.includes("azul")) return "#3b82f6";
-    if (s.includes("green") || s.includes("verde")) return "#22c55e";
-    if (s.includes("yellow") || s.includes("amarillo")) return "#f59e0b";
-    if (s.includes("orange") || s.includes("naranja")) return "#fb923c";
-    if (s.includes("purple") || s.includes("morado") || s.includes("lila")) return "#a855f7";
+        // Check cache first
+        if (cache.has(key)) {
+            return cache.get(key)!;
+        }
 
-    if (s.includes("pink") || s.includes("rosa") || s.includes("barbie")) return "#ec4899";
-    if (s.includes("fuchsia")) return "#d946ef";
+        // Try exact matches first
+        if (COLOR_KEYWORDS.has(key)) {
+            const result = COLOR_KEYWORDS.get(key)!;
+            cache.set(key, result);
+            return result;
+        }
 
-    if (s.includes("camo")) return "#556b2f";
-    if (s.includes("arctic")) return "#7dd3fc";
-    if (s.includes("crystal")) return "#e5e7eb";
-    if (s.includes("gold") || s.includes("dorado")) return "#d4af37";
+        // Then try partial matches
+        for (const [keyword, hex] of COLOR_KEYWORDS.entries()) {
+            if (key.includes(keyword)) {
+                cache.set(key, hex);
+                return hex;
+            }
+        }
 
-    return "#e5e7eb";
+        // Default
+        const defaultColor = '#e5e7eb';
+        cache.set(key, defaultColor);
+        return defaultColor;
+    };
 }
+
+const colorToSwatch = createColorSwatchFn();
 
 function SwatchDot({ color, active }: { color: string; active?: boolean }) {
     const hex = colorToSwatch(color);
@@ -156,11 +196,12 @@ function makeVariantId(args: {
     return `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`.toLowerCase();
 }
 
-export function StoreCatalog() {
+// Main component wrapped in data provider
+function StoreCatalogInner() {
     const router = useRouter();
     const sp = useSearchParams();
 
-    // ✅ Get cart data from shared provider
+    // ✅ Get cart data and item data from provider
     const {
         items,
         itemsLoading: loading,
@@ -171,6 +212,7 @@ export function StoreCatalog() {
         hasCartWhatsApp,
         cartLocationSlug,
         quantities,
+        productImageMap,
         addToCart: handleAddToCart,
         removeFromCart: handleRemoveFromCart,
         removeItem: removeItemFromCart,
@@ -202,10 +244,9 @@ export function StoreCatalog() {
     const [view, setView] = useState<"home" | "catalog">("home");
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
     const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
 
-
+    // Initialize from URL params
     useEffect(() => {
         const v = sp.get("view");
         const l = sp.get("lang");
@@ -228,44 +269,21 @@ export function StoreCatalog() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const res = await fetch("/api/product-images", { cache: "no-store" });
-                if (!res.ok) return;
-                const data = await res.json();
-                if (!Array.isArray(data?.rows)) return;
-
-                const next: Record<string, ProductImageRow> = {};
-                for (const r of data.rows) {
-                    if (r?.key && r?.src) next[String(r.key).toLowerCase()] = r;
-                }
-
-                if (!cancelled) setProductImageMap(next);
-            } catch {
-                // ignore
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const getPhotoByKey = (keyInput: string): { src: string; label: string } => {
+    // ✅ OPTIMIZATION: Memoized photo lookup
+    const getPhotoByKey = useCallback((keyInput: string): { src: string; label: string } => {
         const key = String(keyInput || "").trim().toLowerCase();
         if (!key) return { src: PLACEHOLDER_IMAGE, label: "" };
         const hit = productImageMap[key];
         if (hit?.src) return { src: hit.src, label: "" };
         return { src: PLACEHOLDER_IMAGE, label: "" };
-    };
+    }, [productImageMap]);
 
-    const getPhotoForGroup = (modelName: string, colorEn: string) => {
+    const getPhotoForGroup = useCallback((modelName: string, colorEn: string) => {
         const key = `${String(modelName || "").trim()}__${String(colorEn || "").trim()}`.toLowerCase();
         return getPhotoByKey(key);
-    };
+    }, [getPhotoByKey]);
 
+    // Responsive page size
     useEffect(() => {
         if (typeof window === "undefined") return;
 
@@ -283,6 +301,7 @@ export function StoreCatalog() {
         return () => window.removeEventListener("resize", compute);
     }, []);
 
+    // Load location from localStorage or geo
     useEffect(() => {
         if (typeof window === "undefined") return;
 
@@ -310,13 +329,13 @@ export function StoreCatalog() {
         })();
     }, []);
 
+    // Subscribe to cart open events
     useEffect(() => {
         return subscribeOpenCart(() => {
             setCartOpen(true);
         });
     }, []);
 
-    // If help requested opening cart and Catalog is already mounted
     useEffect(() => {
         return subscribeOpenCart(() => {
             setView("catalog");
@@ -324,7 +343,6 @@ export function StoreCatalog() {
         });
     }, []);
 
-// If help requested opening cart and Catalog is loading fresh
     useEffect(() => {
         if (consumeOpenCartRequest()) {
             setView("catalog");
@@ -332,11 +350,10 @@ export function StoreCatalog() {
         }
     }, []);
 
-
-    const persistLocation = (next: string) => {
+    const persistLocation = useCallback((next: string) => {
         if (typeof window === "undefined") return;
         window.localStorage.setItem(LS_LOCATION_KEY, next);
-    };
+    }, []);
 
     async function loadLocations() {
         const { data, error } = await supabase.from("locations").select("slug, name").order("name", { ascending: true });
@@ -368,21 +385,20 @@ export function StoreCatalog() {
         );
     }
 
-
     useEffect(() => {
         loadLocations();
         loadCategories();
-        // loadInventory() now handled by CartProvider
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-
+    // ✅ OPTIMIZATION: Memoize category lookup
     const categoryById = useMemo(() => {
         const m = new Map<string, CategoryOption>();
         for (const c of categories) m.set(c.id, c);
         return m;
     }, [categories]);
 
+    // ✅ OPTIMIZATION: Memoize scoped items for filters
     const scopedForOptions = useMemo(() => {
         return items.filter((it) => {
             const byLoc = locationFilter === "all" || it.location_slug === locationFilter;
@@ -401,6 +417,7 @@ export function StoreCatalog() {
     const showSize = useMemo(() => scopedForSizeColor.some((it) => !!it.uses_size), [scopedForSizeColor]);
     const showColor = useMemo(() => scopedForSizeColor.some((it) => !!it.uses_color), [scopedForSizeColor]);
 
+    // ✅ OPTIMIZATION: Memoize filter options
     const allBrands = useMemo(() => {
         return Array.from(new Set(scopedForOptions.map((i) => i.brand).filter(Boolean) as string[])).sort((a, b) =>
             a.localeCompare(b)
@@ -426,6 +443,7 @@ export function StoreCatalog() {
             .sort((a, b) => a.localeCompare(b));
     }, [scopedForSizeColor, showColor]);
 
+    // ✅ OPTIMIZATION: Memoize inventory scoping
     const inventoryScoped = useMemo(() => {
         return items.filter((item) => {
             const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
@@ -436,6 +454,7 @@ export function StoreCatalog() {
         });
     }, [items, locationFilter, categoryFilter, brandFilter, colorFilter, showColor]);
 
+    // Auto-reset filters when they become invalid
     useEffect(() => {
         if (!showSize) setSizeFilter("all");
     }, [showSize]);
@@ -478,8 +497,6 @@ export function StoreCatalog() {
         };
     }, [mobileFiltersOpen]);
 
-
-    // ✅ If Help requested opening cart, do it once on mount
     useEffect(() => {
         if (typeof window === "undefined") return;
         const shouldOpen = consumeOpenCartRequest();
@@ -493,12 +510,12 @@ export function StoreCatalog() {
         );
     }, []);
 
-
     const selectedLocationName = useMemo(() => {
         if (locationFilter === "all") return lang === "es" ? "Todas" : "All";
         return locations.find((l) => l.slug === locationFilter)?.name || locationFilter;
     }, [locationFilter, locations, lang]);
 
+    // ✅ OPTIMIZATION: Memoize groups computation (the expensive part)
     const groupsFiltered = useMemo(() => {
         const map = new Map<string, ColorGroup>();
 
@@ -566,14 +583,14 @@ export function StoreCatalog() {
         );
     }, [groupsFiltered]);
 
+    // ✅ OPTIMIZATION: Memoize pagination
     const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
-    const supportWaLink = buildWhatsAppSupportLink(lang, locationFilter);
+    const supportWaLink = useMemo(() => buildWhatsAppSupportLink(lang, locationFilter), [lang, locationFilter]);
 
     const formattedLastUpdated =
         lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
-
 
     const pickupGroupedSpots: Record<string, string[]> =
         locationFilter === "all"
@@ -585,7 +602,8 @@ export function StoreCatalog() {
     const featuredGroups = useMemo(() => groupsFiltered.slice(0, 30), [groupsFiltered]);
     const quickColorChips = useMemo(() => allColors.slice(0, 10), [allColors]);
 
-    const clearAllFilters = () => {
+    // ✅ OPTIMIZATION: Wrap callbacks in useCallback
+    const clearAllFilters = useCallback(() => {
         setLocationFilter("all");
         persistLocation("all");
         setCategoryFilter("all");
@@ -593,7 +611,7 @@ export function StoreCatalog() {
         setSizeFilter("all");
         setColorFilter("all");
         setQuery("");
-    };
+    }, [persistLocation]);
 
     const anyActiveFilters =
         locationFilter !== "all" ||
@@ -617,6 +635,7 @@ export function StoreCatalog() {
         return m;
     }, [categoryOptions]);
 
+    // ✅ OPTIMIZATION: Memoize filter chips
     const desktopFilterChips = useMemo(() => {
         const chips: { key: string; label: React.ReactNode; onRemove: () => void }[] = [];
 
@@ -684,7 +703,47 @@ export function StoreCatalog() {
         showColor,
         selectedLocationName,
         categoryOptions,
+        persistLocation,
     ]);
+
+    // ✅ OPTIMIZATION: Memoize callbacks passed to child components
+    const handleQuickView = useCallback((g: ColorGroup) => {
+        setQuickView(g);
+    }, []);
+
+    const handleShowMore = useCallback(() => {
+        setVisibleCount((p) => p + pageSize);
+    }, [pageSize]);
+
+    const handleCartOpen = useCallback(() => {
+        setCartOpen(true);
+    }, []);
+
+    const handleCartClose = useCallback(() => {
+        setCartOpen(false);
+        const ret = popCartReturnTo();
+        if (ret) router.push(ret);
+    }, [router]);
+
+    const handleQuickViewClose = useCallback(() => {
+        setQuickView(null);
+    }, []);
+
+    const handleHomeClick = useCallback(() => {
+        setView("home");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+
+    const handleCatalogClick = useCallback(() => {
+        setView("catalog");
+        requestAnimationFrame(() =>
+            document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
+        );
+    }, []);
+
+    const handleHelpClick = useCallback(() => {
+        router.push(`/help?lang=${lang}&loc=${locationFilter}`);
+    }, [router, lang, locationFilter]);
 
     return (
         <div className="min-h-screen bg-white text-slate-900">
@@ -695,57 +754,39 @@ export function StoreCatalog() {
                     query={query}
                     setQuery={setQuery}
                     totalCartPairs={totalCartPairs}
-                    onCartClick={() => setCartOpen(true)}
-                    onHomeClick={() => {
-                        setView("home");
-                        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
+                    onCartClick={handleCartOpen}
+                    onHomeClick={handleHomeClick}
                     view={view}
-                    categories={categoryOptions.map((c) => ({ id: c.id, name: c.name || c.slug }))}
-                    categoryFilter={categoryFilter}
-                    onSelectCategory={(id) => {
-                        setCategoryFilter(id);
-                        setView("catalog");
-                        requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-                    }}
                     locationSlug={locationFilter}
                 />
 
                 {view === "home" && (
-                    <div className="pb-10">
-                        <div className="mt-4 w-full">
-                            <HomeSections
-                                lang={lang}
-                                locations={locations}
-                                pickupGroupedSpots={pickupGroupedSpots}
-                                hasAnyPickupSpots={hasAnyPickupSpots}
-                                supportWaLink={supportWaLink}
-                                hasSupportWhatsApp={supportWaLink !== "#"}
-                                featuredGroups={featuredGroups}
-                                quickColorChips={quickColorChips}
-                                getPhotoForGroup={getPhotoForGroup}
-                                locationFilter={locationFilter}
-                                onSelectLocation={(slug) => {
-                                    setLocationFilter(slug);
-                                    persistLocation(slug);
-                                }}
-                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
-                                onBrowseCatalog={() => {
-                                    setView("catalog");
-                                    requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-                                }}
-                                onSelectColor={(c) => {
-                                    setColorFilter(c);
-                                    setView("catalog");
-                                    requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-                                }}
-                                totalCartPairs={totalCartPairs}
-                                onOpenCart={() => setCartOpen(true)}
-                                isMixedCart={isMixedCart}
-                                categoryNameById={categoryNameById}
-                            />
-                        </div>
-                    </div>
+                    <HomeSections
+                        lang={lang}
+                        locations={locations}
+                        pickupGroupedSpots={pickupGroupedSpots}
+                        hasAnyPickupSpots={hasAnyPickupSpots}
+                        supportWaLink={supportWaLink}
+                        hasSupportWhatsApp={supportWaLink !== "#"}
+                        featuredGroups={featuredGroups}
+                        quickColorChips={quickColorChips}
+                        getPhotoForGroup={getPhotoForGroup}
+                        locationFilter={locationFilter}
+                        onSelectLocation={(slug) => {
+                            setLocationFilter(slug);
+                            persistLocation(slug);
+                        }}
+                        visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
+                        onBrowseCatalog={handleCatalogClick}
+                        onSelectColor={(c) => {
+                            setColorFilter(c);
+                            handleCatalogClick();
+                        }}
+                        totalCartPairs={totalCartPairs}
+                        onOpenCart={handleCartOpen}
+                        isMixedCart={isMixedCart}
+                        categoryNameById={categoryNameById}
+                    />
                 )}
 
                 {view === "catalog" && (
@@ -852,9 +893,9 @@ export function StoreCatalog() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setMobileFiltersOpen(false)}
-                                                    className="w-full rounded-full bg-emerald-600 text-white py-3 text-sm font-extrabold hover:bg-emerald-700"
+                                                    className="w-full rounded-full bg-slate-900 text-white py-3 text-sm font-extrabold hover:bg-black transition"
                                                 >
-                                                    ✅ {t(lang, "Ver resultados", "See results")}
+                                                    {t(lang, "Ver productos", "View products")}
                                                 </button>
                                             </div>
                                         </div>
@@ -863,118 +904,236 @@ export function StoreCatalog() {
                             )}
                         </div>
 
-                        {/* Desktop layout */}
-                        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+                        <div className="mt-6 lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
+                            {/* LEFT SIDEBAR - Desktop Only */}
                             <aside className="hidden lg:block">
-                                <div className="sticky top-24">
-                                    <div className="rounded-[28px] border border-slate-200 bg-white p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="text-sm font-extrabold tracking-tight text-slate-900">
-                                                {t(lang, "Filtros", "Filters")}
-                                            </div>
-
-                                            {anyActiveFilters ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={clearAllFilters}
-                                                    className="text-xs font-semibold text-emerald-700 hover:underline"
-                                                >
-                                                    {t(lang, "Limpiar", "Clear")}
-                                                </button>
-                                            ) : null}
+                                <div className="sticky top-24 space-y-4">
+                                    {/* Location Filter */}
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        <div className="mb-3 text-xs font-extrabold tracking-wide uppercase text-slate-500">
+                                            {t(lang, "Ubicación", "Location")}
                                         </div>
 
-                                        <div className="mt-3">
-                                            <FiltersBar
-                                                variant="flat"
-                                                lang={lang}
-                                                loading={loading}
-                                                locationFilter={locationFilter}
-                                                setLocationFilter={(v) => {
-                                                    setLocationFilter(v);
-                                                    persistLocation(v);
-                                                }}
-                                                onPersistLocation={persistLocation}
-                                                locations={locations}
-                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
-                                                categoryFilter={categoryFilter}
-                                                setCategoryFilter={setCategoryFilter}
-                                                categories={categoryOptions}
-                                                brandFilter={brandFilter}
-                                                setBrandFilter={setBrandFilter}
-                                                brands={allBrands}
-                                                showSize={showSize}
-                                                showColor={false}
-                                                sizeFilter={sizeFilter}
-                                                setSizeFilter={setSizeFilter}
-                                                allSizes={allSizes}
-                                                colorFilter={colorFilter}
-                                                setColorFilter={setColorFilter}
-                                                allColors={allColors}
-                                                totalPairsFiltered={totalPairsFiltered}
-                                                formattedLastUpdated={formattedLastUpdated}
-                                                onRefresh={() => {}}
-                                            />
-                                        </div>
+                                        <select
+                                            value={locationFilter}
+                                            onChange={(e) => {
+                                                setLocationFilter(e.target.value);
+                                                persistLocation(e.target.value);
+                                            }}
+                                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                                        >
+                                            <option value="all">{t(lang, "Todas las ubicaciones", "All locations")}</option>
+                                            {locations
+                                                .filter((loc) => (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(loc.slug))
+                                                .map((loc) => (
+                                                    <option key={loc.slug} value={loc.slug}>
+                                                        {loc.name}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    </div>
 
-                                        {showColor && allColors.length > 0 && (
-                                            <div className="mt-4 border-t border-slate-200 pt-4">
-                                                <details className="group" open>
-                                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
-                                                        <div className="text-xs font-extrabold text-slate-900">
-                                                            {t(lang, "Colores", "Colors")}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 group-open:hidden">+</div>
-                                                        <div className="text-xs text-slate-500 hidden group-open:block">–</div>
-                                                    </summary>
-
-                                                    <div className="mt-3 flex flex-wrap gap-2">
-                                                        {allColors.slice(0, 24).map((c) => {
-                                                            const active = colorFilter === c;
-                                                            return (
-                                                                <button
-                                                                    key={c}
-                                                                    type="button"
-                                                                    onClick={() => setColorFilter(active ? "all" : c)}
-                                                                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                                                                        active
-                                                                            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                                                                            : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
-                                                                    }`}
-                                                                    title={c}
-                                                                >
-                                                                    <SwatchDot color={c} active={active} />
-                                                                    <span className="truncate max-w-[160px]">{c}</span>
-                                                                </button>
-                                                            );
-                                                        })}
+                                    {/* Category Filter */}
+                                    {categoryOptions.length > 0 && (
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                            <details className="group" open>
+                                                <summary className="flex cursor-pointer list-none items-center justify-between">
+                                                    <div className="text-xs font-extrabold tracking-wide uppercase text-slate-500">
+                                                        {t(lang, "Categoría", "Category")}
                                                     </div>
+                                                    <div className="text-xs text-slate-500 group-open:hidden">+</div>
+                                                    <div className="text-xs text-slate-500 hidden group-open:block">–</div>
+                                                </summary>
 
-                                                    {colorFilter !== "all" && (
+                                                <div className="mt-3 space-y-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCategoryFilter("all")}
+                                                        className={`w-full text-left rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                                                            categoryFilter === "all"
+                                                                ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                                                                : "text-slate-700 hover:bg-slate-50"
+                                                        }`}
+                                                    >
+                                                        {t(lang, "Todas", "All")}
+                                                    </button>
+
+                                                    {categoryOptions.map((cat) => (
                                                         <button
+                                                            key={cat.id}
                                                             type="button"
-                                                            onClick={() => setColorFilter("all")}
-                                                            className="mt-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline"
+                                                            onClick={() => setCategoryFilter(cat.id)}
+                                                            className={`w-full text-left rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                                                                categoryFilter === cat.id
+                                                                    ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                                                                    : "text-slate-700 hover:bg-slate-50"
+                                                            }`}
                                                         >
-                                                            {t(lang, "Quitar color", "Remove color")}
+                                                            {cat.name}
                                                         </button>
-                                                    )}
-                                                </details>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-4 border-t border-slate-200 pt-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="text-xs text-slate-600">
-                                                    {t(lang, "¿Necesitas ayuda?", "Need help?")}
+                                                    ))}
                                                 </div>
-                                                <a
-                                                    href={supportWaLink}
-                                                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
-                                                >
-                                                    WhatsApp
-                                                </a>
+                                            </details>
+                                        </div>
+                                    )}
+
+                                    {/* Brand Filter */}
+                                    {allBrands.length > 0 && (
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                            <details className="group">
+                                                <summary className="flex cursor-pointer list-none items-center justify-between">
+                                                    <div className="text-xs font-extrabold tracking-wide uppercase text-slate-500">
+                                                        {t(lang, "Marca", "Brand")}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 group-open:hidden">+</div>
+                                                    <div className="text-xs text-slate-500 hidden group-open:block">–</div>
+                                                </summary>
+
+                                                <div className="mt-3 space-y-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBrandFilter("all")}
+                                                        className={`w-full text-left rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                                                            brandFilter === "all"
+                                                                ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                                                                : "text-slate-700 hover:bg-slate-50"
+                                                        }`}
+                                                    >
+                                                        {t(lang, "Todas", "All")}
+                                                    </button>
+
+                                                    {allBrands.slice(0, 12).map((b) => (
+                                                        <button
+                                                            key={b}
+                                                            type="button"
+                                                            onClick={() => setBrandFilter(b)}
+                                                            className={`w-full text-left rounded-lg px-3 py-2 text-xs font-semibold transition truncate ${
+                                                                brandFilter === b
+                                                                    ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                                                                    : "text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                        >
+                                                            {b}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {brandFilter !== "all" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBrandFilter("all")}
+                                                        className="mt-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline"
+                                                    >
+                                                        {t(lang, "Quitar marca", "Remove brand")}
+                                                    </button>
+                                                )}
+                                            </details>
+                                        </div>
+                                    )}
+
+                                    {/* Size Filter */}
+                                    {showSize && allSizes.length > 0 && (
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                            <details className="group">
+                                                <summary className="flex cursor-pointer list-none items-center justify-between">
+                                                    <div className="text-xs font-extrabold tracking-wide uppercase text-slate-500">
+                                                        {t(lang, "Talla", "Size")}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 group-open:hidden">+</div>
+                                                    <div className="text-xs text-slate-500 hidden group-open:block">–</div>
+                                                </summary>
+
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {allSizes.map((sz) => {
+                                                        const active = sizeFilter === sz;
+                                                        return (
+                                                            <button
+                                                                key={sz}
+                                                                type="button"
+                                                                onClick={() => setSizeFilter(active ? "all" : sz)}
+                                                                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                                                                    active
+                                                                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                                                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                                                }`}
+                                                            >
+                                                                {sz}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {sizeFilter !== "all" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSizeFilter("all")}
+                                                        className="mt-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline"
+                                                    >
+                                                        {t(lang, "Quitar talla", "Remove size")}
+                                                    </button>
+                                                )}
+                                            </details>
+                                        </div>
+                                    )}
+
+                                    {/* Color Filter */}
+                                    {showColor && allColors.length > 0 && (
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                            <details className="group">
+                                                <summary className="flex cursor-pointer list-none items-center justify-between">
+                                                    <div className="text-xs font-extrabold tracking-wide uppercase text-slate-500">
+                                                        {t(lang, "Colores", "Colors")}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 group-open:hidden">+</div>
+                                                    <div className="text-xs text-slate-500 hidden group-open:block">–</div>
+                                                </summary>
+
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {allColors.slice(0, 24).map((c) => {
+                                                        const active = colorFilter === c;
+                                                        return (
+                                                            <button
+                                                                key={c}
+                                                                type="button"
+                                                                onClick={() => setColorFilter(active ? "all" : c)}
+                                                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                                                                    active
+                                                                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                                                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                                                }`}
+                                                                title={c}
+                                                            >
+                                                                <SwatchDot color={c} active={active} />
+                                                                <span className="truncate max-w-[160px]">{c}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {colorFilter !== "all" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setColorFilter("all")}
+                                                        className="mt-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline"
+                                                    >
+                                                        {t(lang, "Quitar color", "Remove color")}
+                                                    </button>
+                                                )}
+                                            </details>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-4 border-t border-slate-200 pt-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="text-xs text-slate-600">
+                                                {t(lang, "¿Necesitas ayuda?", "Need help?")}
                                             </div>
+                                            <a
+                                                href={supportWaLink}
+                                                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                                            >
+                                                WhatsApp
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
@@ -1027,9 +1186,9 @@ export function StoreCatalog() {
                                         limitedGroups={limitedGroups}
                                         showingCount={showingCount}
                                         canShowMore={groupsFiltered.length > limitedGroups.length}
-                                        onShowMore={() => setVisibleCount((p) => p + pageSize)}
+                                        onShowMore={handleShowMore}
                                         getPhotoForColor={(key) => getPhotoByKey(key)}
-                                        onQuickView={(g) => setQuickView(g)}
+                                        onQuickView={handleQuickView}
                                     />
                                 </div>
                             </main>
@@ -1044,25 +1203,17 @@ export function StoreCatalog() {
                     view={view}
                     lang={lang}
                     cartCount={totalCartPairs}
-                    onHome={() => {
-                        setView("home");
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    onCatalog={() => {
-                        setView("catalog");
-                        requestAnimationFrame(() =>
-                            document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                        );
-                    }}
-                    onCart={() => setCartOpen(true)}
-                    onHelp={() => router.push(`/help?lang=${lang}&loc=${locationFilter}`)}
+                    onHome={handleHomeClick}
+                    onCatalog={handleCatalogClick}
+                    onCart={handleCartOpen}
+                    onHelp={handleHelpClick}
                 />
 
                 <QuickView
                     open={!!quickView}
                     group={quickView}
                     lang={lang}
-                    onClose={() => setQuickView(null)}
+                    onClose={handleQuickViewClose}
                     quantities={quantities}
                     sizeFilter={sizeFilter}
                     onAdd={handleAddToCart}
@@ -1073,11 +1224,7 @@ export function StoreCatalog() {
 
                 <CartDrawer
                     open={cartOpen}
-                    onClose={() => {
-                        setCartOpen(false);
-                        const ret = popCartReturnTo();
-                        if (ret) router.push(ret);
-                    }}
+                    onClose={handleCartClose}
                     lang={lang}
                     cartLines={cartLines}
                     totalCartPairs={totalCartPairs}
@@ -1094,4 +1241,9 @@ export function StoreCatalog() {
             </div>
         </div>
     );
+}
+
+// ✅ OPTIMIZATION: Main catalog component (no longer wraps with CartProvider - that's at root)
+export function StoreCatalog() {
+    return <StoreCatalogInner />;
 }

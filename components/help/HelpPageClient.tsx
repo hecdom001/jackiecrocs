@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -199,18 +199,37 @@ export default function HelpPageClient() {
     const loc: "all" | LocationSlug =
         rawLoc === "all" ? "all" : isLocationSlug(rawLoc) ? rawLoc : "all";
 
-    const supportWaLink = buildWhatsAppSupportLink(lang, loc);
-
     const [query, setQuery] = useState("");
+    const [cartOpen, setCartOpen] = useState(false);
+
+    // ✅ OPTIMIZATION: Memoize computed values
+    const supportWaLink = useMemo(() => buildWhatsAppSupportLink(lang, loc), [lang, loc]);
 
     const visibleCities = useMemo<LocationSlug[]>(() => {
         if (loc !== "all") return [loc];
         return [...VISIBLE_LOCATION_SLUGS];
     }, [loc]);
 
-    const openCatalog = () => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`);
-    const openHome = () => router.push(`/?view=home&lang=${lang}&loc=${loc}`);
-    const openHelp = () => router.push(`/help?lang=${lang}&loc=${loc}`);
+    // ✅ OPTIMIZATION: Memoize navigation callbacks
+    const openCatalog = useCallback(() => {
+        router.push(`/?view=catalog&lang=${lang}&loc=${loc}`);
+    }, [router, lang, loc]);
+
+    const openHome = useCallback(() => {
+        router.push(`/?view=home&lang=${lang}&loc=${loc}`);
+    }, [router, lang, loc]);
+
+    const openHelp = useCallback(() => {
+        router.push(`/help?lang=${lang}&loc=${loc}`);
+    }, [router, lang, loc]);
+
+    const openCart = useCallback(() => {
+        setCartOpen(true);
+    }, []);
+
+    const closeCart = useCallback(() => {
+        setCartOpen(false);
+    }, []);
 
     // ✅ Get cart data from shared provider
     const {
@@ -227,13 +246,9 @@ export default function HelpPageClient() {
         getPhotoForItem,
     } = useCart();
 
-    const [cartOpen, setCartOpen] = useState(false);
     const cartCount = totalCartPairs;
 
-    // Open cart locally on Help page
-    const openCart = () => {
-        setCartOpen(true);
-    };
+    // ✅ OPTIMIZATION: Memoize FAQ data
     const faq = useMemo(() => {
         return [
             {
@@ -241,7 +256,7 @@ export default function HelpPageClient() {
                 a: t(
                     lang,
                     "Agrega al carrito y envía tu pedido por WhatsApp. Te confirmamos disponibilidad y pick up.",
-                    "Add to cart and send your order via WhatsApp. We’ll confirm availability and pickup."
+                    "Add to cart and send your order via WhatsApp. We'll confirm availability and pickup."
                 ),
             },
             {
@@ -249,7 +264,7 @@ export default function HelpPageClient() {
                 a: t(
                     lang,
                     "Por ahora es SOLO pick up. El catálogo cambia por ciudad.",
-                    "For now it’s PICKUP ONLY. Catalog changes by city."
+                    "For now it's PICKUP ONLY. Catalog changes by city."
                 ),
             },
             {
@@ -267,6 +282,29 @@ export default function HelpPageClient() {
         ];
     }, [lang]);
 
+    // ✅ OPTIMIZATION: Memoize scroll handlers
+    const scrollToPickup = useCallback(() => {
+        document
+            .getElementById("pickup")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, []);
+
+    const scrollToPayment = useCallback(() => {
+        document
+            .getElementById("payment")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, []);
+
+    const scrollToSizing = useCallback(() => {
+        document
+            .getElementById("sizing")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, []);
+
+    const setLangCallback = useCallback((l: Lang) => {
+        router.push(`/help?lang=${l}&loc=${loc}`);
+    }, [router, loc]);
+
     return (
         <div className="min-h-screen bg-white text-slate-900">
             {/* premium background glow */}
@@ -280,7 +318,7 @@ export default function HelpPageClient() {
             <div className="mx-auto w-full max-w-none px-3 sm:px-6 lg:px-10 2xl:px-14">
                 <StoreHeader
                     lang={lang}
-                    setLang={(l) => router.push(`/help?lang=${l}&loc=${loc}`)}
+                    setLang={setLangCallback}
                     query={query}
                     setQuery={setQuery}
                     totalCartPairs={cartCount}
@@ -328,33 +366,21 @@ export default function HelpPageClient() {
                                 title={t(lang, "Pick up", "Pickup")}
                                 subtitle={t(lang, "Ver ubicaciones", "View locations")}
                                 icon={<MapPin className="h-4 w-4 text-slate-700" />}
-                                onClick={() =>
-                                    document
-                                        .getElementById("pickup")
-                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                }
+                                onClick={scrollToPickup}
                             />
 
                             <ActionTile
                                 title={t(lang, "Pago", "Payment")}
                                 subtitle={t(lang, "Transferencia", "Bank transfer")}
                                 icon={<CreditCard className="h-4 w-4 text-slate-700" />}
-                                onClick={() =>
-                                    document
-                                        .getElementById("payment")
-                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                }
+                                onClick={scrollToPayment}
                             />
 
                             <ActionTile
                                 title={t(lang, "Tallas", "Sizing")}
                                 subtitle={t(lang, "Guía de tallas", "Size guide")}
                                 icon={<CreditCard className="h-4 w-4 text-slate-700" />}
-                                onClick={() =>
-                                    document
-                                        .getElementById("sizing")
-                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                }
+                                onClick={scrollToSizing}
                             />
                         </div>
                     </div>
@@ -398,72 +424,37 @@ export default function HelpPageClient() {
                                                     <div className="text-slate-500 text-sm hidden group-open:block">–</div>
                                                 </summary>
 
-                                                <div className="px-4 pb-4 space-y-2">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <a
-                                                            href={waCity}
-                                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-extrabold text-white hover:bg-emerald-700"
-                                                        >
-                                                            <MessageCircle className="h-4 w-4" />
-                                                            WhatsApp
-                                                        </a>
-                                                        <a
-                                                            href={mapsSearchLink(`${prettyCity(slug)} pickup`)}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-extrabold text-slate-900 hover:bg-slate-50"
-                                                        >
-                                                            <MapPin className="h-4 w-4" />
-                                                            Maps
-                                                        </a>
-                                                    </div>
-
-                                                    <div className="space-y-2 pt-1">
-                                                        {spots.map((spot) => {
-                                                            const maps = mapsSearchLink(
-                                                                spot.addressHint
-                                                                    ? `${spot.name} ${spot.addressHint}`
-                                                                    : `${spot.name} ${prettyCity(slug)}`
-                                                            );
-
-                                                            return (
-                                                                <div
-                                                                    key={`${slug}-${spot.name}`}
-                                                                    className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                                                <div className="px-4 pb-4 space-y-3">
+                                                    {spots.map((spot, idx) => (
+                                                        <div key={idx} className="space-y-2">
+                                                            <p className="text-[12px] font-extrabold text-slate-900">
+                                                                {spot.name}
+                                                            </p>
+                                                            {spot.addressHint && (
+                                                                <p className="text-[11px] text-slate-600 leading-relaxed">
+                                                                    {spot.addressHint}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex gap-2">
+                                                                <a
+                                                                    href={mapsSearchLink(spot.name)}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 transition"
                                                                 >
-                                                                    <p className="text-[12px] font-extrabold text-slate-900">
-                                                                        {spot.name}
-                                                                    </p>
-                                                                    {spot.addressHint ? (
-                                                                        <p className="mt-0.5 text-[11px] text-slate-600">
-                                                                            {spot.addressHint}
-                                                                        </p>
-                                                                    ) : null}
-
-                                                                    <div className="mt-2 flex items-center gap-2">
-                                                                        <a
-                                                                            href={maps}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-extrabold text-slate-900 hover:bg-slate-50"
-                                                                        >
-                                                                            <MapPin className="h-4 w-4" />
-                                                                            {t(lang, "Abrir Maps", "Open Maps")}
-                                                                            <ArrowUpRight className="h-4 w-4 opacity-70" />
-                                                                        </a>
-
-                                                                        <a
-                                                                            href={waCity}
-                                                                            className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-2 text-[11px] font-extrabold text-white hover:bg-emerald-700"
-                                                                            aria-label="WhatsApp"
-                                                                        >
-                                                                            <MessageCircle className="h-4 w-4" />
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
+                                                                    <MapPin className="h-3 w-3" />
+                                                                    {t(lang, "Ver mapa", "View map")}
+                                                                </a>
+                                                                <a
+                                                                    href={waCity}
+                                                                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-800 hover:bg-emerald-100/60 transition"
+                                                                >
+                                                                    <MessageCircle className="h-3 w-3" />
+                                                                    WhatsApp
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </details>
                                         );
@@ -471,7 +462,7 @@ export default function HelpPageClient() {
                                 </div>
 
                                 {/* Desktop grid */}
-                                <div className="hidden lg:grid mt-4 grid-cols-2 gap-4">
+                                <div className="mt-4 hidden lg:grid lg:grid-cols-2 gap-4">
                                     {visibleCities.map((slug) => {
                                         const spots = PICKUP_SPOTS_BY_LOCATION[slug] ?? [];
                                         const waCity = buildWhatsAppSupportLink(lang, slug);
@@ -479,64 +470,43 @@ export default function HelpPageClient() {
                                         return (
                                             <div
                                                 key={slug}
-                                                className="rounded-2xl border border-slate-200 bg-white p-5"
+                                                className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3"
                                             >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div>
-                                                        <p className="text-[12px] font-extrabold text-slate-900">
-                                                            {prettyCity(slug)}
-                                                        </p>
-                                                        <p className="mt-0.5 text-[11px] text-slate-600">
-                                                            {t(lang, "Pick up", "Pickup")} ·{" "}
-                                                            {t(lang, "Toca para abrir Maps", "Tap to open Maps")}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2">
-                                                        <a
-                                                            href={waCity}
-                                                            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-[11px] font-extrabold text-white hover:bg-emerald-700"
-                                                        >
-                                                            <MessageCircle className="h-4 w-4" />
-                                                            WhatsApp
-                                                        </a>
-                                                    </div>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[13px] font-extrabold text-slate-900">
+                                                        {prettyCity(slug)}
+                                                    </p>
+                                                    <a
+                                                        href={waCity}
+                                                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-extrabold text-emerald-800 hover:bg-emerald-100/60 transition"
+                                                    >
+                                                        <MessageCircle className="h-3 w-3" />
+                                                        WhatsApp
+                                                    </a>
                                                 </div>
 
-                                                <div className="mt-4 space-y-2">
-                                                    {spots.map((spot) => {
-                                                        const maps = mapsSearchLink(
-                                                            spot.addressHint
-                                                                ? `${spot.name} ${spot.addressHint}`
-                                                                : `${spot.name} ${prettyCity(slug)}`
-                                                        );
-
-                                                        return (
+                                                <div className="space-y-3">
+                                                    {spots.map((spot, idx) => (
+                                                        <div key={idx} className="space-y-1.5">
+                                                            <p className="text-[12px] font-extrabold text-slate-900">
+                                                                {spot.name}
+                                                            </p>
+                                                            {spot.addressHint && (
+                                                                <p className="text-[11px] text-slate-600 leading-relaxed">
+                                                                    {spot.addressHint}
+                                                                </p>
+                                                            )}
                                                             <a
-                                                                key={`${slug}-${spot.name}`}
-                                                                href={maps}
+                                                                href={mapsSearchLink(spot.name)}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="group flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 hover:bg-slate-100 transition"
+                                                                className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-700 hover:underline"
                                                             >
-                                                                <div className="min-w-0">
-                                                                    <p className="text-[13px] font-extrabold text-slate-900 truncate">
-                                                                        {spot.name}
-                                                                    </p>
-                                                                    {spot.addressHint ? (
-                                                                        <p className="text-[11px] text-slate-500 truncate">
-                                                                            {spot.addressHint}
-                                                                        </p>
-                                                                    ) : null}
-                                                                </div>
-                                                                <span className="shrink-0 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-extrabold text-slate-900">
-                                  <MapPin className="h-4 w-4" />
-                                                                    {t(lang, "Maps", "Maps")}
-                                                                    <ArrowUpRight className="h-4 w-4 opacity-70" />
-                                </span>
+                                                                <MapPin className="h-3 w-3" />
+                                                                {t(lang, "Ver en Maps", "View on Maps")}
                                                             </a>
-                                                        );
-                                                    })}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         );
@@ -550,51 +520,85 @@ export default function HelpPageClient() {
                             <div id="payment" className="p-5 sm:p-6">
                                 <SectionTitle
                                     eyebrow={t(lang, "Pago", "Payment")}
-                                    title={t(lang, "Pago por transferencia", "Bank transfer")}
+                                    title={t(lang, "Cómo apartar tu pedido", "How to reserve your order")}
                                     subtitle={t(
                                         lang,
-                                        "Si pagas por transferencia, usa estos datos.",
-                                        "If you pay by transfer, use these details."
+                                        "Transferencia bancaria en México.",
+                                        "Bank transfer in Mexico."
                                     )}
                                     icon={<CreditCard className="h-4 w-4 text-slate-800" />}
                                 />
 
-                                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="text-[12px] font-extrabold text-slate-900">
-                                            {MEX_BANK_INFO.bankName}
-                                        </p>
-                                        <span className="text-[11px] font-semibold text-slate-500">
-                      {t(lang, "Transferencia", "Transfer")}
-                    </span>
+                                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-[11px] font-extrabold tracking-wide uppercase text-slate-500">
+                                                {t(lang, "Banco", "Bank")}
+                                            </p>
+                                            <p className="mt-0.5 text-[13px] font-extrabold text-slate-900">
+                                                {MEX_BANK_INFO.bankName}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-extrabold tracking-wide uppercase text-slate-500">
+                                                {t(lang, "Titular", "Account holder")}
+                                            </p>
+                                            <p className="mt-0.5 text-[13px] font-extrabold text-slate-900">
+                                                {MEX_BANK_INFO.accountName}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-extrabold tracking-wide uppercase text-slate-500">
+                                                {t(lang, "Cuenta", "Account Number")}
+                                            </p>
+                                            <p className="mt-0.5 text-[13px] font-mono font-extrabold text-slate-900 tracking-wider">
+                                                {MEX_BANK_INFO.accountNumber}
+                                            </p>
+                                        </div>
                                     </div>
+                                </div>
 
-                                    <div className="mt-3 space-y-2 text-[12px]">
-                                        <p className="text-slate-700">
-                      <span className="font-extrabold text-slate-900">
-                        {t(lang, "Nombre", "Name")}:
-                      </span>{" "}
-                                            {MEX_BANK_INFO.accountName}
-                                        </p>
-                                        <p className="text-slate-700">
-                      <span className="font-extrabold text-slate-900">
-                        {t(lang, "Cuenta", "Account")}:
-                      </span>{" "}
-                                            {MEX_BANK_INFO.accountNumber}
-                                        </p>
+                                <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 grid h-6 w-6 place-items-center rounded-full bg-slate-100 text-slate-800 text-[11px] font-extrabold flex-shrink-0">
+                                            1
+                                        </div>
+                                        <div>
+                                            <p className="text-[12px] font-extrabold text-slate-900">
+                                                {t(lang, "Envía tu pedido por WhatsApp", "Send your order via WhatsApp")}
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
+                                                {t(
+                                                    lang,
+                                                    "Agrega al carrito y presiona 'Enviar por WhatsApp'.",
+                                                    "Add to cart and press 'Send via WhatsApp'."
+                                                )}
+                                            </p>
+                                        </div>
                                     </div>
+                                </div>
 
-                                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] font-extrabold text-slate-900">
-                                            {t(lang, "Importante", "Important")}
-                                        </p>
-                                        <p className="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
-                                            {t(
-                                                lang,
-                                                "Después manda tu comprobante por WhatsApp para confirmar tu apartado.",
-                                                "Then send your receipt via WhatsApp so we can confirm your reservation."
-                                            )}
-                                        </p>
+                                <div className="mt-2 rounded-2xl border border-slate-200 bg-white/80 p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 grid h-6 w-6 place-items-center rounded-full bg-slate-100 text-slate-800 text-[11px] font-extrabold flex-shrink-0">
+                                            2
+                                        </div>
+                                        <div>
+                                            <p className="text-[12px] font-extrabold text-slate-900">
+                                                {t(
+                                                    lang,
+                                                    "Haz la transferencia y envía tu comprobante",
+                                                    "Make the transfer and send your receipt"
+                                                )}
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
+                                                {t(
+                                                    lang,
+                                                    "Después manda tu comprobante por WhatsApp para confirmar tu apartado.",
+                                                    "Then send your receipt via WhatsApp so we can confirm your reservation."
+                                                )}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -661,11 +665,7 @@ export default function HelpPageClient() {
 
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                document
-                                                    .getElementById("pickup")
-                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                            }
+                                            onClick={scrollToPickup}
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
@@ -681,11 +681,7 @@ export default function HelpPageClient() {
 
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                document
-                                                    .getElementById("payment")
-                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                            }
+                                            onClick={scrollToPayment}
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
@@ -701,11 +697,7 @@ export default function HelpPageClient() {
 
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                document
-                                                    .getElementById("sizing")
-                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                                            }
+                                            onClick={scrollToSizing}
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
@@ -741,15 +733,15 @@ export default function HelpPageClient() {
                 view="help"
                 lang={lang}
                 cartCount={cartCount}
-                onHome={() => router.push(`/?view=home&lang=${lang}&loc=${loc}`)}
-                onCatalog={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
+                onHome={openHome}
+                onCatalog={openCatalog}
                 onCart={openCart}
                 onHelp={openHelp}
             />
 
             <CartDrawer
                 open={cartOpen}
-                onClose={() => setCartOpen(false)}
+                onClose={closeCart}
                 lang={lang}
                 cartLines={cartLines}
                 totalCartPairs={totalCartPairs}

@@ -1,8 +1,7 @@
 // components/store/CartProvider.tsx
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import type { PublicItem, CartLine } from "@/lib/jackieCatalogUtils";
 import { getCartLocationInfo, buildWhatsAppLink } from "@/lib/jackieCatalogUtils";
 import { LS_CART_KEY, PLACEHOLDER_IMAGE } from "./storeConstants";
@@ -19,9 +18,10 @@ interface CartContextValue {
     hasCartWhatsApp: boolean;
     cartLocationSlug: string;
 
-    // Items
+    // Items (passed from parent, not fetched here)
     items: PublicItem[];
     itemsLoading: boolean;
+    productImageMap: ProductImageMap;
 
     // Actions
     addToCart: (item: PublicItem) => void;
@@ -33,106 +33,21 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-    const [items, setItems] = useState<PublicItem[]>([]);
-    const [itemsLoading, setItemsLoading] = useState(true);
+interface CartProviderProps {
+    children: React.ReactNode;
+    items?: PublicItem[];
+    itemsLoading?: boolean;
+    productImageMap?: ProductImageMap;
+}
+
+export function CartProvider({
+                                 children,
+                                 items = [],
+                                 itemsLoading = false,
+                                 productImageMap = {}
+                             }: CartProviderProps) {
     const [quantities, setQuantities] = useState<Record<string, number>>({});
-    const [productImageMap, setProductImageMap] = useState<ProductImageMap>({});
     const cartHydratedRef = useRef(false);
-
-    // Load items ONCE on mount
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadData() {
-            try {
-                // Load images and inventory in parallel
-                const [imagesRes, inventoryRes] = await Promise.all([
-                    fetch("/api/product-images", { cache: "no-store" }),
-                    supabase
-                        .from("inventory_items")
-                        .select(`
-                            id, size_id, location_id, price_mxn, status, created_at,
-                            models ( name, brand, uses_size, uses_color, category_id ),
-                            colors ( name_en ),
-                            sizes ( id, label ),
-                            locations ( slug, name )
-                        `)
-                        .eq("status", "available")
-                ]);
-
-                if (cancelled) return;
-
-                // Process images
-                if (imagesRes.ok) {
-                    const imagesData = await imagesRes.json();
-                    if (Array.isArray(imagesData?.rows)) {
-                        const imageMap: ProductImageMap = {};
-                        for (const r of imagesData.rows) {
-                            if (r?.key && r?.src) {
-                                imageMap[String(r.key).toLowerCase()] = {
-                                    src: r.src,
-                                    label: r.alt || ""
-                                };
-                            }
-                        }
-                        setProductImageMap(imageMap);
-                    }
-                }
-
-                // Process inventory
-                const { data, error } = inventoryRes;
-                if (error || !data || cancelled) {
-                    setItemsLoading(false);
-                    return;
-                }
-
-                const variantMap = new Map<string, PublicItem>();
-                data.forEach((row: any) => {
-                    const model_name = row.models?.name ?? "";
-                    const brand = row.models?.brand ?? "";
-                    const uses_size = !!row.models?.uses_size;
-                    const uses_color = !!row.models?.uses_color;
-                    const category_id = row.models?.category_id ? String(row.models.category_id) : null;
-                    const color = row.colors?.name_en ?? "";
-                    const size_id = row.size_id as string;
-                    const sizeLabel = row.sizes?.label ?? "";
-                    const locSlug = row.locations?.slug ?? "unknown";
-                    const locName = row.locations?.name ?? "";
-                    const price_mxn = Number(row.price_mxn);
-                    const created_at = row.created_at ?? new Date(0).toISOString();
-
-                    if (!size_id || !sizeLabel) return;
-
-                    const stableId = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`.toLowerCase();
-                    const existing = variantMap.get(stableId);
-
-                    if (existing) {
-                        existing.availableCount += 1;
-                    } else {
-                        variantMap.set(stableId, {
-                            id: stableId,
-                            model_name, brand, uses_size, uses_color, category_id,
-                            color, size: sizeLabel, size_id,
-                            location_slug: locSlug, location_name: locName,
-                            price_mxn, availableCount: 1, created_at,
-                        });
-                    }
-                });
-
-                if (!cancelled) {
-                    setItems(Array.from(variantMap.values()));
-                    setItemsLoading(false);
-                }
-            } catch (err) {
-                console.error('Failed to load cart data:', err);
-                if (!cancelled) setItemsLoading(false);
-            }
-        }
-
-        loadData();
-        return () => { cancelled = true; };
-    }, []);
 
     // Hydrate cart from localStorage ONCE
     useEffect(() => {
@@ -159,29 +74,51 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    // Write to localStorage when quantities change (after hydration)
+    // ✅ OPTIMIZATION: Debounce localStorage writes to avoid excessive writes
+    const debouncedQuantitiesRef = useRef(quantities);
+    const writeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
     useEffect(() => {
         if (typeof window === "undefined") return;
         if (!cartHydratedRef.current) return;
 
-        requestAnimationFrame(() => {
+        // Clear previous timeout
+        if (writeTimeoutRef.current) {
+            clearTimeout(writeTimeoutRef.current);
+        }
+
+        // Debounce writes by 300ms
+        writeTimeoutRef.current = setTimeout(() => {
             try {
                 window.localStorage.setItem(LS_CART_KEY, JSON.stringify(quantities));
+                debouncedQuantitiesRef.current = quantities;
             } catch {
                 // Ignore write errors
             }
-        });
+        }, 300);
+
+        return () => {
+            if (writeTimeoutRef.current) {
+                clearTimeout(writeTimeoutRef.current);
+            }
+        };
     }, [quantities]);
 
-    // Compute derived values
+    // ✅ OPTIMIZATION: Memoize cart lines computation
     const cartLines: CartLine[] = useMemo(() => {
         return items
             .map((item) => ({ item, count: quantities[item.id] ?? 0 }))
             .filter((line) => line.count > 0);
     }, [items, quantities]);
 
+    // ✅ OPTIMIZATION: Memoize all derived values
     const cartLocationInfo = useMemo(() => getCartLocationInfo(cartLines), [cartLines]);
-    const isMixedCart = cartLocationInfo.state === "mixed";
+
+    const isMixedCart = useMemo(() =>
+            cartLocationInfo.state === "mixed",
+        [cartLocationInfo.state]
+    );
+
     const totalCartPairs = useMemo(() =>
             cartLines.reduce((sum, l) => sum + l.count, 0),
         [cartLines]
@@ -192,18 +129,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         [cartLines]
     );
 
-    const hasCartWhatsApp = !isMixedCart && waLinkForCart !== "#" && cartLines.length > 0;
-    const cartLocationSlug = cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown");
+    const hasCartWhatsApp = useMemo(() =>
+            !isMixedCart && waLinkForCart !== "#" && cartLines.length > 0,
+        [isMixedCart, waLinkForCart, cartLines.length]
+    );
 
-    // Actions
-    const addToCart = (item: PublicItem) => {
+    const cartLocationSlug = useMemo(() =>
+            cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown"),
+        [cartLocationInfo.slug, isMixedCart]
+    );
+
+    // ✅ OPTIMIZATION: Wrap actions in useCallback to prevent unnecessary re-renders
+    const addToCart = useCallback((item: PublicItem) => {
         setQuantities((prev) => ({
             ...prev,
             [item.id]: (prev[item.id] ?? 0) + 1
         }));
-    };
+    }, []);
 
-    const removeFromCart = (itemId: string) => {
+    const removeFromCart = useCallback((itemId: string) => {
         setQuantities((prev) => {
             const current = prev[itemId] ?? 0;
             if (current <= 1) {
@@ -212,26 +156,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             }
             return { ...prev, [itemId]: current - 1 };
         });
-    };
+    }, []);
 
-    const removeItem = (itemId: string) => {
+    const removeItem = useCallback((itemId: string) => {
         setQuantities((prev) => {
             const { [itemId]: _, ...rest } = prev;
             return rest;
         });
-    };
+    }, []);
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         setQuantities({});
-    };
+    }, []);
 
-    const getPhotoForItem = (item: PublicItem) => {
+    // ✅ OPTIMIZATION: Memoize photo lookup function
+    const getPhotoForItem = useCallback((item: PublicItem) => {
         const key = `${String(item.model_name || "").trim()}__${String(item.color || "").trim()}`.toLowerCase();
         const photo = productImageMap[key];
         return photo?.src ? photo : { src: PLACEHOLDER_IMAGE, label: item.model_name || "" };
-    };
+    }, [productImageMap]);
 
-    const value: CartContextValue = {
+    // ✅ OPTIMIZATION: Memoize context value to prevent unnecessary re-renders
+    const value: CartContextValue = useMemo(() => ({
         quantities,
         cartLines,
         totalCartPairs,
@@ -241,12 +187,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         cartLocationSlug,
         items,
         itemsLoading,
+        productImageMap,
         addToCart,
         removeFromCart,
         removeItem,
         clearCart,
         getPhotoForItem,
-    };
+    }), [
+        quantities,
+        cartLines,
+        totalCartPairs,
+        isMixedCart,
+        waLinkForCart,
+        hasCartWhatsApp,
+        cartLocationSlug,
+        items,
+        itemsLoading,
+        productImageMap,
+        addToCart,
+        removeFromCart,
+        removeItem,
+        clearCart,
+        getPhotoForItem,
+    ]);
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

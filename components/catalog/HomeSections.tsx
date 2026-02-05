@@ -450,16 +450,6 @@ export function HomeSections({
                                         >
                                             📲 {t(lang, "WhatsApp", "WhatsApp")}
                                         </button>
-
-                                        {totalCartPairs > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={onOpenCart}
-                                                className="inline-flex items-center justify-center rounded-full bg-white border border-slate-200 px-6 py-4 text-sm font-extrabold text-slate-900 hover:bg-slate-50 transition"
-                                            >
-                                                🧺 {t(lang, "Carrito", "Cart")} · {totalCartPairs}
-                                            </button>
-                                        )}
                                     </div>
                                 </div>
 
