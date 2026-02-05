@@ -3,22 +3,39 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { buildWhatsAppSupportLink, Lang, t } from "@/lib/jackieCatalogUtils";
+import {
+    buildWhatsAppSupportLink,
+    buildWhatsAppLink,
+    getCartLocationInfo,
+    Lang,
+    t,
+    type CartLine,
+    type PublicItem,
+} from "@/lib/jackieCatalogUtils";
 
 import { StoreHeader } from "@/components/layout/StoreHeader";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { SizeGuide } from "@/components/help/SizeGuide";
 import { StoreFooter } from "@/components/layout/StoreFooter";
+import { CartDrawer } from "@/components/catalog/CartDrawer";
+import { supabase } from "@/lib/supabaseClient";
+import { useCart } from "@/components/store/CartProvider";
 
 import {
     VISIBLE_LOCATION_SLUGS,
     PICKUP_SPOTS_BY_LOCATION,
     MEX_BANK_INFO,
+    PLACEHOLDER_IMAGE,
     type LocationSlug,
     isLocationSlug,
 } from "@/components/store/storeConstants";
 
-import { subscribeCart, countCartPairs, requestOpenCart } from "@/components/store/storeClient";
+import {
+    subscribeCart,
+    countCartPairs,
+    requestOpenCart,
+    readCart,
+} from "@/components/store/storeClient";
 
 import {
     MapPin,
@@ -195,19 +212,28 @@ export default function HelpPageClient() {
     const openHome = () => router.push(`/?view=home&lang=${lang}&loc=${loc}`);
     const openHelp = () => router.push(`/help?lang=${lang}&loc=${loc}`);
 
-    // Open cart from Help page
-    const openCartInCatalog = () => {
-        requestOpenCart(window.location.href);
-        router.push(`/?view=catalog&lang=${lang}&loc=${loc}`);
+    // ✅ Get cart data from shared provider
+    const {
+        cartLines,
+        totalCartPairs,
+        isMixedCart,
+        waLinkForCart,
+        hasCartWhatsApp,
+        cartLocationSlug,
+        addToCart: handleAddToCart,
+        removeFromCart: handleRemoveFromCart,
+        removeItem: removeItemFromCart,
+        clearCart,
+        getPhotoForItem,
+    } = useCart();
+
+    const [cartOpen, setCartOpen] = useState(false);
+    const cartCount = totalCartPairs;
+
+    // Open cart locally on Help page
+    const openCart = () => {
+        setCartOpen(true);
     };
-
-    const [cartCount, setCartCount] = useState(0);
-
-    // ✅ Centralized cart updates (fast + consistent across pages)
-    useEffect(() => {
-        return subscribeCart((cart) => setCartCount(countCartPairs(cart)));
-    }, []);
-
     const faq = useMemo(() => {
         return [
             {
@@ -258,7 +284,7 @@ export default function HelpPageClient() {
                     query={query}
                     setQuery={setQuery}
                     totalCartPairs={cartCount}
-                    onCartClick={openCartInCatalog}
+                    onCartClick={openCart}
                     onHomeClick={openHome}
                     view="help"
                     categories={[]}
@@ -717,8 +743,25 @@ export default function HelpPageClient() {
                 cartCount={cartCount}
                 onHome={() => router.push(`/?view=home&lang=${lang}&loc=${loc}`)}
                 onCatalog={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
-                onCart={openCartInCatalog}
+                onCart={openCart}
                 onHelp={openHelp}
+            />
+
+            <CartDrawer
+                open={cartOpen}
+                onClose={() => setCartOpen(false)}
+                lang={lang}
+                cartLines={cartLines}
+                totalCartPairs={totalCartPairs}
+                isMixedCart={isMixedCart}
+                waLinkForCart={waLinkForCart}
+                hasCartWhatsApp={hasCartWhatsApp}
+                clearCart={clearCart}
+                onAdd={handleAddToCart}
+                onRemove={handleRemoveFromCart}
+                onRemoveItem={removeItemFromCart}
+                cartLocationSlug={cartLocationSlug}
+                getPhotoForCartItem={getPhotoForItem}
             />
         </div>
     );

@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useCart } from "@/components/store/CartProvider";
 
 import {
     LS_LOCATION_KEY,
@@ -159,10 +160,25 @@ export function StoreCatalog() {
     const router = useRouter();
     const sp = useSearchParams();
 
-    const [lang, setLang] = useState<Lang>("es");
+    // ✅ Get cart data from shared provider
+    const {
+        items,
+        itemsLoading: loading,
+        cartLines,
+        totalCartPairs,
+        isMixedCart,
+        waLinkForCart,
+        hasCartWhatsApp,
+        cartLocationSlug,
+        quantities,
+        addToCart: handleAddToCart,
+        removeFromCart: handleRemoveFromCart,
+        removeItem: removeItemFromCart,
+        clearCart,
+        getPhotoForItem,
+    } = useCart();
 
-    const [items, setItems] = useState<PublicItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [lang, setLang] = useState<Lang>("es");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -180,8 +196,6 @@ export function StoreCatalog() {
     const [cartOpen, setCartOpen] = useState(false);
     const [quickView, setQuickView] = useState<ColorGroup | null>(null);
 
-    const [quantities, setQuantities] = useState<Record<string, number>>({});
-
     const [pageSize, setPageSize] = useState<number>(MOBILE_INITIAL_VISIBLE);
     const [visibleCount, setVisibleCount] = useState<number>(MOBILE_INITIAL_VISIBLE);
 
@@ -191,8 +205,6 @@ export function StoreCatalog() {
     const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
     const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
 
-    // ✅ prevent “initial {} write” from nuking localStorage
-    const cartHydratedRef = useRef(false);
 
     useEffect(() => {
         const v = sp.get("view");
@@ -356,117 +368,14 @@ export function StoreCatalog() {
         );
     }
 
-    async function loadInventory() {
-        setLoading(true);
-        setErrorMsg(null);
-
-        const { data, error } = await supabase
-            .from("inventory_items")
-            .select(
-                `
-        id,
-        size_id,
-        location_id,
-        price_mxn,
-        status,
-        created_at,
-        models ( name, brand, uses_size, uses_color, category_id ),
-        colors ( name_en ),
-        sizes ( id, label ),
-        locations ( slug, name )
-      `
-            )
-            .eq("status", "available")
-            .order("created_at", { ascending: false });
-
-        if (error) {
-            setErrorMsg("Error cargando inventario / Error loading inventory");
-            setLoading(false);
-            return;
-        }
-
-        const variantMap = new Map<string, PublicItem>();
-
-        (data ?? []).forEach((row: any) => {
-            const model_name: string = row.models?.name ?? "";
-            const brand: string = row.models?.brand ?? "";
-
-            const uses_size: boolean = !!row.models?.uses_size;
-            const uses_color: boolean = !!row.models?.uses_color;
-
-            const category_id: string | null = row.models?.category_id ? String(row.models.category_id) : null;
-
-            const color: string = row.colors?.name_en ?? "";
-            const size_id: string = row.size_id as string;
-            const sizeLabel: string = row.sizes?.label ?? "";
-            const locSlug: string = row.locations?.slug ?? "unknown";
-            const locName: string = row.locations?.name ?? "";
-            const price_mxn: number = Number(row.price_mxn);
-            const created_at: string = row.created_at ?? new Date(0).toISOString();
-
-            if (!size_id || !sizeLabel) return;
-
-            const stableId = makeVariantId({ model_name, color, size_id, price_mxn, locSlug });
-            const existing = variantMap.get(stableId);
-
-            if (existing) {
-                existing.availableCount += 1;
-                if (created_at > existing.created_at) existing.created_at = created_at;
-            } else {
-                variantMap.set(stableId, {
-                    id: stableId,
-                    model_name,
-                    brand,
-                    uses_size,
-                    uses_color,
-                    category_id,
-                    color,
-                    size: sizeLabel,
-                    size_id,
-                    location_slug: locSlug,
-                    location_name: locName,
-                    price_mxn,
-                    availableCount: 1,
-                    created_at,
-                });
-            }
-        });
-
-        const mapped = Array.from(variantMap.values());
-        setItems(mapped);
-
-        // ✅ Only clamp AFTER cart hydration (do not delete unknown keys)
-        setQuantities((prev) => {
-            if (!cartHydratedRef.current) return prev;
-
-            const next = { ...prev };
-            for (const item of mapped) {
-                const qty = prev[item.id] ?? 0;
-                if (qty > 0) next[item.id] = Math.min(qty, item.availableCount);
-            }
-            // Only remove keys for items that exist and are now <=0 (keep unknown keys untouched)
-            for (const item of mapped) {
-                if ((next[item.id] ?? 0) <= 0) delete next[item.id];
-            }
-            return next;
-        });
-
-        setLastUpdated(new Date());
-        setLoading(false);
-    }
 
     useEffect(() => {
         loadLocations();
         loadCategories();
-        loadInventory();
+        // loadInventory() now handled by CartProvider
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    useEffect(() => {
-        const id = setInterval(() => loadInventory(), 3 * 60_000);
-        return () => clearInterval(id);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const categoryById = useMemo(() => {
         const m = new Map<string, CategoryOption>();
@@ -569,44 +478,6 @@ export function StoreCatalog() {
         };
     }, [mobileFiltersOpen]);
 
-    // ✅ Hydrate cart (NO early returns)
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-
-        try {
-            const raw = window.localStorage.getItem(LS_CART_KEY);
-            const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : null;
-
-            const next: Record<string, number> = {};
-            if (parsed && typeof parsed === "object") {
-                for (const [k, v] of Object.entries(parsed)) {
-                    const n = Number(v);
-                    if (Number.isFinite(n) && n > 0) next[k] = Math.floor(n);
-                }
-            }
-            setQuantities(next);
-        } catch {
-            setQuantities({});
-        } finally {
-            cartHydratedRef.current = true;
-        }
-    }, []);
-
-    // ✅ Only write AFTER hydration
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        if (!cartHydratedRef.current) return;
-
-        // CRITICAL FIX: Use requestAnimationFrame to ensure state has updated
-        // This prevents writing stale {} state after hydration
-        requestAnimationFrame(() => {
-            try {
-                window.localStorage.setItem(LS_CART_KEY, JSON.stringify(quantities));
-            } catch {
-                // ignore
-            }
-        });
-    }, [quantities]);
 
     // ✅ If Help requested opening cart, do it once on mount
     useEffect(() => {
@@ -622,14 +493,6 @@ export function StoreCatalog() {
         );
     }, []);
 
-    const clearCart = () => {
-        setQuantities({});
-        if (typeof window !== "undefined") {
-            try {
-                window.localStorage.removeItem(LS_CART_KEY);
-            } catch {}
-        }
-    };
 
     const selectedLocationName = useMemo(() => {
         if (locationFilter === "all") return lang === "es" ? "Todas" : "All";
@@ -706,49 +569,11 @@ export function StoreCatalog() {
     const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
-    const cartLines: CartLine[] = useMemo(() => {
-        return items.map((item) => ({ item, count: quantities[item.id] ?? 0 })).filter((line) => line.count > 0);
-    }, [items, quantities]);
-
-    const cartLocationInfo = getCartLocationInfo(cartLines);
-    const isMixedCart = cartLocationInfo.state === "mixed";
-
-    const waLinkForCart = buildWhatsAppLink(cartLines, lang);
-    const hasCartWhatsApp = !isMixedCart && waLinkForCart !== "#" && cartLines.length > 0;
-
     const supportWaLink = buildWhatsAppSupportLink(lang, locationFilter);
-
-    const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
     const formattedLastUpdated =
         lastUpdated?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? null;
 
-    const handleAddToCart = (item: PublicItem) => {
-        setQuantities((prev) => {
-            const current = prev[item.id] ?? 0;
-            // @ts-ignore runtime availableCount
-            if (current >= (item as any).availableCount) return prev;
-            return { ...prev, [item.id]: current + 1 };
-        });
-    };
-
-    const handleRemoveFromCart = (itemId: string) => {
-        setQuantities((prev) => {
-            const current = prev[itemId] ?? 0;
-            if (current <= 1) {
-                const { [itemId]: _, ...rest } = prev;
-                return rest;
-            }
-            return { ...prev, [itemId]: current - 1 };
-        });
-    };
-
-    const removeItemFromCart = (itemId: string) => {
-        setQuantities((prev) => {
-            const { [itemId]: _, ...rest } = prev;
-            return rest;
-        });
-    };
 
     const pickupGroupedSpots: Record<string, string[]> =
         locationFilter === "all"
@@ -1019,7 +844,7 @@ export function StoreCatalog() {
                                                     allColors={allColors}
                                                     totalPairsFiltered={totalPairsFiltered}
                                                     formattedLastUpdated={formattedLastUpdated}
-                                                    onRefresh={loadInventory}
+                                                    onRefresh={() => {}}
                                                 />
                                             </div>
 
@@ -1088,7 +913,7 @@ export function StoreCatalog() {
                                                 allColors={allColors}
                                                 totalPairsFiltered={totalPairsFiltered}
                                                 formattedLastUpdated={formattedLastUpdated}
-                                                onRefresh={loadInventory}
+                                                onRefresh={() => {}}
                                             />
                                         </div>
 
@@ -1263,11 +1088,8 @@ export function StoreCatalog() {
                     onAdd={handleAddToCart}
                     onRemove={handleRemoveFromCart}
                     onRemoveItem={removeItemFromCart}
-                    cartLocationSlug={cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown")}
-                    getPhotoForCartItem={(item) => {
-                        const key = `${String(item.model_name || "").trim()}__${String(item.color || "").trim()}`.toLowerCase();
-                        return getPhotoByKey(key);
-                    }}
+                    cartLocationSlug={cartLocationSlug}
+                    getPhotoForCartItem={getPhotoForItem}
                 />
             </div>
         </div>
