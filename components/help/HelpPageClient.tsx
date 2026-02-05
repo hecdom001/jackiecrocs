@@ -18,7 +18,7 @@ import {
     isLocationSlug,
 } from "@/components/store/storeConstants";
 
-import { subscribeCart, countCartPairs } from "@/components/store/storeClient";
+import { subscribeCart, countCartPairs, requestOpenCart } from "@/components/store/storeClient";
 
 import {
     MapPin,
@@ -195,6 +195,12 @@ export default function HelpPageClient() {
     const openHome = () => router.push(`/?view=home&lang=${lang}&loc=${loc}`);
     const openHelp = () => router.push(`/help?lang=${lang}&loc=${loc}`);
 
+    // Open cart from Help page
+    const openCartInCatalog = () => {
+        requestOpenCart(window.location.href);
+        router.push(`/?view=catalog&lang=${lang}&loc=${loc}`);
+    };
+
     const [cartCount, setCartCount] = useState(0);
 
     // ✅ Centralized cart updates (fast + consistent across pages)
@@ -252,7 +258,7 @@ export default function HelpPageClient() {
                     query={query}
                     setQuery={setQuery}
                     totalCartPairs={cartCount}
-                    onCartClick={openCatalog}
+                    onCartClick={openCartInCatalog}
                     onHomeClick={openHome}
                     view="help"
                     categories={[]}
@@ -711,7 +717,7 @@ export default function HelpPageClient() {
                 cartCount={cartCount}
                 onHome={() => router.push(`/?view=home&lang=${lang}&loc=${loc}`)}
                 onCatalog={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
-                onCart={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
+                onCart={openCartInCatalog}
                 onHelp={openHelp}
             />
         </div>

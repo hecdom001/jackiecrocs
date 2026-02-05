@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
             🐊
           </div>
           <h1 className="text-lg font-semibold text-slate-900">
-            Jacky Crocs Admin
+            Aguuacatito.Shop Admin
           </h1>
           <p className="mt-1 text-xs text-slate-500">
             Inicia sesión para administrar inventario y pedidos.

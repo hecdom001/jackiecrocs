@@ -1,7 +1,7 @@
-// components/catalog/JackieCatalog.tsx
+// components/catalog/StoreCatalog.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -22,22 +22,29 @@ import {
 
 import {
     LS_CART_KEY,
-    VISIBLE_LOCATION_SLUGS,
     MOBILE_INITIAL_VISIBLE,
     TABLET_INITIAL_VISIBLE,
     DESKTOP_INITIAL_VISIBLE,
     PLACEHOLDER_IMAGE,
+    VISIBLE_LOCATION_SLUGS,
 } from "@/components/store/storeConstants";
 
-// ✅ keep these pointing to /components/jackie for now (we'll move them in later steps)
+import { StoreHeader } from "@/components/layout/StoreHeader";
 import { StoreFooter } from "@/components/layout/StoreFooter";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { StoreHeader } from "@/components/layout/StoreHeader";
-import { FiltersBar } from "@/components/catalog/FiltersBar";
-import { ProductGrid } from "@/components/catalog/ProductGrid";
-import { QuickView } from "@/components/catalog/QuickView";
-import { CartDrawer } from "@/components/catalog/CartDrawer";
-import { HomeSections } from "@/components/catalog/HomeSections";
+
+import { FiltersBar } from "./FiltersBar";
+import { ProductGrid } from "./ProductGrid";
+import { QuickView } from "./QuickView";
+import { CartDrawer } from "./CartDrawer";
+import { HomeSections } from "./HomeSections";
+
+import {
+    subscribeOpenCart,
+    consumeOpenCartRequest,
+    popCartReturnTo,
+} from "@/components/store/storeClient";
+
 
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
     tijuana: ["Colectivo Paseo del Rio"],
@@ -77,7 +84,7 @@ function Chip({
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
             title={title}
         >
-      <span className="truncate max-w-[220px]">{children}</span>
+            <span className="truncate max-w-[220px]">{children}</span>
             {onRemove && (
                 <button
                     type="button"
@@ -88,7 +95,7 @@ function Chip({
                     ✕
                 </button>
             )}
-    </span>
+        </span>
     );
 }
 
@@ -136,33 +143,21 @@ function SwatchDot({ color, active }: { color: string; active?: boolean }) {
     );
 }
 
-export function JackieCatalog() {
+// ✅ stable id generator
+function makeVariantId(args: {
+    model_name: string;
+    color: string;
+    size_id: string;
+    price_mxn: number;
+    locSlug: string;
+}) {
+    const { model_name, color, size_id, price_mxn, locSlug } = args;
+    return `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`.toLowerCase();
+}
+
+export function StoreCatalog() {
     const router = useRouter();
     const sp = useSearchParams();
-
-    useEffect(() => {
-        const v = sp.get("view");
-        const l = sp.get("lang");
-        const loc = sp.get("loc");
-
-        if (l === "es" || l === "en") setLang(l);
-
-        const allowed = ["all", ...(VISIBLE_LOCATION_SLUGS as readonly string[])];
-        if (loc && allowed.includes(loc)) {
-            setLocationFilter(loc);
-            persistLocation(loc);
-        }
-
-        if (v === "catalog" || v === "home") {
-            setView(v);
-            if (v === "catalog") {
-                requestAnimationFrame(() =>
-                    document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                );
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const [lang, setLang] = useState<Lang>("es");
 
@@ -196,6 +191,31 @@ export function JackieCatalog() {
     const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
     const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
 
+    // ✅ prevent “initial {} write” from nuking localStorage
+    const cartHydratedRef = useRef(false);
+
+    useEffect(() => {
+        const v = sp.get("view");
+        const l = sp.get("lang");
+        const loc = sp.get("loc");
+
+        if (l === "es" || l === "en") setLang(l);
+        if (loc && (loc === "all" || (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(loc))) {
+            setLocationFilter(loc);
+            persistLocation(loc);
+        }
+
+        if (v === "catalog" || v === "home") {
+            setView(v);
+            if (v === "catalog") {
+                requestAnimationFrame(() =>
+                    document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                );
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -209,6 +229,7 @@ export function JackieCatalog() {
                 for (const r of data.rows) {
                     if (r?.key && r?.src) next[String(r.key).toLowerCase()] = r;
                 }
+
                 if (!cancelled) setProductImageMap(next);
             } catch {
                 // ignore
@@ -228,7 +249,7 @@ export function JackieCatalog() {
         return { src: PLACEHOLDER_IMAGE, label: "" };
     };
 
-    const getPhotoForGroup = (modelName: string, colorEn: string): { src: string; label: string } => {
+    const getPhotoForGroup = (modelName: string, colorEn: string) => {
         const key = `${String(modelName || "").trim()}__${String(colorEn || "").trim()}`.toLowerCase();
         return getPhotoByKey(key);
     };
@@ -254,9 +275,7 @@ export function JackieCatalog() {
         if (typeof window === "undefined") return;
 
         const saved = window.localStorage.getItem(LS_LOCATION_KEY);
-        const allowed = ["all", ...(VISIBLE_LOCATION_SLUGS as readonly string[])];
-
-        if (saved && allowed.includes(saved)) {
+        if (saved && (saved === "all" || (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(saved))) {
             setLocationFilter(saved);
             return;
         }
@@ -278,6 +297,29 @@ export function JackieCatalog() {
             }
         })();
     }, []);
+
+    useEffect(() => {
+        return subscribeOpenCart(() => {
+            setCartOpen(true);
+        });
+    }, []);
+
+    // If help requested opening cart and Catalog is already mounted
+    useEffect(() => {
+        return subscribeOpenCart(() => {
+            setView("catalog");
+            setCartOpen(true);
+        });
+    }, []);
+
+// If help requested opening cart and Catalog is loading fresh
+    useEffect(() => {
+        if (consumeOpenCartRequest()) {
+            setView("catalog");
+            setCartOpen(true);
+        }
+    }, []);
+
 
     const persistLocation = (next: string) => {
         if (typeof window === "undefined") return;
@@ -364,15 +406,15 @@ export function JackieCatalog() {
 
             if (!size_id || !sizeLabel) return;
 
-            const key = `${model_name}__${color}__${size_id}__${price_mxn}__${locSlug}`;
-            const existing = variantMap.get(key);
+            const stableId = makeVariantId({ model_name, color, size_id, price_mxn, locSlug });
+            const existing = variantMap.get(stableId);
 
             if (existing) {
                 existing.availableCount += 1;
                 if (created_at > existing.created_at) existing.created_at = created_at;
             } else {
-                variantMap.set(key, {
-                    id: row.id as string,
+                variantMap.set(stableId, {
+                    id: stableId,
                     model_name,
                     brand,
                     uses_size,
@@ -393,11 +435,18 @@ export function JackieCatalog() {
         const mapped = Array.from(variantMap.values());
         setItems(mapped);
 
+        // ✅ Only clamp AFTER cart hydration (do not delete unknown keys)
         setQuantities((prev) => {
-            const next: Record<string, number> = {};
+            if (!cartHydratedRef.current) return prev;
+
+            const next = { ...prev };
             for (const item of mapped) {
                 const qty = prev[item.id] ?? 0;
                 if (qty > 0) next[item.id] = Math.min(qty, item.availableCount);
+            }
+            // Only remove keys for items that exist and are now <=0 (keep unknown keys untouched)
+            for (const item of mapped) {
+                if ((next[item.id] ?? 0) <= 0) delete next[item.id];
             }
             return next;
         });
@@ -520,35 +569,58 @@ export function JackieCatalog() {
         };
     }, [mobileFiltersOpen]);
 
+    // ✅ Hydrate cart (NO early returns)
     useEffect(() => {
         if (typeof window === "undefined") return;
 
         try {
             const raw = window.localStorage.getItem(LS_CART_KEY);
-            if (!raw) return;
-
-            const parsed = JSON.parse(raw) as Record<string, number>;
-            if (!parsed || typeof parsed !== "object") return;
+            const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : null;
 
             const next: Record<string, number> = {};
-            for (const [k, v] of Object.entries(parsed)) {
-                const n = Number(v);
-                if (Number.isFinite(n) && n > 0) next[k] = Math.floor(n);
+            if (parsed && typeof parsed === "object") {
+                for (const [k, v] of Object.entries(parsed)) {
+                    const n = Number(v);
+                    if (Number.isFinite(n) && n > 0) next[k] = Math.floor(n);
+                }
             }
             setQuantities(next);
         } catch {
-            // ignore
+            setQuantities({});
+        } finally {
+            cartHydratedRef.current = true;
         }
     }, []);
 
+    // ✅ Only write AFTER hydration
     useEffect(() => {
         if (typeof window === "undefined") return;
-        try {
-            window.localStorage.setItem(LS_CART_KEY, JSON.stringify(quantities));
-        } catch {
-            // ignore
-        }
+        if (!cartHydratedRef.current) return;
+
+        // CRITICAL FIX: Use requestAnimationFrame to ensure state has updated
+        // This prevents writing stale {} state after hydration
+        requestAnimationFrame(() => {
+            try {
+                window.localStorage.setItem(LS_CART_KEY, JSON.stringify(quantities));
+            } catch {
+                // ignore
+            }
+        });
     }, [quantities]);
+
+    // ✅ If Help requested opening cart, do it once on mount
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const shouldOpen = consumeOpenCartRequest();
+        if (!shouldOpen) return;
+
+        setView("catalog");
+        setCartOpen(true);
+
+        requestAnimationFrame(() =>
+            document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" })
+        );
+    }, []);
 
     const clearCart = () => {
         setQuantities({});
@@ -625,16 +697,17 @@ export function JackieCatalog() {
     }, [inventoryScoped, showSize, sizeFilter, query, sortBy]);
 
     const totalPairsFiltered = useMemo(() => {
-        return groupsFiltered.reduce((sum, g) => sum + g.variants.reduce((s: number, v: any) => s + v.availableCount, 0), 0);
+        return groupsFiltered.reduce(
+            (sum, g) => sum + g.variants.reduce((s: number, v: any) => s + v.availableCount, 0),
+            0
+        );
     }, [groupsFiltered]);
 
     const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
     const showingCount = Math.min(visibleCount, groupsFiltered.length);
 
     const cartLines: CartLine[] = useMemo(() => {
-        return items
-            .map((item) => ({ item, count: quantities[item.id] ?? 0 }))
-            .filter((line) => line.count > 0);
+        return items.map((item) => ({ item, count: quantities[item.id] ?? 0 })).filter((line) => line.count > 0);
     }, [items, quantities]);
 
     const cartLocationInfo = getCartLocationInfo(cartLines);
@@ -644,7 +717,6 @@ export function JackieCatalog() {
     const hasCartWhatsApp = !isMixedCart && waLinkForCart !== "#" && cartLines.length > 0;
 
     const supportWaLink = buildWhatsAppSupportLink(lang, locationFilter);
-    const hasSupportWhatsApp = supportWaLink !== "#";
 
     const totalCartPairs = cartLines.reduce((sum, l) => sum + l.count, 0);
 
@@ -654,7 +726,7 @@ export function JackieCatalog() {
     const handleAddToCart = (item: PublicItem) => {
         setQuantities((prev) => {
             const current = prev[item.id] ?? 0;
-            // @ts-ignore - item has availableCount in runtime
+            // @ts-ignore runtime availableCount
             if (current >= (item as any).availableCount) return prev;
             return { ...prev, [item.id]: current + 1 };
         });
@@ -801,9 +873,7 @@ export function JackieCatalog() {
                     onCartClick={() => setCartOpen(true)}
                     onHomeClick={() => {
                         setView("home");
-                        if (typeof window !== "undefined") {
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                        }
+                        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     view={view}
                     categories={categoryOptions.map((c) => ({ id: c.id, name: c.name || c.slug }))}
@@ -811,10 +881,7 @@ export function JackieCatalog() {
                     onSelectCategory={(id) => {
                         setCategoryFilter(id);
                         setView("catalog");
-                        requestAnimationFrame(() => {
-                            const el = document.getElementById("product-grid");
-                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        });
+                        requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
                     }}
                     locationSlug={locationFilter}
                 />
@@ -828,7 +895,7 @@ export function JackieCatalog() {
                                 pickupGroupedSpots={pickupGroupedSpots}
                                 hasAnyPickupSpots={hasAnyPickupSpots}
                                 supportWaLink={supportWaLink}
-                                hasSupportWhatsApp={hasSupportWhatsApp}
+                                hasSupportWhatsApp={supportWaLink !== "#"}
                                 featuredGroups={featuredGroups}
                                 quickColorChips={quickColorChips}
                                 getPhotoForGroup={getPhotoForGroup}
@@ -837,21 +904,15 @@ export function JackieCatalog() {
                                     setLocationFilter(slug);
                                     persistLocation(slug);
                                 }}
-                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
+                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
                                 onBrowseCatalog={() => {
                                     setView("catalog");
-                                    requestAnimationFrame(() => {
-                                        const el = document.getElementById("product-grid");
-                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                    });
+                                    requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
                                 }}
                                 onSelectColor={(c) => {
                                     setColorFilter(c);
                                     setView("catalog");
-                                    requestAnimationFrame(() => {
-                                        const el = document.getElementById("product-grid");
-                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                    });
+                                    requestAnimationFrame(() => document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" }));
                                 }}
                                 totalCartPairs={totalCartPairs}
                                 onOpenCart={() => setCartOpen(true)}
@@ -864,6 +925,7 @@ export function JackieCatalog() {
 
                 {view === "catalog" && (
                     <div className="pb-10">
+                        {/* Mobile controls */}
                         <div className="lg:hidden mt-4">
                             <div className="flex items-center justify-between gap-2">
                                 <button
@@ -874,15 +936,15 @@ export function JackieCatalog() {
                                     ⚙️ {t(lang, "Filtros", "Filters")}
                                     {activeFiltersCount > 0 ? (
                                         <span className="ml-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
-                      {activeFiltersCount}
-                    </span>
+                                            {activeFiltersCount}
+                                        </span>
                                     ) : null}
                                 </button>
 
                                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                    {t(lang, "Ordenar", "Sort")}
-                  </span>
+                                    <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                        {t(lang, "Ordenar", "Sort")}
+                                    </span>
                                     <select
                                         value={sortBy}
                                         onChange={(e) => setSortBy(e.target.value as any)}
@@ -940,7 +1002,7 @@ export function JackieCatalog() {
                                                     setLocationFilter={setLocationFilter}
                                                     onPersistLocation={persistLocation}
                                                     locations={locations}
-                                                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
+                                                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
                                                     categoryFilter={categoryFilter}
                                                     setCategoryFilter={setCategoryFilter}
                                                     categories={categoryOptions}
@@ -976,6 +1038,7 @@ export function JackieCatalog() {
                             )}
                         </div>
 
+                        {/* Desktop layout */}
                         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
                             <aside className="hidden lg:block">
                                 <div className="sticky top-24">
@@ -1008,7 +1071,7 @@ export function JackieCatalog() {
                                                 }}
                                                 onPersistLocation={persistLocation}
                                                 locations={locations}
-                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
+                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as any}
                                                 categoryFilter={categoryFilter}
                                                 setCategoryFilter={setCategoryFilter}
                                                 categories={categoryOptions}
@@ -1077,7 +1140,9 @@ export function JackieCatalog() {
 
                                         <div className="mt-4 border-t border-slate-200 pt-4">
                                             <div className="flex items-center justify-between gap-3">
-                                                <div className="text-xs text-slate-600">{t(lang, "¿Necesitas ayuda?", "Need help?")}</div>
+                                                <div className="text-xs text-slate-600">
+                                                    {t(lang, "¿Necesitas ayuda?", "Need help?")}
+                                                </div>
                                                 <a
                                                     href={supportWaLink}
                                                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
@@ -1111,9 +1176,9 @@ export function JackieCatalog() {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                      {t(lang, "Ordenar por", "Sort by")}
-                    </span>
+                                        <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                            {t(lang, "Ordenar por", "Sort by")}
+                                        </span>
 
                                         <select
                                             value={sortBy}
@@ -1183,12 +1248,16 @@ export function JackieCatalog() {
 
                 <CartDrawer
                     open={cartOpen}
-                    onClose={() => setCartOpen(false)}
+                    onClose={() => {
+                        setCartOpen(false);
+                        const ret = popCartReturnTo();
+                        if (ret) router.push(ret);
+                    }}
                     lang={lang}
                     cartLines={cartLines}
                     totalCartPairs={totalCartPairs}
                     isMixedCart={isMixedCart}
-                    waLinkForCart={buildWhatsAppLink(cartLines, lang)}
+                    waLinkForCart={waLinkForCart}
                     hasCartWhatsApp={hasCartWhatsApp}
                     clearCart={clearCart}
                     onAdd={handleAddToCart}

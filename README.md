@@ -1,14 +1,14 @@
-# JackyCrocs 🐊  
+# Aguuacatito.Shop  
 Live inventory & order system for a viral Crocs reselling business
 
-🌐 **Live site:** https://jackycrocs.com/  
+🌐 **Live site:** https://aguuacatito.shop/  
 🚀 **Hosting:** Vercel (Production)
 
 ---
 
 ## Overview
 
-JackyCrocs started as a small side business, reselling Crocs locally in **Tijuana, Mexico**.
+Aguuacatito.Shop started as a small side business, reselling Crocs locally in **Tijuana, Mexico**.
 
 After unexpectedly going **viral on TikTok**, we were suddenly flooded with **~1,000+ DMs**, all asking for colors, sizes, prices, and availability. Managing everything manually through WhatsApp between just two people became overwhelming very quickly.
 

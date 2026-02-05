@@ -1,7 +1,7 @@
 // components/store/storeConstants.ts
 
-export const LS_CART_KEY = "jackie_cart_v1";
-
+export const LS_CART_KEY = "cart_v1";
+export const LS_CART_OPEN_KEY = "cart_open_v1";
 export const VISIBLE_LOCATION_SLUGS = [
     "tijuana",
     "mexicali",

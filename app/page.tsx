@@ -1,13 +1,13 @@
 
 // app/page.tsx
 
-import { JackieCatalog } from "@/components/catalog/JackieCatalog"
 import { Suspense } from "react";
+import { StoreCatalog } from "@/components/catalog/StoreCatalog";
 
 export default function Home() {
-  return (
-      <Suspense fallback={<div className="min-h-screen bg-white" />}>
-        <JackieCatalog />
-      </Suspense>
-  );
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
+            <StoreCatalog />
+        </Suspense>
+    );
 }

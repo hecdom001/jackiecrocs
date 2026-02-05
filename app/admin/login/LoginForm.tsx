@@ -51,7 +51,7 @@ export function LoginForm() {
         </div>
         <div>
           <h1 className="text-base font-semibold text-slate-900">
-            Jacky Crocs Admin
+            Aguuacatito.Shop Admin
           </h1>
           <p className="text-[11px] text-slate-500">
             Solo para uso interno
