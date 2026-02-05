@@ -9,7 +9,7 @@ import { t } from "@/lib/jackieCatalogUtils";
 import {
     SIZE_GUIDE_IMAGE_URL_EN,
     SIZE_GUIDE_IMAGE_URL_ES,
-} from "@/components/jackie/storeConstants";
+} from "@/components/store/storeConstants";
 
 export function SizeGuide({ lang }: { lang: Lang }) {
     const [imgError, setImgError] = useState(false);

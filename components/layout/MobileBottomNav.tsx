@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import type { Lang } from "@/lib/jackieCatalogUtils";
 import { t } from "@/lib/jackieCatalogUtils";
+import { useRouter } from "next/navigation";
 
 export function MobileBottomNav({
                                     show,
@@ -24,6 +25,12 @@ export function MobileBottomNav({
     onHelp: () => void;
 }) {
     if (!show) return null;
+
+    const router = useRouter();
+
+    useEffect(() => {
+        router.prefetch("/help");
+    }, [router]);
 
     const Item = ({
                       active,

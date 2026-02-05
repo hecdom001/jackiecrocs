@@ -1,7 +1,7 @@
 
 // app/page.tsx
 
-import { JackieCatalog } from "@/components/jackie/JackieCatalog"
+import { JackieCatalog } from "@/components/catalog/JackieCatalog"
 import { Suspense } from "react";
 
 export default function Home() {

@@ -1,12 +1,19 @@
-// components/jackie/storeConstants.ts
+// components/store/storeConstants.ts
 
-export const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"] as const;
+export const LS_CART_KEY = "jackie_cart_v1";
+
+export const VISIBLE_LOCATION_SLUGS = [
+    "tijuana",
+    "mexicali",
+    "hermosillo_sonora",
+] as const;
 
 export type LocationSlug = (typeof VISIBLE_LOCATION_SLUGS)[number];
 
 export function isLocationSlug(v: string): v is LocationSlug {
     return (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(v);
 }
+
 export type PickupSpot = {
     name: string;
     addressHint?: string;
@@ -33,8 +40,5 @@ export const SUPABASE_IMAGE_BASE =
 
 export const PLACEHOLDER_IMAGE = `${SUPABASE_IMAGE_BASE}/product-images/placeholderCominSoon.png`;
 
-export const SIZE_GUIDE_IMAGE_URL_EN =
-    `${SUPABASE_IMAGE_BASE}/site/sizes_en.png`;
-
-export const SIZE_GUIDE_IMAGE_URL_ES =
-    `${SUPABASE_IMAGE_BASE}/site/sizes_es.jpeg`;
+export const SIZE_GUIDE_IMAGE_URL_EN = `${SUPABASE_IMAGE_BASE}/site/sizes_en.png`;
+export const SIZE_GUIDE_IMAGE_URL_ES = `${SUPABASE_IMAGE_BASE}/site/sizes_es.jpeg`;

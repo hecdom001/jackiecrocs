@@ -1,5 +1,7 @@
+// app/help/page.tsx
+
 import { Suspense } from "react";
-import HelpPageClient from "./HelpPageClient";
+import HelpPageClient from "../../components/help/HelpPageClient";
 
 export default function HelpPage() {
     return (

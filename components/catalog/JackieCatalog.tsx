@@ -1,12 +1,9 @@
-// components/jackie/JackieCatalog.tsx
+// components/catalog/JackieCatalog.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { StoreFooter } from "./StoreFooter";
-import { MobileBottomNav } from "./MobileBottomNav";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import {
     LS_LOCATION_KEY,
@@ -24,20 +21,23 @@ import {
 } from "@/lib/jackieCatalogUtils";
 
 import {
+    LS_CART_KEY,
+    VISIBLE_LOCATION_SLUGS,
     MOBILE_INITIAL_VISIBLE,
     TABLET_INITIAL_VISIBLE,
     DESKTOP_INITIAL_VISIBLE,
-    PLACEHOLDER_IMAGE
-} from "@/components/jackie/storeConstants";
+    PLACEHOLDER_IMAGE,
+} from "@/components/store/storeConstants";
 
-import { StoreHeader } from "./StoreHeader";
-import { FiltersBar } from "./FiltersBar";
-import { ProductGrid } from "./ProductGrid";
-import { QuickView } from "./QuickView";
-import { CartDrawer } from "./CartDrawer";
-import { HomeSections } from "./HomeSections";
-
-const VISIBLE_LOCATION_SLUGS = ["tijuana", "mexicali", "hermosillo_sonora"];
+// ✅ keep these pointing to /components/jackie for now (we'll move them in later steps)
+import { StoreFooter } from "@/components/layout/StoreFooter";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { StoreHeader } from "@/components/layout/StoreHeader";
+import { FiltersBar } from "@/components/catalog/FiltersBar";
+import { ProductGrid } from "@/components/catalog/ProductGrid";
+import { QuickView } from "@/components/catalog/QuickView";
+import { CartDrawer } from "@/components/catalog/CartDrawer";
+import { HomeSections } from "@/components/catalog/HomeSections";
 
 const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
     tijuana: ["Colectivo Paseo del Rio"],
@@ -48,7 +48,7 @@ const DELIVERY_SPOTS_BY_LOCATION: Record<string, string[]> = {
 
 const FILTERED_DELIVERY_SPOTS = Object.fromEntries(
     Object.entries(DELIVERY_SPOTS_BY_LOCATION).filter(([slug]) =>
-        VISIBLE_LOCATION_SLUGS.includes(slug)
+        (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(slug)
     )
 );
 
@@ -95,7 +95,6 @@ function Chip({
 function colorToSwatch(c: string): string {
     const s = (c || "").toLowerCase();
 
-    // common exact-ish matches
     if (s.includes("black") || s.includes("negro")) return "#111827";
     if (s.includes("white") || s.includes("blanco")) return "#ffffff";
     if (s.includes("grey") || s.includes("gray") || s.includes("gris")) return "#9ca3af";
@@ -115,13 +114,11 @@ function colorToSwatch(c: string): string {
     if (s.includes("pink") || s.includes("rosa") || s.includes("barbie")) return "#ec4899";
     if (s.includes("fuchsia")) return "#d946ef";
 
-    // themed / special
     if (s.includes("camo")) return "#556b2f";
     if (s.includes("arctic")) return "#7dd3fc";
     if (s.includes("crystal")) return "#e5e7eb";
     if (s.includes("gold") || s.includes("dorado")) return "#d4af37";
 
-    // fallback
     return "#e5e7eb";
 }
 
@@ -149,7 +146,9 @@ export function JackieCatalog() {
         const loc = sp.get("loc");
 
         if (l === "es" || l === "en") setLang(l);
-        if (loc && (loc === "all" || ["tijuana", "mexicali", "hermosillo_sonora"].includes(loc))) {
+
+        const allowed = ["all", ...(VISIBLE_LOCATION_SLUGS as readonly string[])];
+        if (loc && allowed.includes(loc)) {
             setLocationFilter(loc);
             persistLocation(loc);
         }
@@ -164,7 +163,6 @@ export function JackieCatalog() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
 
     const [lang, setLang] = useState<Lang>("es");
 
@@ -193,13 +191,9 @@ export function JackieCatalog() {
     const [visibleCount, setVisibleCount] = useState<number>(MOBILE_INITIAL_VISIBLE);
 
     const [view, setView] = useState<"home" | "catalog">("home");
-
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-    const [productImageMap, setProductImageMap] = useState<
-        Record<string, ProductImageRow>
-    >({});
-
+    const [productImageMap, setProductImageMap] = useState<Record<string, ProductImageRow>>({});
     const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "name">("newest");
 
     useEffect(() => {
@@ -215,7 +209,6 @@ export function JackieCatalog() {
                 for (const r of data.rows) {
                     if (r?.key && r?.src) next[String(r.key).toLowerCase()] = r;
                 }
-
                 if (!cancelled) setProductImageMap(next);
             } catch {
                 // ignore
@@ -245,16 +238,10 @@ export function JackieCatalog() {
 
         const compute = () => {
             const w = window.innerWidth;
-
             let next: number;
-            if (w >= 1024) {
-                next = DESKTOP_INITIAL_VISIBLE; // desktop
-            } else if (w >= 768) {
-                next = TABLET_INITIAL_VISIBLE; // tablet / iPad
-            } else {
-                next = MOBILE_INITIAL_VISIBLE; // mobile
-            }
-
+            if (w >= 1024) next = DESKTOP_INITIAL_VISIBLE;
+            else if (w >= 768) next = TABLET_INITIAL_VISIBLE;
+            else next = MOBILE_INITIAL_VISIBLE;
             setPageSize(next);
         };
 
@@ -267,7 +254,9 @@ export function JackieCatalog() {
         if (typeof window === "undefined") return;
 
         const saved = window.localStorage.getItem(LS_LOCATION_KEY);
-        if (saved && (saved === "all" || VISIBLE_LOCATION_SLUGS.includes(saved))) {
+        const allowed = ["all", ...(VISIBLE_LOCATION_SLUGS as readonly string[])];
+
+        if (saved && allowed.includes(saved)) {
             setLocationFilter(saved);
             return;
         }
@@ -279,7 +268,7 @@ export function JackieCatalog() {
 
                 const geo = await res.json();
                 const slug = geoCityToLocationSlug(geo?.city ?? null);
-                const next = slug && VISIBLE_LOCATION_SLUGS.includes(slug) ? slug : "all";
+                const next = slug && (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(slug) ? slug : "all";
 
                 setLocationFilter(next);
                 window.localStorage.setItem(LS_LOCATION_KEY, next);
@@ -296,11 +285,7 @@ export function JackieCatalog() {
     };
 
     async function loadLocations() {
-        const { data, error } = await supabase
-            .from("locations")
-            .select("slug, name")
-            .order("name", { ascending: true });
-
+        const { data, error } = await supabase.from("locations").select("slug, name").order("name", { ascending: true });
         if (error) return;
 
         const list: LocationOption[] = (data ?? [])
@@ -317,11 +302,7 @@ export function JackieCatalog() {
     }
 
     async function loadCategories() {
-        const { data, error } = await supabase
-            .from("categories")
-            .select("id, slug, name")
-            .order("name", { ascending: true });
-
+        const { data, error } = await supabase.from("categories").select("id, slug, name").order("name", { ascending: true });
         if (error) return;
 
         setCategories(
@@ -371,9 +352,7 @@ export function JackieCatalog() {
             const uses_size: boolean = !!row.models?.uses_size;
             const uses_color: boolean = !!row.models?.uses_color;
 
-            const category_id: string | null = row.models?.category_id
-                ? String(row.models.category_id)
-                : null;
+            const category_id: string | null = row.models?.category_id ? String(row.models.category_id) : null;
 
             const color: string = row.colors?.name_en ?? "";
             const size_id: string = row.size_id as string;
@@ -449,8 +428,7 @@ export function JackieCatalog() {
     const scopedForOptions = useMemo(() => {
         return items.filter((it) => {
             const byLoc = locationFilter === "all" || it.location_slug === locationFilter;
-            const byCategory =
-                categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
+            const byCategory = categoryFilter === "all" || String(it.category_id ?? "") === categoryFilter;
             return byLoc && byCategory;
         });
     }, [items, locationFilter, categoryFilter]);
@@ -493,8 +471,7 @@ export function JackieCatalog() {
     const inventoryScoped = useMemo(() => {
         return items.filter((item) => {
             const byLoc = locationFilter === "all" || item.location_slug === locationFilter;
-            const byCategory =
-                categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
+            const byCategory = categoryFilter === "all" || String(item.category_id ?? "") === categoryFilter;
             const byBrand = brandFilter === "all" || (item.brand ?? "") === brandFilter;
             const byColor = !showColor || colorFilter === "all" || item.color === colorFilter;
             return byLoc && byCategory && byBrand && byColor;
@@ -530,17 +507,10 @@ export function JackieCatalog() {
     }, [query]);
 
     useEffect(() => {
-        // only close on mobile
         if (typeof window === "undefined") return;
         if (window.innerWidth >= 1024) return;
         setMobileFiltersOpen(false);
-    }, [
-        locationFilter,
-        categoryFilter,
-        brandFilter,
-        sizeFilter,
-        colorFilter,
-    ]);
+    }, [locationFilter, categoryFilter, brandFilter, sizeFilter, colorFilter]);
 
     useEffect(() => {
         if (typeof document === "undefined") return;
@@ -549,6 +519,45 @@ export function JackieCatalog() {
             document.body.style.overflow = "";
         };
     }, [mobileFiltersOpen]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        try {
+            const raw = window.localStorage.getItem(LS_CART_KEY);
+            if (!raw) return;
+
+            const parsed = JSON.parse(raw) as Record<string, number>;
+            if (!parsed || typeof parsed !== "object") return;
+
+            const next: Record<string, number> = {};
+            for (const [k, v] of Object.entries(parsed)) {
+                const n = Number(v);
+                if (Number.isFinite(n) && n > 0) next[k] = Math.floor(n);
+            }
+            setQuantities(next);
+        } catch {
+            // ignore
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            window.localStorage.setItem(LS_CART_KEY, JSON.stringify(quantities));
+        } catch {
+            // ignore
+        }
+    }, [quantities]);
+
+    const clearCart = () => {
+        setQuantities({});
+        if (typeof window !== "undefined") {
+            try {
+                window.localStorage.removeItem(LS_CART_KEY);
+            } catch {}
+        }
+    };
 
     const selectedLocationName = useMemo(() => {
         if (locationFilter === "all") return lang === "es" ? "Todas" : "All";
@@ -585,9 +594,7 @@ export function JackieCatalog() {
         let list = Array.from(map.values());
 
         if (showSize && sizeFilter !== "all") {
-            list = list.filter((g) =>
-                g.variants.some((v: any) => v.uses_size && v.size === sizeFilter)
-            );
+            list = list.filter((g) => g.variants.some((v: any) => v.uses_size && v.size === sizeFilter));
         }
 
         const q = query.trim().toLowerCase();
@@ -604,7 +611,7 @@ export function JackieCatalog() {
             if (sortBy === "price_low") return a.price_mxn_min - b.price_mxn_min;
             if (sortBy === "price_high") return b.price_mxn_min - a.price_mxn_min;
             if (sortBy === "name") return (a.model_name || "").localeCompare(b.model_name || "");
-            // newest (default)
+
             const tt = b.latest_created_at.localeCompare(a.latest_created_at);
             if (tt !== 0) return tt;
             const c = a.color.localeCompare(b.color);
@@ -614,15 +621,11 @@ export function JackieCatalog() {
             return a.price_mxn_min - b.price_mxn_min;
         });
 
-
         return list;
     }, [inventoryScoped, showSize, sizeFilter, query, sortBy]);
 
     const totalPairsFiltered = useMemo(() => {
-        return groupsFiltered.reduce(
-            (sum, g) => sum + g.variants.reduce((s: number, v: any) => s + v.availableCount, 0),
-            0
-        );
+        return groupsFiltered.reduce((sum, g) => sum + g.variants.reduce((s: number, v: any) => s + v.availableCount, 0), 0);
     }, [groupsFiltered]);
 
     const limitedGroups = useMemo(() => groupsFiltered.slice(0, visibleCount), [groupsFiltered, visibleCount]);
@@ -675,8 +678,6 @@ export function JackieCatalog() {
         });
     };
 
-    const clearCart = () => setQuantities({});
-
     const pickupGroupedSpots: Record<string, string[]> =
         locationFilter === "all"
             ? FILTERED_DELIVERY_SPOTS
@@ -713,7 +714,6 @@ export function JackieCatalog() {
         (showColor && colorFilter !== "all" ? 1 : 0) +
         (query.trim() ? 1 : 0);
 
-
     const categoryNameById = useMemo(() => {
         const m: Record<string, string> = {};
         for (const c of categoryOptions) m[c.id] = c.name;
@@ -735,9 +735,7 @@ export function JackieCatalog() {
         }
 
         if (categoryFilter !== "all") {
-            const catName =
-                categoryOptions.find((c) => c.id === categoryFilter)?.name ?? categoryFilter;
-
+            const catName = categoryOptions.find((c) => c.id === categoryFilter)?.name ?? categoryFilter;
             chips.push({
                 key: "cat",
                 label: <>🗂️ {catName}</>,
@@ -791,12 +789,10 @@ export function JackieCatalog() {
         categoryOptions,
     ]);
 
-
     return (
         <div className="min-h-screen bg-white text-slate-900">
-            {/* wider desktop container */}
             <div className="mx-auto w-full max-w-none px-3 sm:px-6 lg:px-10 2xl:px-14">
-            <StoreHeader
+                <StoreHeader
                     lang={lang}
                     setLang={setLang}
                     query={query}
@@ -820,12 +816,11 @@ export function JackieCatalog() {
                             el?.scrollIntoView({ behavior: "smooth", block: "start" });
                         });
                     }}
-                    locationSlug={locationFilter}   // ✅ add this
+                    locationSlug={locationFilter}
                 />
 
                 {view === "home" && (
                     <div className="pb-10">
-                        {/* Full-bleed area (no max-w, no big outer card) */}
                         <div className="mt-4 w-full">
                             <HomeSections
                                 lang={lang}
@@ -842,7 +837,7 @@ export function JackieCatalog() {
                                     setLocationFilter(slug);
                                     persistLocation(slug);
                                 }}
-                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
                                 onBrowseCatalog={() => {
                                     setView("catalog");
                                     requestAnimationFrame(() => {
@@ -869,7 +864,6 @@ export function JackieCatalog() {
 
                 {view === "catalog" && (
                     <div className="pb-10">
-                        {/* Mobile controls (collapsed filters) */}
                         <div className="lg:hidden mt-4">
                             <div className="flex items-center justify-between gap-2">
                                 <button
@@ -880,17 +874,15 @@ export function JackieCatalog() {
                                     ⚙️ {t(lang, "Filtros", "Filters")}
                                     {activeFiltersCount > 0 ? (
                                         <span className="ml-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
-                                        {activeFiltersCount}
-                                      </span>
+                      {activeFiltersCount}
+                    </span>
                                     ) : null}
-
                                 </button>
 
-                                {/* Sort stays visible */}
                                 <div className="flex items-center gap-2">
-                                      <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                                        {t(lang, "Ordenar", "Sort")}
-                                      </span>
+                  <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                    {t(lang, "Ordenar", "Sort")}
+                  </span>
                                     <select
                                         value={sortBy}
                                         onChange={(e) => setSortBy(e.target.value as any)}
@@ -904,10 +896,8 @@ export function JackieCatalog() {
                                 </div>
                             </div>
 
-                            {/* Bottom sheet modal */}
                             {mobileFiltersOpen && (
                                 <div className="fixed inset-0 z-[70] lg:hidden">
-                                    {/* Backdrop */}
                                     <button
                                         type="button"
                                         className="absolute inset-0 bg-black/40"
@@ -915,10 +905,8 @@ export function JackieCatalog() {
                                         aria-label={t(lang, "Cerrar", "Close")}
                                     />
 
-                                    {/* Bottom sheet */}
                                     <div className="absolute inset-x-0 bottom-0">
                                         <div className="mx-auto w-full max-w-md md:max-w-2xl max-h-[85vh] overflow-auto rounded-t-3xl bg-white border border-slate-200 shadow-2xl">
-                                            {/* Header */}
                                             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                                                 <p className="text-sm font-extrabold">{t(lang, "Filtros", "Filters")}</p>
 
@@ -944,7 +932,6 @@ export function JackieCatalog() {
                                                 </div>
                                             </div>
 
-                                            {/* Content */}
                                             <div className="p-4">
                                                 <FiltersBar
                                                     lang={lang}
@@ -953,7 +940,7 @@ export function JackieCatalog() {
                                                     setLocationFilter={setLocationFilter}
                                                     onPersistLocation={persistLocation}
                                                     locations={locations}
-                                                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                                    visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
                                                     categoryFilter={categoryFilter}
                                                     setCategoryFilter={setCategoryFilter}
                                                     categories={categoryOptions}
@@ -972,11 +959,8 @@ export function JackieCatalog() {
                                                     formattedLastUpdated={formattedLastUpdated}
                                                     onRefresh={loadInventory}
                                                 />
-
-                                                {/* NOTE: Popular colors stays hidden on mobile because we removed that section */}
                                             </div>
 
-                                            {/* Footer CTA */}
                                             <div className="p-4 border-t border-slate-100">
                                                 <button
                                                     type="button"
@@ -990,16 +974,12 @@ export function JackieCatalog() {
                                     </div>
                                 </div>
                             )}
-
                         </div>
 
-
-                        {/* Desktop layout */}
                         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
                             <aside className="hidden lg:block">
                                 <div className="sticky top-24">
                                     <div className="rounded-[28px] border border-slate-200 bg-white p-4">
-                                        {/* Header */}
                                         <div className="flex items-center justify-between">
                                             <div className="text-sm font-extrabold tracking-tight text-slate-900">
                                                 {t(lang, "Filtros", "Filters")}
@@ -1016,7 +996,6 @@ export function JackieCatalog() {
                                             ) : null}
                                         </div>
 
-                                        {/* Filters (hide the dropdown color on desktop to avoid duplication) */}
                                         <div className="mt-3">
                                             <FiltersBar
                                                 variant="flat"
@@ -1029,7 +1008,7 @@ export function JackieCatalog() {
                                                 }}
                                                 onPersistLocation={persistLocation}
                                                 locations={locations}
-                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS}
+                                                visibleLocationSlugs={VISIBLE_LOCATION_SLUGS as unknown as string[]}
                                                 categoryFilter={categoryFilter}
                                                 setCategoryFilter={setCategoryFilter}
                                                 categories={categoryOptions}
@@ -1037,7 +1016,7 @@ export function JackieCatalog() {
                                                 setBrandFilter={setBrandFilter}
                                                 brands={allBrands}
                                                 showSize={showSize}
-                                                showColor={false} // ✅ desktop: we use chips/swatches below instead
+                                                showColor={false}
                                                 sizeFilter={sizeFilter}
                                                 setSizeFilter={setSizeFilter}
                                                 allSizes={allSizes}
@@ -1050,7 +1029,6 @@ export function JackieCatalog() {
                                             />
                                         </div>
 
-                                        {/* Collapsible Colors */}
                                         {showColor && allColors.length > 0 && (
                                             <div className="mt-4 border-t border-slate-200 pt-4">
                                                 <details className="group" open>
@@ -1097,12 +1075,9 @@ export function JackieCatalog() {
                                             </div>
                                         )}
 
-                                        {/* Support row (no extra card) */}
                                         <div className="mt-4 border-t border-slate-200 pt-4">
                                             <div className="flex items-center justify-between gap-3">
-                                                <div className="text-xs text-slate-600">
-                                                    {t(lang, "¿Necesitas ayuda?", "Need help?")}
-                                                </div>
+                                                <div className="text-xs text-slate-600">{t(lang, "¿Necesitas ayuda?", "Need help?")}</div>
                                                 <a
                                                     href={supportWaLink}
                                                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
@@ -1115,10 +1090,8 @@ export function JackieCatalog() {
                                 </div>
                             </aside>
 
-
                             <main className="min-w-0">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                    {/* Left: active chips */}
                                     <div className="hidden lg:flex flex-wrap items-center gap-2 min-w-0">
                                         {desktopFilterChips.map((c) => (
                                             <Chip key={c.key} onRemove={c.onRemove}>
@@ -1137,11 +1110,10 @@ export function JackieCatalog() {
                                         )}
                                     </div>
 
-                                    {/* Right: sort */}
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                                          {t(lang, "Ordenar por", "Sort by")}
-                                        </span>
+                    <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                      {t(lang, "Ordenar por", "Sort by")}
+                    </span>
 
                                         <select
                                             value={sortBy}
@@ -1155,9 +1127,6 @@ export function JackieCatalog() {
                                         </select>
                                     </div>
                                 </div>
-
-
-
 
                                 <div id="product-grid" className="scroll-mt-24 mt-4">
                                     <ProductGrid
@@ -1178,10 +1147,7 @@ export function JackieCatalog() {
                     </div>
                 )}
 
-                <StoreFooter
-                    lang={lang}
-                    supportWaLink={supportWaLink}
-                />
+                <StoreFooter lang={lang} supportWaLink={supportWaLink} />
 
                 <MobileBottomNav
                     show={!cartOpen && !quickView}
@@ -1201,7 +1167,6 @@ export function JackieCatalog() {
                     onCart={() => setCartOpen(true)}
                     onHelp={() => router.push(`/help?lang=${lang}&loc=${locationFilter}`)}
                 />
-
 
                 <QuickView
                     open={!!quickView}
@@ -1230,10 +1195,9 @@ export function JackieCatalog() {
                     onRemove={handleRemoveFromCart}
                     onRemoveItem={removeItemFromCart}
                     cartLocationSlug={cartLocationInfo.slug ?? (isMixedCart ? "mixed" : "unknown")}
-
                     getPhotoForCartItem={(item) => {
                         const key = `${String(item.model_name || "").trim()}__${String(item.color || "").trim()}`.toLowerCase();
-                        return getPhotoByKey(key); // uses your DB-first image map + placeholder fallback
+                        return getPhotoByKey(key);
                     }}
                 />
             </div>

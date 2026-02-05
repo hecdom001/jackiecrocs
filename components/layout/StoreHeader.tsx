@@ -6,6 +6,8 @@ import type { Lang } from "@/lib/jackieCatalogUtils";
 import { t } from "@/lib/jackieCatalogUtils";
 import Link from "next/link";
 
+
+
 export type HeaderCategory = { id: string; name: string };
 
 function CartIcon({ className = "h-5 w-5" }: { className?: string }) {
@@ -95,12 +97,6 @@ export function StoreHeader({
     const showSearch = view === "catalog";
     const showTabs = view === "catalog" && categories.length > 0 && !!onSelectCategory;
 
-    const pickupSpotsByLocation: Record<string, string[]> = {
-        tijuana: ["Colectivo Paseo del Rio"],
-        mexicali: ["Oaxaca 1820"],
-        hermosillo_sonora: ["Villa Bonita"],
-    };
-
     const locationLabel = (slug: string) => {
         if (slug === "tijuana") return "Tijuana";
         if (slug === "mexicali") return "Mexicali";
@@ -131,12 +127,10 @@ export function StoreHeader({
 
     type BannerTone = "black" | "red";
 
-    const bannerTone: BannerTone = "black"; // switch to "red" any time
+    const bannerTone: BannerTone = "black";
 
     const bannerClass =
         ({ black: "bg-black", red: "bg-red-600" } as const)[bannerTone];
-
-
 
     return (
         <header className={`sticky top-0 z-50 bg-white border-b border-slate-200 ${scrolled ? "shadow-sm" : ""}`}>

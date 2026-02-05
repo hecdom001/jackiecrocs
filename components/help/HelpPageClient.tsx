@@ -1,15 +1,25 @@
 "use client";
 
-import { buildWhatsAppSupportLink, Lang } from "@/lib/jackieCatalogUtils";
-import { t } from "@/lib/jackieCatalogUtils";
-
-import { StoreHeader } from "@/components/jackie/StoreHeader";
-import { MobileBottomNav } from "@/components/jackie/MobileBottomNav";
-import { SizeGuide } from "@/components/jackie/SizeGuide";
-import { StoreFooter } from "@/components/jackie/StoreFooter";
-
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
+import { buildWhatsAppSupportLink, Lang, t } from "@/lib/jackieCatalogUtils";
+
+import { StoreHeader } from "@/components/layout/StoreHeader";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { SizeGuide } from "@/components/help/SizeGuide";
+import { StoreFooter } from "@/components/layout/StoreFooter";
+
+import {
+    VISIBLE_LOCATION_SLUGS,
+    PICKUP_SPOTS_BY_LOCATION,
+    MEX_BANK_INFO,
+    type LocationSlug,
+    isLocationSlug,
+} from "@/components/store/storeConstants";
+
+import { subscribeCart, countCartPairs } from "@/components/store/storeClient";
+
 import {
     MapPin,
     MessageCircle,
@@ -18,15 +28,10 @@ import {
     HelpCircle,
 } from "lucide-react";
 
-import {
-    VISIBLE_LOCATION_SLUGS,
-    PICKUP_SPOTS_BY_LOCATION,
-    MEX_BANK_INFO,
-    type LocationSlug, isLocationSlug,
-} from "@/components/jackie/storeConstants";
-
 function mapsSearchLink(q: string) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        q
+    )}`;
 }
 
 function prettyCity(slug: string) {
@@ -97,7 +102,9 @@ function FaqItem({ q, a }: { q: React.ReactNode; a: React.ReactNode }) {
                 <div className="text-slate-500 text-sm group-open:hidden">+</div>
                 <div className="text-slate-500 text-sm hidden group-open:block">–</div>
             </summary>
-            <div className="px-4 pb-4 text-[13px] text-slate-700 leading-relaxed">{a}</div>
+            <div className="px-4 pb-4 text-[13px] text-slate-700 leading-relaxed">
+                {a}
+            </div>
         </details>
     );
 }
@@ -130,10 +137,18 @@ function ActionTile({
                 {icon}
             </div>
             <div className="min-w-0">
-                <p className={`text-[12px] font-extrabold ${tone === "emerald" ? "text-emerald-950" : "text-slate-900"}`}>
+                <p
+                    className={`text-[12px] font-extrabold ${
+                        tone === "emerald" ? "text-emerald-950" : "text-slate-900"
+                    }`}
+                >
                     {title}
                 </p>
-                <p className={`mt-0.5 text-[11px] ${tone === "emerald" ? "text-emerald-900/70" : "text-slate-600"}`}>
+                <p
+                    className={`mt-0.5 text-[11px] ${
+                        tone === "emerald" ? "text-emerald-900/70" : "text-slate-600"
+                    }`}
+                >
                     {subtitle}
                 </p>
             </div>
@@ -164,7 +179,8 @@ export default function HelpPageClient() {
 
     const lang = ((sp.get("lang") as Lang) || "es") as Lang;
     const rawLoc = sp.get("loc") || "all";
-    const loc: "all" | LocationSlug = rawLoc === "all" ? "all" : (isLocationSlug(rawLoc) ? rawLoc : "all");
+    const loc: "all" | LocationSlug =
+        rawLoc === "all" ? "all" : isLocationSlug(rawLoc) ? rawLoc : "all";
 
     const supportWaLink = buildWhatsAppSupportLink(lang, loc);
 
@@ -178,6 +194,13 @@ export default function HelpPageClient() {
     const openCatalog = () => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`);
     const openHome = () => router.push(`/?view=home&lang=${lang}&loc=${loc}`);
     const openHelp = () => router.push(`/help?lang=${lang}&loc=${loc}`);
+
+    const [cartCount, setCartCount] = useState(0);
+
+    // ✅ Centralized cart updates (fast + consistent across pages)
+    useEffect(() => {
+        return subscribeCart((cart) => setCartCount(countCartPairs(cart)));
+    }, []);
 
     const faq = useMemo(() => {
         return [
@@ -198,7 +221,11 @@ export default function HelpPageClient() {
                 ),
             },
             {
-                q: t(lang, "¿Qué pasa si mi carrito tiene varias ciudades?", "What if my cart has multiple cities?"),
+                q: t(
+                    lang,
+                    "¿Qué pasa si mi carrito tiene varias ciudades?",
+                    "What if my cart has multiple cities?"
+                ),
                 a: t(
                     lang,
                     "Te recomendamos ordenar por ciudad (pick up). Si mezclas, WhatsApp no se habilita para evitar errores.",
@@ -224,7 +251,7 @@ export default function HelpPageClient() {
                     setLang={(l) => router.push(`/help?lang=${l}&loc=${loc}`)}
                     query={query}
                     setQuery={setQuery}
-                    totalCartPairs={0}
+                    totalCartPairs={cartCount}
                     onCartClick={openCatalog}
                     onHomeClick={openHome}
                     view="help"
@@ -255,7 +282,7 @@ export default function HelpPageClient() {
                             </p>
                         </div>
 
-                        {/* Premium tiles (mobile-friendly, NOT cluttered) */}
+                        {/* Premium tiles */}
                         <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                             <ActionTile
                                 title="WhatsApp"
@@ -270,7 +297,9 @@ export default function HelpPageClient() {
                                 subtitle={t(lang, "Ver ubicaciones", "View locations")}
                                 icon={<MapPin className="h-4 w-4 text-slate-700" />}
                                 onClick={() =>
-                                    document.getElementById("pickup")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                    document
+                                        .getElementById("pickup")
+                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
                                 }
                             />
 
@@ -279,7 +308,9 @@ export default function HelpPageClient() {
                                 subtitle={t(lang, "Transferencia", "Bank transfer")}
                                 icon={<CreditCard className="h-4 w-4 text-slate-700" />}
                                 onClick={() =>
-                                    document.getElementById("payment")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                    document
+                                        .getElementById("payment")
+                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
                                 }
                             />
 
@@ -288,7 +319,9 @@ export default function HelpPageClient() {
                                 subtitle={t(lang, "Guía de tallas", "Size guide")}
                                 icon={<CreditCard className="h-4 w-4 text-slate-700" />}
                                 onClick={() =>
-                                    document.getElementById("sizing")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                    document
+                                        .getElementById("sizing")
+                                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
                                 }
                             />
                         </div>
@@ -299,7 +332,7 @@ export default function HelpPageClient() {
                 <div className="mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 lg:gap-6">
                     {/* LEFT */}
                     <div className="space-y-4 lg:space-y-6">
-                        {/* PICKUP (premium, compact, with Maps + WhatsApp per city) */}
+                        {/* PICKUP */}
                         <PremiumCard>
                             <div id="pickup" className="p-5 sm:p-6">
                                 <SectionTitle
@@ -309,7 +342,7 @@ export default function HelpPageClient() {
                                     icon={<MapPin className="h-4 w-4 text-slate-800" />}
                                 />
 
-                                {/* Mobile: accordions (clean). Desktop: grid of city cards */}
+                                {/* Mobile accordions */}
                                 <div className="mt-4 space-y-3 lg:hidden">
                                     {visibleCities.map((slug) => {
                                         const spots = PICKUP_SPOTS_BY_LOCATION[slug] ?? [];
@@ -405,19 +438,25 @@ export default function HelpPageClient() {
                                     })}
                                 </div>
 
-                                {/* Desktop: clean grid */}
+                                {/* Desktop grid */}
                                 <div className="hidden lg:grid mt-4 grid-cols-2 gap-4">
                                     {visibleCities.map((slug) => {
                                         const spots = PICKUP_SPOTS_BY_LOCATION[slug] ?? [];
                                         const waCity = buildWhatsAppSupportLink(lang, slug);
 
                                         return (
-                                            <div key={slug} className="rounded-2xl border border-slate-200 bg-white p-5">
+                                            <div
+                                                key={slug}
+                                                className="rounded-2xl border border-slate-200 bg-white p-5"
+                                            >
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div>
-                                                        <p className="text-[12px] font-extrabold text-slate-900">{prettyCity(slug)}</p>
+                                                        <p className="text-[12px] font-extrabold text-slate-900">
+                                                            {prettyCity(slug)}
+                                                        </p>
                                                         <p className="mt-0.5 text-[11px] text-slate-600">
-                                                            {t(lang, "Pick up", "Pickup")} · {t(lang, "Toca para abrir Maps", "Tap to open Maps")}
+                                                            {t(lang, "Pick up", "Pickup")} ·{" "}
+                                                            {t(lang, "Toca para abrir Maps", "Tap to open Maps")}
                                                         </p>
                                                     </div>
 
@@ -453,7 +492,9 @@ export default function HelpPageClient() {
                                                                         {spot.name}
                                                                     </p>
                                                                     {spot.addressHint ? (
-                                                                        <p className="text-[11px] text-slate-500 truncate">{spot.addressHint}</p>
+                                                                        <p className="text-[11px] text-slate-500 truncate">
+                                                                            {spot.addressHint}
+                                                                        </p>
                                                                     ) : null}
                                                                 </div>
                                                                 <span className="shrink-0 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-extrabold text-slate-900">
@@ -478,13 +519,19 @@ export default function HelpPageClient() {
                                 <SectionTitle
                                     eyebrow={t(lang, "Pago", "Payment")}
                                     title={t(lang, "Pago por transferencia", "Bank transfer")}
-                                    subtitle={t(lang, "Si pagas por transferencia, usa estos datos.", "If you pay by transfer, use these details.")}
+                                    subtitle={t(
+                                        lang,
+                                        "Si pagas por transferencia, usa estos datos.",
+                                        "If you pay by transfer, use these details."
+                                    )}
                                     icon={<CreditCard className="h-4 w-4 text-slate-800" />}
                                 />
 
                                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="text-[12px] font-extrabold text-slate-900">{MEX_BANK_INFO.bankName}</p>
+                                        <p className="text-[12px] font-extrabold text-slate-900">
+                                            {MEX_BANK_INFO.bankName}
+                                        </p>
                                         <span className="text-[11px] font-semibold text-slate-500">
                       {t(lang, "Transferencia", "Transfer")}
                     </span>
@@ -492,17 +539,23 @@ export default function HelpPageClient() {
 
                                     <div className="mt-3 space-y-2 text-[12px]">
                                         <p className="text-slate-700">
-                                            <span className="font-extrabold text-slate-900">{t(lang, "Nombre", "Name")}:</span>{" "}
+                      <span className="font-extrabold text-slate-900">
+                        {t(lang, "Nombre", "Name")}:
+                      </span>{" "}
                                             {MEX_BANK_INFO.accountName}
                                         </p>
                                         <p className="text-slate-700">
-                                            <span className="font-extrabold text-slate-900">{t(lang, "Cuenta", "Account")}:</span>{" "}
+                      <span className="font-extrabold text-slate-900">
+                        {t(lang, "Cuenta", "Account")}:
+                      </span>{" "}
                                             {MEX_BANK_INFO.accountNumber}
                                         </p>
                                     </div>
 
                                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] font-extrabold text-slate-900">{t(lang, "Importante", "Important")}</p>
+                                        <p className="text-[11px] font-extrabold text-slate-900">
+                                            {t(lang, "Importante", "Important")}
+                                        </p>
                                         <p className="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
                                             {t(
                                                 lang,
@@ -533,7 +586,7 @@ export default function HelpPageClient() {
                             </div>
                         </PremiumCard>
 
-                        {/* ✅ SIZE GUIDE AT THE END (as requested) */}
+                        {/* SIZE GUIDE AT THE END */}
                         <PremiumCard>
                             <div id="sizing" className="p-5 sm:p-6">
                                 <SectionTitle
@@ -564,44 +617,72 @@ export default function HelpPageClient() {
                                             className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 hover:bg-emerald-100/60 transition"
                                         >
                                             <div>
-                                                <p className="text-[12px] font-extrabold text-emerald-950">WhatsApp</p>
-                                                <p className="text-[11px] text-emerald-900/70">{t(lang, "Soporte", "Support")}</p>
+                                                <p className="text-[12px] font-extrabold text-emerald-950">
+                                                    WhatsApp
+                                                </p>
+                                                <p className="text-[11px] text-emerald-900/70">
+                                                    {t(lang, "Soporte", "Support")}
+                                                </p>
                                             </div>
                                             <ArrowUpRight className="h-4 w-4 text-emerald-900" />
                                         </a>
 
                                         <button
                                             type="button"
-                                            onClick={() => document.getElementById("pickup")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                            onClick={() =>
+                                                document
+                                                    .getElementById("pickup")
+                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                            }
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
-                                                <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Pick up", "Pickup")}</p>
-                                                <p className="text-[11px] text-slate-600">{t(lang, "Ubicaciones", "Locations")}</p>
+                                                <p className="text-[12px] font-extrabold text-slate-900">
+                                                    {t(lang, "Pick up", "Pickup")}
+                                                </p>
+                                                <p className="text-[11px] text-slate-600">
+                                                    {t(lang, "Ubicaciones", "Locations")}
+                                                </p>
                                             </div>
                                             <ArrowUpRight className="h-4 w-4 text-slate-500" />
                                         </button>
 
                                         <button
                                             type="button"
-                                            onClick={() => document.getElementById("payment")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                            onClick={() =>
+                                                document
+                                                    .getElementById("payment")
+                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                            }
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
-                                                <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Pago", "Payment")}</p>
-                                                <p className="text-[11px] text-slate-600">{t(lang, "Transferencia", "Transfer")}</p>
+                                                <p className="text-[12px] font-extrabold text-slate-900">
+                                                    {t(lang, "Pago", "Payment")}
+                                                </p>
+                                                <p className="text-[11px] text-slate-600">
+                                                    {t(lang, "Transferencia", "Transfer")}
+                                                </p>
                                             </div>
                                             <ArrowUpRight className="h-4 w-4 text-slate-500" />
                                         </button>
 
                                         <button
                                             type="button"
-                                            onClick={() => document.getElementById("sizing")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                            onClick={() =>
+                                                document
+                                                    .getElementById("sizing")
+                                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                            }
                                             className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition"
                                         >
                                             <div className="text-left">
-                                                <p className="text-[12px] font-extrabold text-slate-900">{t(lang, "Tallas", "Sizing")}</p>
-                                                <p className="text-[11px] text-slate-600">{t(lang, "Guía de tallas", "Size guide\n")}</p>
+                                                <p className="text-[12px] font-extrabold text-slate-900">
+                                                    {t(lang, "Tallas", "Sizing")}
+                                                </p>
+                                                <p className="text-[11px] text-slate-600">
+                                                    {t(lang, "Guía de tallas", "Size guide")}
+                                                </p>
                                             </div>
                                             <ArrowUpRight className="h-4 w-4 text-slate-500" />
                                         </button>
@@ -627,7 +708,7 @@ export default function HelpPageClient() {
                 show={true}
                 view="help"
                 lang={lang}
-                cartCount={0}
+                cartCount={cartCount}
                 onHome={() => router.push(`/?view=home&lang=${lang}&loc=${loc}`)}
                 onCatalog={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
                 onCart={() => router.push(`/?view=catalog&lang=${lang}&loc=${loc}`)}
