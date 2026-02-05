@@ -5,8 +5,7 @@ import Image from "next/image";
 import type { Lang } from "@/lib/jackieCatalogUtils";
 import { t } from "@/lib/jackieCatalogUtils";
 import Link from "next/link";
-
-
+import {pickupSpotsByLocation} from "@/components/store/storeConstants";
 
 export type HeaderCategory = { id: string; name: string };
 

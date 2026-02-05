@@ -13,7 +13,6 @@ export type LocationSlug = (typeof VISIBLE_LOCATION_SLUGS)[number];
 export function isLocationSlug(v: string): v is LocationSlug {
     return (VISIBLE_LOCATION_SLUGS as readonly string[]).includes(v);
 }
-
 export type PickupSpot = {
     name: string;
     addressHint?: string;
@@ -23,6 +22,12 @@ export const PICKUP_SPOTS_BY_LOCATION: Record<LocationSlug, PickupSpot[]> = {
     tijuana: [{ name: "Colectivo Paseo del Rio", addressHint: "Tijuana" }],
     mexicali: [{ name: "Oaxaca 1820", addressHint: "Mexicali" }],
     hermosillo_sonora: [{ name: "Villa Bonita", addressHint: "Hermosillo" }],
+};
+
+export const pickupSpotsByLocation: Record<string, string[]> = {
+    tijuana: ["Colectivo Paseo del Rio"],
+    mexicali: ["Oaxaca 1820"],
+    hermosillo_sonora: ["Villa Bonita"],
 };
 
 export const MEX_BANK_INFO = {
