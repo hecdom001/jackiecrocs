@@ -271,13 +271,18 @@ export function getCartLocationInfo(cart: CartLine[]): { state: CartLocationStat
     return { state: "mixed", slug: null };
 }
 
-export function buildWhatsAppSupportLink(lang: Lang, locationSlug: string | "all") {
+export function buildWhatsAppSupportLink(
+    lang: Lang,
+    locationSlug: string | "all"
+) {
     const phone = getWhatsAppNumberForLocationSlug(locationSlug);
     if (!phone) return "#";
+
     const message =
         lang === "es"
-            ? "Hola 👋 Tengo dudas sobre tallas o colores de los Crocs."
-            : "Hi 👋 I have questions about Crocs sizes or colors.";
+            ? "Hola 👋 Vengo de aguuacatito.shop. ¿Me puedes ayudar con una pregunta sobre un producto o un pedido?"
+            : "Hi 👋 I'm coming from aguuacatito.shop. Can you help me with a question about a product or an order?";
+
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
@@ -301,42 +306,53 @@ export function buildWhatsAppMessage(cart: CartLine[], lang: Lang) {
 
     const linesEs = cart.map(({ item, count }, idx) => {
         const colorEs = translateColor(item.color, "es");
-        const modelEs = translateModelLabel(item.model_name || "Classic", "es") || "Crocs";
-        const qtyLine = `Cantidad: ${count} ${count === 1 ? "par" : "pares"}`;
+        const modelEs =
+            translateModelLabel(item.model_name || "Producto", "es") ||
+            (item.model_name || "Producto");
+
+        const qtyLine = `Cantidad: ${count} ${count === 1 ? "pieza" : "piezas"}`;
         const locLine = item.location_name ? `Ubicación: ${item.location_name}` : "";
 
-        const colorLine = item.uses_color ? `Color: ${colorEs} (${item.color})\n      ` : "";
-        const sizeLine = item.uses_size ? `Talla: ${formatSizeLabel(item.size, lang)}\n      ` : "";
+        const colorLine = item.uses_color
+            ? `Color: ${colorEs}${item.color ? ` (${item.color})` : ""}\n      `
+            : "";
+
+        const sizeLine = item.uses_size
+            ? `Talla: ${formatSizeLabel(item.size, lang)}\n      `
+            : "";
 
         return `• ${idx + 1}:
-      ${locLine ? `${locLine}\n      ` : ""}Modelo: ${modelEs} Crocs
-      ${colorLine}${sizeLine}Precio por par: $${item.price_mxn.toFixed(0)} MXN
+      ${locLine ? `${locLine}\n      ` : ""}Producto: ${modelEs}
+      ${colorLine}${sizeLine}Precio: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
     });
 
     const linesEn = cart.map(({ item, count }, idx) => {
-        const modelEn = translateModelLabel(item.model_name || "Classic", "en");
-        const qtyLine = `Quantity: ${count} ${count === 1 ? "pair" : "pairs"}`;
+        const modelEn =
+            translateModelLabel(item.model_name || "Item", "en") ||
+            (item.model_name || "Item");
+
+        const qtyLine = `Quantity: ${count} ${count === 1 ? "item" : "items"}`;
         const locLine = item.location_name ? `Location: ${item.location_name}` : "";
 
         const colorLine = item.uses_color ? `Color: ${item.color}\n      ` : "";
         const sizeLine = item.uses_size ? `Size: ${item.size}\n      ` : "";
 
         return `• ${idx + 1}:
-      ${locLine ? `${locLine}\n      ` : ""}Model: ${modelEn} Crocs
-      ${colorLine}${sizeLine}Price per pair: $${item.price_mxn.toFixed(0)} MXN
+      ${locLine ? `${locLine}\n      ` : ""}Item: ${modelEn}
+      ${colorLine}${sizeLine}Price: $${item.price_mxn.toFixed(0)} MXN
       ${qtyLine}`;
     });
 
     if (lang === "es") {
-        return `Hola 👋 Me interesan estos pares de Crocs:
+        return `Hola 👋 Vengo de aguuacatito.shop y me interesan estos artículos:
 
 ${linesEs.join("\n\n")}
 
 ¿Siguen disponibles?`;
     }
 
-    return `Hi 👋 I'm interested in these Crocs:
+    return `Hi 👋 I'm coming from aguuacatito.shop and I'm interested in these items:
 
 ${linesEn.join("\n\n")}
 
