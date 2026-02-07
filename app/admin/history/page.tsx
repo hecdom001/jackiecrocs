@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang, type Lang } from "../adminLangContext";
 import type { InventoryStatus } from "@/types/inventory";
+import {
+  translateColor,
+  translateModelLabel,
+} from "@/lib/jackieCatalogUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -35,98 +39,6 @@ type HistoryEntry = {
   location_id?: string | null;
   location?: { id: string; slug: string; name: string } | null;
 };
-
-/* ---------- Shared helpers ---------- */
-
-function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
-  if (!colorEn) return "";
-  if (lang === "en") return colorEn;
-  const key = colorEn.trim().toLowerCase();
-  switch (key) {
-      // 🎨 basic colors
-    case "black":
-      return "Negro";
-    case "white":
-      return "Blanco";
-    case "beige":
-      return "Beige";
-    case "purple":
-      return "Morado";
-    case "baby pink":
-      return "Rosa Pastel";
-    case "red":
-      return "Rojo";
-    case "lilac":
-      return "Lila";
-    case "arctic":
-      return "Azul Ártico";
-    case "camo":
-      return "Camuflaje";
-    case "light pink shimmer":
-      return "Rosa Claro con Brillo";
-    case "fuchsia":
-      return "Fucsia";
-    case "rust brown":
-      return "Ladrillo";
-    case "grey black":
-      return "Gris / Negro";
-    case "beige brown":
-      return "Beige / Café";
-    case "grey white":
-      return "Gris / Blanco";
-    case "rose sugar":
-      return "Rosa Azúcar";
-    case "crystal white":
-      return "Blanco Cristal";
-
-      // ⭐ themed crocs
-    case "barbie":
-      return "Barbie";
-    case "batman":
-      return "Batman";
-    case "buzz lightyear":
-      return "Buzz Lightyear";
-    case "dragon ball":
-      return "Dragon Ball";
-    case "hello kitty":
-      return "Hello Kitty";
-    case "simpsons":
-      return "Los Simpson";
-    case "stranger things":
-      return "Stranger Things";
-    case "superman":
-      return "Superman";
-    case "toy story":
-      return "Toy Story";
-    case "yoda":
-      return "Yoda";
-    case "egg":
-      return "Huevito";
-    default:
-      return colorEn;
-  }
-}
-
-function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
-  if (!modelEn) return "";
-  if (lang === "en") return modelEn;
-  const key = modelEn.trim().toLowerCase();
-  switch (key) {
-    case "classic crocs":
-      return "Crocs Clásico";
-
-    case "classic platform crocs":
-      return "Crocs Plataforma Clásica";
-
-    case "classic shimmer gemstone crocs":
-      return "Crocs Clásico Shimmer Gemstone";
-
-    case "special edition crocs":
-      return "Crocs Edición Especial";
-    default:
-      return modelEn;
-  }
-}
 
 function formatDate(dt: string, lang: Lang) {
   if (!dt) return "";
@@ -516,7 +428,7 @@ function HistoryRow({ entry, lang }: { entry: HistoryEntry; lang: Lang }) {
         {translateModelLabel(entry.model_name, lang)}
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
-        {translateColorLabel(entry.color, lang)}
+        {translateColor(entry.color, lang)}
       </td>
       <td className="px-3 py-2 align-top text-slate-900 text-xs">
         {entry.size}
@@ -572,7 +484,7 @@ function HistoryCardMobile({
             {translateModelLabel(entry.model_name, lang)} · {entry.size}
           </p>
           <p className="text-[11px] text-slate-500">
-            {translateColorLabel(entry.color, lang)}
+            {translateColor(entry.color, lang)}
           </p>
           <div className="mt-1">
             <LocationChip name={locName} />

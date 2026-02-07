@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { InventoryItem, InventoryStatus } from "@/types/inventory";
 import { useAdminLang, type Lang } from "../adminLangContext";
+import {
+  translateColor,
+  translateModelLabel,
+} from "@/lib/jackieCatalogUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -24,93 +28,6 @@ const statusLabel: Record<InventoryStatus, { es: string; en: string }> = {
   paid_complete: { es: "Pagado Completo", en: "Fully Paid" },
   cancelled: { es: "Cancelado", en: "Cancelled" },
 };
-
-function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
-  if (!colorEn) return "";
-  if (lang === "en") return colorEn;
-  const key = colorEn.trim().toLowerCase();
-  switch (key) {
-      // 🎨 basic colors
-    case "black":
-      return "Negro";
-    case "white":
-      return "Blanco";
-    case "beige":
-      return "Beige";
-    case "purple":
-      return "Morado";
-    case "baby pink":
-      return "Rosa Pastel";
-    case "red":
-      return "Rojo";
-    case "lilac":
-      return "Lila";
-    case "arctic":
-      return "Azul Ártico";
-    case "camo":
-      return "Camuflaje";
-    case "light pink shimmer":
-      return "Rosa Claro con Brillo";
-    case "fuchsia":
-      return "Fucsia";
-    case "rust brown":
-      return "Ladrillo";
-    case "grey black":
-      return "Gris / Negro";
-    case "beige brown":
-      return "Beige / Café";
-    case "grey white":
-      return "Gris / Blanco";
-    case "rose sugar":
-      return "Rosa Azúcar";
-    case "crystal white":
-      return "Blanco Cristal";
-
-      // ⭐ themed crocs
-    case "barbie":
-      return "Barbie";
-    case "batman":
-      return "Batman";
-    case "buzz lightyear":
-      return "Buzz Lightyear";
-    case "dragon ball":
-      return "Dragon Ball";
-    case "hello kitty":
-      return "Hello Kitty";
-    case "simpsons":
-      return "Los Simpson";
-    case "stranger things":
-      return "Stranger Things";
-    case "superman":
-      return "Superman";
-    case "toy story":
-      return "Toy Story";
-    case "yoda":
-      return "Yoda";
-    case "egg":
-      return "Huevito";
-    default:
-      return colorEn;
-  }
-}
-
-function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
-  if (!modelEn) return "";
-  if (lang === "en") return modelEn;
-  const key = modelEn.trim().toLowerCase();
-  switch (key) {
-    case "classic crocs":
-      return "Crocs Clásico";
-    case "classic platform crocs":
-      return "Crocs Plataforma Clásica";
-    case "classic shimmer gemstone crocs":
-      return "Crocs Clásico Shimmer Gemstone";
-    case "special edition crocs":
-      return "Crocs Edición Especial";
-    default:
-      return modelEn;
-  }
-}
 
 // Location helpers (read-only display)
 function getLocationName(item: InventoryItem) {
@@ -555,7 +472,7 @@ export default function AdminInventoryPage() {
                   <option value="all">{t("Todos", "All")}</option>
                   {colorFilterOptions.map((c) => (
                       <option key={c} value={c}>
-                        {translateColorLabel(c, lang)}
+                        {translateColor(c, lang)}
                       </option>
                   ))}
                 </select>
@@ -657,7 +574,7 @@ export default function AdminInventoryPage() {
                       <option value="all">{t("Todos", "All")}</option>
                       {colorFilterOptions.map((c) => (
                           <option key={c} value={c}>
-                            {translateColorLabel(c, lang)}
+                            {translateColor(c, lang)}
                           </option>
                       ))}
                     </select>
@@ -956,7 +873,7 @@ function InventoryRow({
           {translateModelLabel(item.model_name, lang)}
         </td>
         <td className="px-3 py-2 align-top text-slate-900 text-xs">
-          {translateColorLabel(item.color, lang)}
+          {translateColor(item.color, lang)}
         </td>
         <td className="px-3 py-2 align-top text-slate-900 text-xs">{item.size}</td>
 
@@ -1155,7 +1072,7 @@ function InventoryCardMobile({
                 {translateModelLabel(item.model_name, lang)} · {item.size}
               </p>
               <p className="text-xs text-slate-500 truncate">
-                {translateColorLabel(item.color, lang)}
+                {translateColor(item.color, lang)}
               </p>
 
               <p className="mt-1 text-[11px] text-slate-600">📍 {getLocationName(item)}</p>
@@ -1368,7 +1285,7 @@ function InventoryFastRowMobile({
                 {translateModelLabel(item.model_name, lang)} · {item.size}
               </p>
               <p className="text-[11px] text-slate-500 truncate">
-                {translateColorLabel(item.color, lang)} · 📍 {getLocationName(item)}
+                {translateColor(item.color, lang)} · 📍 {getLocationName(item)}
               </p>
               <p className="text-[11px] text-slate-500 truncate">
                 {item.customer_name} · {item.notes}

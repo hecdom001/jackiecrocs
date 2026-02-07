@@ -47,8 +47,8 @@ export type ColorGroup = {
 export const t = (lang: Lang, es: string, en: string) => (lang === "es" ? es : en);
 
 // ---------------- translations ----------------
-
-export function translateColor(colorEn: string, lang: Lang) {
+export function translateColor(colorEn: string| null, lang: Lang) {
+    if (!colorEn) return "en";
     if (lang === "en") return colorEn;
     const key = colorEn.trim().toLowerCase();
     switch (key) {

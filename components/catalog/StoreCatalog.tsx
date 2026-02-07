@@ -18,7 +18,7 @@ import {
     type ColorGroup,
     type Lang,
     type LocationOption,
-    type PublicItem, translateCategory,
+    type PublicItem, translateCategory, translateColor,
 } from "@/lib/jackieCatalogUtils";
 
 import {
@@ -1093,7 +1093,7 @@ function StoreCatalogInner() {
                                                         const active = colorFilter === c;
                                                         return (
                                                             <button
-                                                                key={c}
+                                                                key={translateColor(c, lang)}
                                                                 type="button"
                                                                 onClick={() => setColorFilter(active ? "all" : c)}
                                                                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
@@ -1101,10 +1101,10 @@ function StoreCatalogInner() {
                                                                         ? "border-emerald-300 bg-emerald-50 text-emerald-800"
                                                                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                                                                 }`}
-                                                                title={c}
+                                                                title={translateColor(c, lang)}
                                                             >
-                                                                <SwatchDot color={c} active={active} />
-                                                                <span className="truncate max-w-[160px]">{c}</span>
+                                                                <SwatchDot color={translateColor(c, lang)} active={active} />
+                                                                <span className="truncate max-w-[160px]">{translateColor(c, lang)}</span>
                                                             </button>
                                                         );
                                                     })}

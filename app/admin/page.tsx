@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { InventoryItem } from "@/types/inventory";
 import { useAdminLang } from "./adminLangContext";
+import {
+  translateColor,
+} from "@/lib/jackieCatalogUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -35,43 +38,6 @@ function getLocationLite(item: any): LocationLite | null {
   }
 
   return null;
-}
-
-/* ---------- Color helper ---------- */
-
-function translateColorLabel(colorEn: string | null | undefined, lang: Lang): string {
-  if (!colorEn) return lang === "es" ? "Sin color" : "No color";
-  if (lang === "en") return colorEn;
-
-  const key = colorEn.trim().toLowerCase();
-  switch (key) {
-    case "black":
-      return "Negro";
-    case "white":
-      return "Blanco";
-    case "beige":
-      return "Beige";
-    case "purple":
-      return "Morado";
-    case "baby pink":
-      return "Rosa Pastel";
-    case "red":
-      return "Rojo";
-    case "lilac":
-      return "Lila";
-    case "arctic":
-      return "Azul Ártico";
-    case "camo":
-      return "Camuflaje";
-    case "light pink shimmer":
-      return "Rosa Claro con Brillo";
-    case "fuchsia":
-      return "Fucsia";
-    case "rust brown":
-      return "Ladrillo";
-    default:
-      return colorEn;
-  }
 }
 
 /* ---------- Size sorting helper ---------- */
@@ -489,7 +455,7 @@ export default function AdminDashboardPage() {
                 >
                   <div className="flex flex-col">
                     <span className="text-[11px] font-semibold text-slate-900">
-                      {translateColorLabel(colorKey === "no_color" ? null : colorKey, lang)}
+                      {translateColor(colorKey === "no_color" ? null : colorKey, lang)}
                     </span>
                     <span className="text-[10px] text-slate-500">
                       {t("Total", "Total")}: {stats.total}
@@ -539,7 +505,7 @@ export default function AdminDashboardPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-[11px] font-semibold text-slate-900">
-                    {translateColorLabel(colorKey === "no_color" ? null : colorKey, lang)} -{" "}
+                    {translateColor(colorKey === "no_color" ? null : colorKey, lang)} -{" "}
                     {t("Total", "Total")}: {colorTotals.total} - {t("Disp.", "Avail.")}:{" "}
                     {colorTotals.available} - {t("Apart.", "Resv.")}: {colorTotals.reserved}
                   </span>
@@ -768,7 +734,7 @@ export default function AdminDashboardPage() {
                       className="border-b border-slate-100 last:border-0"
                     >
                       <td className="py-1.5 pr-3 text-slate-800">
-                        {translateColorLabel(colorKey === "no_color" ? null : colorKey, lang)}
+                        {translateColor(colorKey === "no_color" ? null : colorKey, lang)}
                       </td>
                       <td className="py-1.5 px-3 text-right text-slate-800">{stats.total}</td>
                       <td className="py-1.5 px-3 text-right text-emerald-700">{stats.available}</td>
@@ -816,7 +782,7 @@ export default function AdminDashboardPage() {
                 return (
                   <div key={colorKey}>
                     <h4 className="text-[11px] font-semibold text-slate-700 mb-1.5">
-                      {translateColorLabel(colorKey === "no_color" ? null : colorKey, lang)}
+                      {translateColor(colorKey === "no_color" ? null : colorKey, lang)}
                     </h4>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[11px] border-collapse min-w-[260px]">

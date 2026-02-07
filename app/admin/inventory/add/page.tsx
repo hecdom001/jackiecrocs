@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAdminLang } from "../../adminLangContext";
 import { translateCategory } from "@/lib/jackieCatalogUtils";
+import {
+  translateColor,
+  translateModelLabel,
+} from "@/lib/jackieCatalogUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -39,90 +43,6 @@ type ModelRow = {
 };
 
 type Lang = "es" | "en";
-
-function translateColorLabel(colorEn: string | null | undefined, lang: Lang) {
-  if (!colorEn) return "";
-  if (lang === "en") return colorEn;
-  const key = colorEn.trim().toLowerCase();
-  switch (key) {
-    case "black":
-      return "Negro";
-    case "white":
-      return "Blanco";
-    case "beige":
-      return "Beige";
-    case "purple":
-      return "Morado";
-    case "baby pink":
-      return "Rosa Pastel";
-    case "red":
-      return "Rojo";
-    case "lilac":
-      return "Lila";
-    case "arctic":
-      return "Azul Ártico";
-    case "camo":
-      return "Camuflaje";
-    case "light pink shimmer":
-      return "Rosa Claro con Brillo";
-    case "fuchsia":
-      return "Fucsia";
-    case "rust brown":
-      return "Ladrillo";
-    case "grey black":
-      return "Gris / Negro";
-    case "beige brown":
-      return "Beige / Café";
-    case "grey white":
-      return "Gris / Blanco";
-    case "rose sugar":
-      return "Rosa Azúcar";
-    case "crystal white":
-      return "Blanco Cristal";
-    case "barbie":
-      return "Barbie";
-    case "batman":
-      return "Batman";
-    case "buzz lightyear":
-      return "Buzz Lightyear";
-    case "dragon ball":
-      return "Dragon Ball";
-    case "hello kitty":
-      return "Hello Kitty";
-    case "simpsons":
-      return "Los Simpson";
-    case "stranger things":
-      return "Stranger Things";
-    case "superman":
-      return "Superman";
-    case "toy story":
-      return "Toy Story";
-    case "yoda":
-      return "Yoda";
-    case "egg":
-      return "Huevito";
-    default:
-      return colorEn;
-  }
-}
-
-function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
-  if (!modelEn) return "";
-  if (lang === "en") return modelEn;
-  const key = modelEn.trim().toLowerCase();
-  switch (key) {
-    case "classic crocs":
-      return "Crocs Clásico";
-    case "classic platform crocs":
-      return "Crocs Plataforma Clásica";
-    case "classic shimmer gemstone crocs":
-      return "Crocs Clásico Shimmer Gemstone";
-    case "special edition crocs":
-      return "Crocs Edición Especial";
-    default:
-      return modelEn;
-  }
-}
 
 function slugifyLocation(input: string) {
   return input
@@ -1621,7 +1541,7 @@ function AddInventorySection({
                     {!colors.includes(naColorValue) ? <option value={naColorValue}>{naColorValue}</option> : null}
                     {colors.map((c) => (
                         <option key={c} value={c}>
-                          {translateColorLabel(c, lang)}
+                          {translateColor(c, lang)}
                         </option>
                     ))}
                   </select>
@@ -1797,7 +1717,7 @@ function AddInventorySection({
                       <option value="">{t("Selecciona un color", "Select a color")}</option>
                       {imgColorOptions.map((c) => (
                           <option key={c} value={c}>
-                            {translateColorLabel(c, lang)}
+                            {translateColor(c, lang)}
                           </option>
                       ))}
                     </select>
@@ -1874,7 +1794,7 @@ function AddInventorySection({
                     {imgModel ? (
                         <>
                           <span className="font-medium">{translateModelLabel(imgModel, lang)}</span>
-                          {imgUsesColor ? <> · {translateColorLabel(imgColor, lang)}</> : null}
+                          {imgUsesColor ? <> · {translateColor(imgColor, lang)}</> : null}
                           {currentImage?.storage_path ? (
                               <span className="text-slate-400"> · {currentImage.storage_path}</span>
                           ) : (
@@ -2020,7 +1940,7 @@ function AddInventorySection({
                     <option value="">{t("Selecciona un color", "Select a color")}</option>
                     {trColorOptions.map((c) => (
                         <option key={c} value={c}>
-                          {translateColorLabel(c, lang)}
+                          {translateColor(c, lang)}
                         </option>
                     ))}
                   </select>
@@ -2324,7 +2244,7 @@ function AddInventorySection({
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[11px] text-slate-700">
                 {t("Vista en español:", "Spanish preview:")}{" "}
-                <span className="font-semibold">{translateColorLabel(newColorNameEn, "es")}</span>
+                <span className="font-semibold">{translateColor(newColorNameEn, "es")}</span>
               </p>
             </div>
 
