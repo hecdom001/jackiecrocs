@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAdminLang } from "../../adminLangContext";
+import { translateCategory } from "@/lib/jackieCatalogUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -120,36 +121,6 @@ function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
       return "Crocs Edición Especial";
     default:
       return modelEn;
-  }
-}
-
-export function translateCategory(labelOrSlug: string | null | undefined, lang: Lang) {
-  if (!labelOrSlug) return "";
-  if (lang === "en") return labelOrSlug;
-
-  const key = labelOrSlug.trim().toLowerCase();
-
-  // You can match either the category name OR slug
-  switch (key) {
-    case "footwear":
-      return "Calzado";
-
-    case "bags":
-    case "handbags":
-      return "Bolsas";
-
-    case "perfume":
-    case "perfumes":
-    case "fragrance":
-    case "fragrances":
-      return "Perfumes";
-
-    case "accessories":
-      return "Accesorios";
-
-    default:
-      // fallback: show as-is
-      return labelOrSlug;
   }
 }
 

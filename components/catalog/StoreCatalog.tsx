@@ -18,7 +18,7 @@ import {
     type ColorGroup,
     type Lang,
     type LocationOption,
-    type PublicItem,
+    type PublicItem, translateCategory,
 } from "@/lib/jackieCatalogUtils";
 
 import {
@@ -969,7 +969,7 @@ function StoreCatalogInner() {
                                                                     : "text-slate-700 hover:bg-slate-50"
                                                             }`}
                                                         >
-                                                            {cat.name}
+                                                            {translateCategory(cat.name || cat.slug, lang)}
                                                         </button>
                                                     ))}
                                                 </div>
