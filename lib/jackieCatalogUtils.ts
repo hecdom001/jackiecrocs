@@ -89,13 +89,34 @@ export function translateColor(colorEn: string| null, lang: Lang) {
 export function translateModelLabel(modelEn: string | null | undefined, lang: Lang) {
     if (!modelEn) return "";
     if (lang === "en") return modelEn;
+
     const key = modelEn.trim().toLowerCase();
+
     switch (key) {
+        // Crocs
         case "classic crocs": return "Crocs Clásico";
-        case "classic platform crocs": return "Crocs Plataforma Clásica";
+        case "classic platform crocs": return "Crocs Plataforma Clásico";
         case "classic shimmer gemstone crocs": return "Crocs Clásico Shimmer Gemstone";
         case "special edition crocs": return "Crocs Edición Especial";
-        default: return modelEn;
+        case "classic crocs backpack": return "Mochila Crocs Clásico";
+        case "crocs glitter": return "Crocs con glitter";
+        case "classic lined crocs":
+        case "classic lined clog":
+            return "Crocs con peluche";
+
+        // Owala / designs
+        case "hello kitty": return "Hello Kitty";
+        case "cherries": return "Cerezas";
+        case "bows": return "Moños";
+        case "tulips": return "Tulipanes";
+        case "cowboy": return "Vaquero";
+
+        // Coach bags (if you want them translated)
+        case "bleecker bucket bag": return "Bolsa bleecker bucket";
+        case "chelsea shoulder bag": return "Bolsa chelsea shoulder";
+
+        default:
+            return modelEn;
     }
 }
 
