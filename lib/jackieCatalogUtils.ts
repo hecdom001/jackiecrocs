@@ -67,6 +67,7 @@ export function translateColor(colorEn: string, lang: Lang) {
         case "rust brown": return "Ladrillo";
         case "grey black": return "Gris / Negro";
         case "beige brown": return "Beige / Café";
+        case "brown": return "Café";
         case "grey white": return "Gris / Blanco";
         case "rose sugar": return "Rosa Azúcar";
         case "crystal white": return "Blanco Cristal";
@@ -130,10 +131,13 @@ export function translateCategory(labelOrSlug: string, lang: Lang) {
     // You can match either the category name OR slug
     switch (key) {
         case "footwear":
+        case "shoes":
+        case "sneakers":
             return "Calzado";
 
         case "bags":
         case "handbags":
+        case "backpacks":
             return "Bolsas";
 
         case "perfume":
@@ -145,12 +149,48 @@ export function translateCategory(labelOrSlug: string, lang: Lang) {
         case "accessories":
             return "Accesorios";
 
+        // Drinkware
+        case "drinkware":
+            return "Bebidas";
+        case "bottles":
+            return "Botellas de agua";
+        case "tumblers":
+        case "tumbler":
+        case "thermos":
+        case "thermoses":
+        case "vacuum-flask":
+        case "water-bottles":
+        case "water-bottle":
+            return "Termos";
+
+        // Apparel
+        case "apparel":
+        case "clothing":
+            return "Ropa";
+        case "t-shirts":
+        case "shirts":
+            return "Playeras";
+        case "hoodies":
+            return "Sudaderas";
+        case "hats":
+        case "caps":
+            return "Gorras";
+
+        // Electronics / misc
+        case "electronics":
+            return "Electrónicos";
+        case "home":
+        case "home-goods":
+            return "Artículos para el hogar";
+        case "sports":
+        case "fitness":
+            return "Deportes y fitness";
+
         default:
             // fallback: show as-is
             return labelOrSlug;
     }
 }
-
 
 // ---------------- size helpers ----------------
 
