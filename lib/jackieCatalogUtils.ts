@@ -104,6 +104,9 @@ export function translateModelLabel(modelEn: string | null | undefined, lang: La
         case "classic lined clog":
             return "Crocs con peluche";
 
+        // Shoe Charms
+        case "Shoe Charms": return "Charms para calzado";
+
         // Owala / designs
         case "hello kitty": return "Hello Kitty";
         case "cherries": return "Cerezas";
