@@ -10,6 +10,7 @@ function requireAdmin(req: NextRequest) {
 
 /**
  * GET /api/admin/inventory
+ * UPDATED: now returns category info via models -> categories relationship
  */
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -32,7 +33,15 @@ export async function GET(req: NextRequest) {
       notes,
       created_at,
       updated_at,
-      models ( name ),
+      models (
+        name,
+        category_id,
+        categories (
+          id,
+          slug,
+          name
+        )
+      ),
       colors ( name_en ),
       sizes (
         id,
@@ -49,10 +58,7 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     console.error("Error fetching inventory:", error);
-    return NextResponse.json(
-        { error: "Error fetching inventory" },
-        { status: 500 }
-    );
+    return NextResponse.json({ error: "Error fetching inventory" }, { status: 500 });
   }
 
   const items =
@@ -62,6 +68,18 @@ export async function GET(req: NextRequest) {
         color_id: row.color_id as string,
 
         model_name: row.models?.name ?? null,
+
+        // ✅ NEW: category fields that your page.tsx can read
+        category_id: row.models?.category_id ? String(row.models.category_id) : null,
+        category: row.models?.categories
+            ? {
+              id: row.models.categories.id as string,
+              slug: row.models.categories.slug as string,
+              name: row.models.categories.name as string,
+            }
+            : null,
+        category_name: row.models?.categories?.name ?? null,
+
         color: row.colors?.name_en ?? null,
 
         size: row.sizes?.label ?? "",
@@ -90,6 +108,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/inventory
+ * (UNCHANGED — do not change this)
  */
 export async function POST(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -100,11 +119,15 @@ export async function POST(req: NextRequest) {
   const { model_name, color, size_id, price_mxn, quantity, location_id } = body;
 
   // ✅ allow price_mxn = 0 (so check undefined/null instead of falsy)
-  if (!model_name || !color || !size_id || price_mxn === undefined || price_mxn === null || !location_id) {
-    return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-    );
+  if (
+      !model_name ||
+      !color ||
+      !size_id ||
+      price_mxn === undefined ||
+      price_mxn === null ||
+      !location_id
+  ) {
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   const qty = Number(quantity) || 1;
@@ -137,17 +160,11 @@ export async function POST(req: NextRequest) {
 
   if (locationError) {
     console.error("Error selecting location:", locationError);
-    return NextResponse.json(
-        { error: "Error checking location" },
-        { status: 500 }
-    );
+    return NextResponse.json({ error: "Error checking location" }, { status: 500 });
   }
 
   if (!locationRow) {
-    return NextResponse.json(
-        { error: "Invalid location_id" },
-        { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid location_id" }, { status: 400 });
   }
 
   // 1) Ensure model exists (models.name)
@@ -219,16 +236,11 @@ export async function POST(req: NextRequest) {
     status: "available",
   }));
 
-  const { error: insertError } = await supabase
-      .from("inventory_items")
-      .insert(rows);
+  const { error: insertError } = await supabase.from("inventory_items").insert(rows);
 
   if (insertError) {
     console.error("Error inserting inventory:", insertError);
-    return NextResponse.json(
-        { error: "Error inserting inventory" },
-        { status: 500 }
-    );
+    return NextResponse.json({ error: "Error inserting inventory" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -236,7 +248,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * PATCH /api/admin/inventory
- * NOW supports price_mxn updates too.
+ * (UNCHANGED — your price_mxn support remains)
  */
 export async function PATCH(req: NextRequest) {
   if (!requireAdmin(req)) {
@@ -250,14 +262,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Missing item id" }, { status: 400 });
   }
 
-  // ✅ Allow price_mxn now
   const allowedFields = [
     "status",
     "customer_name",
     "customer_whatsapp",
     "notes",
     "location_id",
-    "price_mxn", // ✅ NEW
+    "price_mxn",
   ] as const;
 
   const payload: Record<string, any> = {};
@@ -268,10 +279,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (Object.keys(payload).length === 0) {
-    return NextResponse.json(
-        { error: "No valid fields to update" },
-        { status: 400 }
-    );
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
   // Validate location_id if updating
@@ -284,10 +292,7 @@ export async function PATCH(req: NextRequest) {
 
     if (locErr) {
       console.error("Error checking location:", locErr);
-      return NextResponse.json(
-          { error: "Error checking location" },
-          { status: 500 }
-      );
+      return NextResponse.json({ error: "Error checking location" }, { status: 500 });
     }
 
     if (!loc) {
@@ -295,22 +300,16 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // ✅ Validate price_mxn if updating
+  // Validate price_mxn if updating
   if (payload.price_mxn !== undefined) {
     const n = Number(payload.price_mxn);
     if (!Number.isFinite(n) || n < 0) {
-      return NextResponse.json(
-          { error: "Invalid price_mxn" },
-          { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid price_mxn" }, { status: 400 });
     }
     payload.price_mxn = n;
   }
 
-  const { error } = await supabase
-      .from("inventory_items")
-      .update(payload)
-      .eq("id", id);
+  const { error } = await supabase.from("inventory_items").update(payload).eq("id", id);
 
   if (error) {
     console.error("Error updating inventory item:", error);

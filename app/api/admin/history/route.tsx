@@ -16,17 +16,17 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
 
-    // limit: default 20, max 30 (same as MAX_HISTORY on UI)
+    // limit: default 90, hard cap 100
     const limitParam = searchParams.get("limit");
     const limit = Math.min(Number(limitParam) || 90, 100);
 
-    // optional location filter (by location_id) – safe even if UI doesn't send it yet
+    // optional location filter
     const locationId = searchParams.get("locationId");
 
     let query = supabase
-      .from("inventory_items")
-      .select(
-        `
+        .from("inventory_items")
+        .select(
+            `
         id,
         model_id,
         color_id,
@@ -35,19 +35,27 @@ export async function GET(req: NextRequest) {
         price_mxn,
         status,
         customer_name,
-        customer_whatsapp,
         notes,
         created_at,
         updated_at,
-        models ( name ),
+
+        models (
+          name,
+          categories (
+            id,
+            slug,
+            name
+          )
+        ),
+
         colors ( name_en ),
         sizes ( label ),
         locations ( id, slug, name )
       `
-      )
-      .neq("status", "available")
-      .order("updated_at", { ascending: false })
-      .limit(limit);
+        )
+        .neq("status", "available")
+        .order("updated_at", { ascending: false })
+        .limit(limit);
 
     if (locationId && locationId !== "all") {
       query = query.eq("location_id", locationId);
@@ -58,26 +66,53 @@ export async function GET(req: NextRequest) {
     if (error) {
       console.error("Error fetching history:", error);
       return NextResponse.json(
-        { error: "Error fetching history" },
-        { status: 500 }
+          { error: "Error fetching history" },
+          { status: 500 }
       );
     }
 
     const history = (data ?? []).map((row: any) => ({
-      ...row,
-      // UI uses entry.size
+      id: row.id,
+
+      model_name: row.models?.name ?? null,
+
+      // ✅ CATEGORY (for UI column after "Last update")
+      category: row.models?.categories
+          ? {
+            id: row.models.categories.id,
+            slug: row.models.categories.slug,
+            name: row.models.categories.name,
+          }
+          : null,
+
+      color: row.colors?.name_en ?? null,
       size: row.sizes?.label ?? "",
-      // normalized fields the UI code expects
+
+      price_mxn: Number(row.price_mxn),
+      status: row.status,
+
+      customer_name: row.customer_name ?? null,
+      notes: row.notes ?? null,
+
+      updated_at: row.updated_at,
+
+      // location normalization
       location_id: row.location_id ?? null,
-      locations: row.locations ?? null,
+      location: row.locations
+          ? {
+            id: row.locations.id,
+            slug: row.locations.slug,
+            name: row.locations.name,
+          }
+          : null,
     }));
 
     return NextResponse.json({ history });
   } catch (err) {
     console.error("Unexpected error in /api/admin/history:", err);
     return NextResponse.json(
-      { error: "Unexpected error" },
-      { status: 500 }
+        { error: "Unexpected error" },
+        { status: 500 }
     );
   }
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { InventoryItem, InventoryStatus } from "@/types/inventory";
 import { useAdminLang, type Lang } from "../adminLangContext";
 import {
+  translateCategory,
   translateColor,
   translateModelLabel,
 } from "@/lib/jackieCatalogUtils";
@@ -69,6 +70,9 @@ export default function AdminInventoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | InventoryStatus>(
       "all"
   );
+  // Category + Model (UI only; relies on existing API fields on items)
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [modelFilter, setModelFilter] = useState<string>("all"); // model_id preferred
   const [sizeFilter, setSizeFilter] = useState<string>("all"); // size_id or "all"
   const [colorFilter, setColorFilter] = useState<string>("all");
   const [customerQuery, setCustomerQuery] = useState("");
@@ -144,7 +148,15 @@ export default function AdminInventoryPage() {
   // Reset page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, sizeFilter, colorFilter, customerQuery, locationFilter]);
+  }, [
+    statusFilter,
+    categoryFilter,
+    modelFilter,
+    sizeFilter,
+    colorFilter,
+    customerQuery,
+    locationFilter,
+  ]);
 
   // Build locations list from items (NO /api/admin/locations needed)
   const locationOptions = useMemo<LocationOption[]>(() => {
@@ -165,10 +177,77 @@ export default function AdminInventoryPage() {
       });
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-    );
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [items]);
+
+  // Category / Model helpers
+  function getItemCategory(it: InventoryItem): {
+    id: string | null;
+    name: string | null;
+  } {
+    const anyIt = it as any;
+
+    // Common shapes returned by APIs / joins
+    const catObj =
+        anyIt?.category ||
+        anyIt?.categories ||
+        anyIt?.models?.categories ||
+        anyIt?.model?.categories;
+    if (catObj && (catObj.id || catObj.name)) {
+      return {
+        id: catObj.id ? String(catObj.id) : null,
+        name: catObj.name ? String(catObj.name) : null,
+      };
+    }
+
+    const id = anyIt?.category_id ? String(anyIt.category_id) : null;
+    const name = anyIt?.category_name
+        ? String(anyIt.category_name)
+        : anyIt?.categorySlug
+            ? String(anyIt.categorySlug)
+            : null;
+    return { id, name };
+  }
+
+  const categoryFilterOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const it of items) {
+      const cat = getItemCategory(it);
+      const key = cat.id || cat.name ? String(cat.id || cat.name) : "";
+      if (!key) continue;
+      map.set(key, { id: key, name: String(cat.name || cat.id || key) });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
+
+  const modelFilterOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const it of items) {
+      const anyIt = it as any;
+      const id = anyIt?.model_id
+          ? String(anyIt.model_id)
+          : anyIt?.modelId
+              ? String(anyIt.modelId)
+              : "";
+      const name = anyIt?.model_name
+          ? String(anyIt.model_name)
+          : anyIt?.model?.name
+              ? String(anyIt.model.name)
+              : "";
+      if (!id && !name) continue;
+      const key = id || name;
+
+      // If a category filter is selected, only include models that match it
+      if (categoryFilter !== "all") {
+        const cat = getItemCategory(it);
+        const catKey = String(cat.id || cat.name || "");
+        if (!catKey || catKey !== categoryFilter) continue;
+      }
+
+      map.set(key, { id: key, name });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, categoryFilter]);
 
   // Filter options
   const sizeFilterOptions = Array.from(
@@ -188,8 +267,28 @@ export default function AdminInventoryPage() {
   const locationFilterOptions = locationOptions;
 
   const filteredItems = items.filter((item) => {
-    const matchesStatus =
-        statusFilter === "all" || item.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+
+    const cat = getItemCategory(item);
+    const catKey = String(cat.id || cat.name || "");
+    const matchesCategory =
+        categoryFilter === "all" || (!!catKey && catKey === categoryFilter);
+
+    const anyItem = item as any;
+    const itemModelId = anyItem?.model_id
+        ? String(anyItem.model_id)
+        : anyItem?.modelId
+            ? String(anyItem.modelId)
+            : "";
+    const itemModelName = anyItem?.model_name
+        ? String(anyItem.model_name)
+        : anyItem?.model?.name
+            ? String(anyItem.model.name)
+            : "";
+    const itemModelKey = itemModelId || itemModelName;
+    const matchesModel =
+        modelFilter === "all" || (!!itemModelKey && itemModelKey === modelFilter);
+
     const matchesSize = sizeFilter === "all" || item.size_id === sizeFilter;
     const matchesColor = colorFilter === "all" || item.color === colorFilter;
 
@@ -197,17 +296,19 @@ export default function AdminInventoryPage() {
         ? String((item as any).location.id)
         : ((item as any).location_id as string | undefined);
 
-    const matchesLocation =
-        locationFilter === "all" || itemLocId === locationFilter;
+    const matchesLocation = locationFilter === "all" || itemLocId === locationFilter;
 
     const query = customerQuery.trim().toLowerCase();
     const matchesCustomer =
         !query ||
         (item.customer_name || "").toLowerCase().includes(query) ||
+        // still allow searching by whatsapp even if hidden in UI
         (item.customer_whatsapp || "").toLowerCase().includes(query);
 
     return (
         matchesStatus &&
+        matchesCategory &&
+        matchesModel &&
         matchesCustomer &&
         matchesSize &&
         matchesColor &&
@@ -219,13 +320,14 @@ export default function AdminInventoryPage() {
   const countsByStatus: Record<InventoryStatus, number> = {
     available: filteredItems.filter((i) => i.status === "available").length,
     reserved: filteredItems.filter((i) => i.status === "reserved").length,
-    paid_complete: filteredItems.filter((i) => i.status === "paid_complete")
-        .length,
+    paid_complete: filteredItems.filter((i) => i.status === "paid_complete").length,
     cancelled: filteredItems.filter((i) => i.status === "cancelled").length,
   };
 
   const hasActiveFilters =
       statusFilter !== "all" ||
+      categoryFilter !== "all" ||
+      modelFilter !== "all" ||
       sizeFilter !== "all" ||
       colorFilter !== "all" ||
       locationFilter !== "all" ||
@@ -233,6 +335,8 @@ export default function AdminInventoryPage() {
 
   function clearFilters() {
     setStatusFilter("all");
+    setCategoryFilter("all");
+    setModelFilter("all");
     setSizeFilter("all");
     setColorFilter("all");
     setLocationFilter("all");
@@ -242,8 +346,7 @@ export default function AdminInventoryPage() {
   // Pagination
   const effectivePageSize = isMobile ? PAGE_SIZE_MOBILE : PAGE_SIZE_DESKTOP;
   const totalFiltered = filteredItems.length;
-  const totalPages =
-      totalFiltered === 0 ? 1 : Math.ceil(totalFiltered / effectivePageSize);
+  const totalPages = totalFiltered === 0 ? 1 : Math.ceil(totalFiltered / effectivePageSize);
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * effectivePageSize;
   const endIndex = startIndex + effectivePageSize;
@@ -405,7 +508,7 @@ export default function AdminInventoryPage() {
             </div>
 
             {/* Desktop filter bar */}
-            <div className="hidden sm:grid sm:grid-cols-6 gap-2 w-full sm:w-auto sm:min-w-[800px] text-[11px]">
+            <div className="hidden sm:grid sm:grid-cols-8 gap-2 w-full sm:w-auto sm:min-w-[1040px] text-[11px]">
               {/* status */}
               <div className="flex flex-col gap-1">
                 <span className="text-slate-700">{t("Estatus", "Status")}</span>
@@ -439,6 +542,46 @@ export default function AdminInventoryPage() {
                   {locationFilterOptions.map((loc) => (
                       <option key={loc.id} value={loc.id}>
                         {loc.name}
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* category */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">{t("Categoría", "Category")}</span>
+                <select
+                    value={categoryFilter}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCategoryFilter(v);
+                      setModelFilter("all");
+                    }}
+                    disabled={categoryFilterOptions.length === 0}
+                    className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                >
+                  <option value="all">{t("Todas", "All")}</option>
+                  {categoryFilterOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {translateCategory(c.name, lang)}
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* model */}
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-700">{t("Modelo", "Model")}</span>
+                <select
+                    value={modelFilter}
+                    onChange={(e) => setModelFilter(e.target.value)}
+                    disabled={modelFilterOptions.length === 0}
+                    className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                >
+                  <option value="all">{t("Todos", "All")}</option>
+                  {modelFilterOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {translateModelLabel(m.name, lang)}
                       </option>
                   ))}
                 </select>
@@ -480,12 +623,12 @@ export default function AdminInventoryPage() {
 
               {/* customer search */}
               <div className="flex flex-col gap-1">
-                <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
+                <span className="text-slate-700">{t("Cliente", "Customer")}</span>
                 <input
                     value={customerQuery}
                     onChange={(e) => setCustomerQuery(e.target.value)}
                     className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                    placeholder={lang === "es" ? "Buscar nombre o +52..." : "Search name or +52..."}
+                    placeholder={lang === "es" ? "Buscar nombre..." : "Search customer..."}
                 />
               </div>
 
@@ -546,6 +689,46 @@ export default function AdminInventoryPage() {
                     </select>
                   </div>
 
+                  {/* category */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-700">{t("Categoría", "Category")}</span>
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCategoryFilter(v);
+                          setModelFilter("all");
+                        }}
+                        disabled={categoryFilterOptions.length === 0}
+                        className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                    >
+                      <option value="all">{t("Todas", "All")}</option>
+                      {categoryFilterOptions.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {translateCategory(c.name, lang)}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* model */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-700">{t("Modelo", "Model")}</span>
+                    <select
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                        disabled={modelFilterOptions.length === 0}
+                        className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                    >
+                      <option value="all">{t("Todos", "All")}</option>
+                      {modelFilterOptions.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {translateModelLabel(m.name, lang)}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* size */}
                   <div className="flex flex-col gap-1">
                     <span className="text-slate-700">{t("Talla", "Size")}</span>
@@ -582,12 +765,12 @@ export default function AdminInventoryPage() {
 
                   {/* customer search */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-slate-700">{t("Cliente / WhatsApp", "Customer / WhatsApp")}</span>
+                    <span className="text-slate-700">{t("Cliente", "Customer")}</span>
                     <input
                         value={customerQuery}
                         onChange={(e) => setCustomerQuery(e.target.value)}
                         className="border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                        placeholder={lang === "es" ? "Buscar nombre o +52..." : "Search name or +52..."}
+                        placeholder={lang === "es" ? "Buscar nombre..." : "Search customer..."}
                     />
                   </div>
                 </div>
@@ -636,7 +819,10 @@ export default function AdminInventoryPage() {
           {/* LIST / TABLE */}
           {items.length === 0 ? (
               <p className="text-xs text-slate-500">
-                {t("No hay pares cargados todavía o la sesión no ha cargado.", "No pairs loaded yet, or session not loaded.")}
+                {t(
+                    "No hay pares cargados todavía o la sesión no ha cargado.",
+                    "No pairs loaded yet, or session not loaded."
+                )}
               </p>
           ) : filteredItems.length === 0 ? (
               <p className="text-xs text-slate-500">
@@ -661,6 +847,7 @@ export default function AdminInventoryPage() {
                               lang={lang}
                               onUpdate={updateItem}
                               locations={locationOptions}
+                              getItemCategory={getItemCategory}
                           />
                       )
                   )}
@@ -672,17 +859,38 @@ export default function AdminInventoryPage() {
                     <table className="min-w-full text-[11px]">
                       <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">ID</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Modelo", "Model")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Color", "Color")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Talla", "Size")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Ubicación", "Location")}</th>
-                        <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Precio", "Price")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Estatus", "Status")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Cliente", "Customer")}</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">WhatsApp</th>
-                        <th className="text-left px-3 py-2 font-semibold text-slate-600">{t("Notas", "Notes")}</th>
-                        <th className="text-right px-3 py-2 font-semibold text-slate-600">{t("Acciones", "Actions")}</th>
+                        {/* ID removed; Category added in its place */}
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Categoría", "Category")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Modelo", "Model")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Color", "Color")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Talla", "Size")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Ubicación", "Location")}
+                        </th>
+                        <th className="text-right px-3 py-2 font-semibold text-slate-600">
+                          {t("Precio", "Price")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Estatus", "Status")}
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Cliente", "Customer")}
+                        </th>
+                        {/* WhatsApp removed */}
+                        <th className="text-left px-3 py-2 font-semibold text-slate-600">
+                          {t("Notas", "Notes")}
+                        </th>
+                        <th className="text-right px-3 py-2 font-semibold text-slate-600">
+                          {t("Acciones", "Actions")}
+                        </th>
                       </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -693,6 +901,7 @@ export default function AdminInventoryPage() {
                               lang={lang}
                               onUpdate={updateItem}
                               locations={locationOptions}
+                              getItemCategory={getItemCategory}
                           />
                       ))}
                       </tbody>
@@ -795,21 +1004,22 @@ function InventoryRow({
                         lang,
                         onUpdate,
                         locations,
+                        getItemCategory,
                       }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
   locations: LocationOption[];
+  getItemCategory: (it: InventoryItem) => { id: string | null; name: string | null };
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
   const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
-  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [localLocationId, setLocalLocationId] = useState<string>(
       String((item as any)?.location?.id || (item as any).location_id || "")
   );
 
-  // ✅ NEW: editable price
+  // editable price
   const [localPrice, setLocalPrice] = useState<string>(String(item.price_mxn ?? 0));
 
   const [saving, setSaving] = useState(false);
@@ -819,10 +1029,9 @@ function InventoryRow({
   useEffect(() => {
     setLocalStatus(item.status);
     setLocalCustomerName(item.customer_name || "");
-    setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
     setLocalLocationId(String((item as any)?.location?.id || (item as any).location_id || ""));
-    setLocalPrice(String(item.price_mxn ?? 0)); // ✅ NEW
+    setLocalPrice(String(item.price_mxn ?? 0));
   }, [item]);
 
   const originalLocId = String((item as any)?.location?.id || (item as any).location_id || "");
@@ -832,10 +1041,9 @@ function InventoryRow({
   const hasChanges =
       localStatus !== item.status ||
       localCustomerName !== (item.customer_name || "") ||
-      localWhatsapp !== (item.customer_whatsapp || "") ||
       localNotes !== (item.notes || "") ||
       localLocationId !== originalLocId ||
-      parsedLocalPrice !== originalPrice; // ✅ NEW
+      parsedLocalPrice !== originalPrice;
 
   async function handleSave() {
     if (!hasChanges) return;
@@ -847,9 +1055,8 @@ function InventoryRow({
       // IMPORTANT: undefined means "don't send"; string means update.
       location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
-      customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
-      price_mxn: parsedLocalPrice, // ✅ NEW
+      price_mxn: parsedLocalPrice,
     });
 
     setSaving(false);
@@ -864,17 +1071,25 @@ function InventoryRow({
                   ? "bg-sky-50 text-sky-700 border-sky-200"
                   : "bg-rose-50 text-rose-700 border-rose-200";
 
+  const cat = getItemCategory(item);
+  const catLabel =
+      cat?.name || cat?.id ? translateCategory(String(cat.name || cat.id), lang) : "—";
+
   return (
       <tr className="hover:bg-slate-50/70">
-        <td className="px-3 py-2 align-top text-slate-500">
-          <span className="font-mono text-[10px]">{item.id.slice(0, 8)}…</span>
+        {/* Category (replaces ID column) */}
+        <td className="px-3 py-2 align-top text-slate-900 text-xs">
+          {catLabel}
         </td>
+
         <td className="px-3 py-2 align-top text-slate-900 text-xs">
           {translateModelLabel(item.model_name, lang)}
         </td>
+
         <td className="px-3 py-2 align-top text-slate-900 text-xs">
           {translateColor(item.color, lang)}
         </td>
+
         <td className="px-3 py-2 align-top text-slate-900 text-xs">{item.size}</td>
 
         {/* editable location */}
@@ -894,7 +1109,7 @@ function InventoryRow({
           <p className="mt-1 text-[10px] text-slate-500">📍 {getLocationName(item)}</p>
         </td>
 
-        {/* ✅ NEW: editable price cell */}
+        {/* editable price cell */}
         <td className="px-3 py-2 align-top text-right text-slate-900 text-xs">
           <input
               type="number"
@@ -919,7 +1134,9 @@ function InventoryRow({
                   </option>
               ))}
             </select>
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}>
+            <span
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}
+            >
             {statusLabel[localStatus][lang]}
           </span>
           </div>
@@ -934,14 +1151,7 @@ function InventoryRow({
           />
         </td>
 
-        <td className="px-3 py-2 align-top">
-          <input
-              value={localWhatsapp}
-              onChange={(e) => setLocalWhatsapp(e.target.value)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-2 py-1 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              placeholder="+52..."
-          />
-        </td>
+        {/* WhatsApp removed */}
 
         <td className="px-3 py-2 align-top">
         <textarea
@@ -972,21 +1182,22 @@ function InventoryCardMobile({
                                lang,
                                onUpdate,
                                locations,
+                               getItemCategory,
                              }: {
   item: InventoryItem;
   lang: Lang;
   onUpdate: (p: Partial<InventoryItem> & { id: string }) => void;
   locations: LocationOption[];
+  getItemCategory: (it: InventoryItem) => { id: string | null; name: string | null };
 }) {
   const [localStatus, setLocalStatus] = useState<InventoryStatus>(item.status);
   const [localCustomerName, setLocalCustomerName] = useState(item.customer_name || "");
-  const [localWhatsapp, setLocalWhatsapp] = useState(item.customer_whatsapp || "");
   const [localNotes, setLocalNotes] = useState(item.notes || "");
   const [localLocationId, setLocalLocationId] = useState<string>(
       String((item as any)?.location?.id || (item as any).location_id || "")
   );
 
-  // ✅ NEW: editable price in mobile details
+  // editable price in mobile details
   const [localPrice, setLocalPrice] = useState<string>(String(item.price_mxn ?? 0));
 
   const [saving, setSaving] = useState(false);
@@ -998,10 +1209,9 @@ function InventoryCardMobile({
   useEffect(() => {
     setLocalStatus(item.status);
     setLocalCustomerName(item.customer_name || "");
-    setLocalWhatsapp(item.customer_whatsapp || "");
     setLocalNotes(item.notes || "");
     setLocalLocationId(String((item as any)?.location?.id || (item as any).location_id || ""));
-    setLocalPrice(String(item.price_mxn ?? 0)); // ✅ NEW
+    setLocalPrice(String(item.price_mxn ?? 0));
   }, [item]);
 
   const originalLocId = String((item as any)?.location?.id || (item as any).location_id || "");
@@ -1010,10 +1220,9 @@ function InventoryCardMobile({
 
   const hasChanges =
       localCustomerName !== (item.customer_name || "") ||
-      localWhatsapp !== (item.customer_whatsapp || "") ||
       localNotes !== (item.notes || "") ||
       localLocationId !== originalLocId ||
-      parsedLocalPrice !== originalPrice; // ✅ NEW
+      parsedLocalPrice !== originalPrice;
 
   async function saveWithStatus(newStatus: InventoryStatus) {
     setSaving(true);
@@ -1024,9 +1233,8 @@ function InventoryCardMobile({
       status: newStatus,
       location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
-      customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
-      price_mxn: parsedLocalPrice, // ✅ NEW (keeps price consistent if edited)
+      price_mxn: parsedLocalPrice,
     });
 
     setSaving(false);
@@ -1046,9 +1254,8 @@ function InventoryCardMobile({
       status: localStatus,
       location_id: localLocationId ? localLocationId : undefined,
       customer_name: localCustomerName || null,
-      customer_whatsapp: localWhatsapp || null,
       notes: localNotes || null,
-      price_mxn: parsedLocalPrice, // ✅ NEW
+      price_mxn: parsedLocalPrice,
     });
 
     setSaving(false);
@@ -1063,6 +1270,10 @@ function InventoryCardMobile({
                   ? "bg-sky-50 text-sky-700 border-sky-200"
                   : "bg-rose-50 text-rose-700 border-rose-200";
 
+  const cat = getItemCategory(item);
+  const catLabel =
+      cat?.name || cat?.id ? translateCategory(String(cat.name || cat.id), lang) : "—";
+
   return (
       <>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
@@ -1075,16 +1286,17 @@ function InventoryCardMobile({
                 {translateColor(item.color, lang)}
               </p>
 
+              <p className="mt-1 text-[11px] text-slate-600">🏷️ {catLabel}</p>
               <p className="mt-1 text-[11px] text-slate-600">📍 {getLocationName(item)}</p>
-
-              <p className="mt-1 text-[11px] text-slate-400 font-mono">ID: {item.id.slice(0, 8)}…</p>
             </div>
 
             <div className="text-right">
               <p className="text-base font-semibold text-slate-900">
                 ${Number(item.price_mxn ?? 0).toFixed(0)} MXN
               </p>
-              <span className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}>
+              <span
+                  className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass}`}
+              >
               {statusLabel[localStatus][lang]}
             </span>
             </div>
@@ -1122,7 +1334,9 @@ function InventoryCardMobile({
               onClick={() => setShowDetails((prev) => !prev)}
               className="flex w-full items-center justify-between rounded-full bg-slate-100 px-3 py-1.5 text-[11px] text-slate-700"
           >
-            <span>{showDetails ? tt("Ocultar detalles", "Hide details") : tt("Ver / editar detalles", "View / edit details")}</span>
+          <span>
+            {showDetails ? tt("Ocultar detalles", "Hide details") : tt("Ver / editar detalles", "View / edit details")}
+          </span>
             <span className="text-xs">{showDetails ? "▲" : "▼"}</span>
           </button>
 
@@ -1145,7 +1359,7 @@ function InventoryCardMobile({
                   </select>
                 </div>
 
-                {/* ✅ NEW: price editor */}
+                {/* price editor */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-slate-700">{tt("Precio (MXN)", "Price (MXN)")}</label>
                   <input
@@ -1167,15 +1381,7 @@ function InventoryCardMobile({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-slate-700">WhatsApp</label>
-                  <input
-                      value={localWhatsapp}
-                      onChange={(e) => setLocalWhatsapp(e.target.value)}
-                      className="w-full border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      placeholder="+52..."
-                  />
-                </div>
+                {/* WhatsApp removed */}
 
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-slate-700">{tt("Notas", "Notes")}</label>
@@ -1193,7 +1399,11 @@ function InventoryCardMobile({
                       disabled={!hasChanges || saving}
                       className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
                   >
-                    {saving ? tt("Guardando…", "Saving…") : hasChanges ? tt("Guardar detalles", "Save details") : tt("Sin cambios", "No changes")}
+                    {saving
+                        ? tt("Guardando…", "Saving…")
+                        : hasChanges
+                            ? tt("Guardar detalles", "Save details")
+                            : tt("Sin cambios", "No changes")}
                   </button>
                 </div>
               </div>
@@ -1204,7 +1414,9 @@ function InventoryCardMobile({
         {pendingStatus && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
               <div className="mx-6 w-full max-w-sm rounded-2xl bg-white p-4 space-y-3 shadow-lg">
-                <p className="text-sm font-semibold text-slate-900">{tt("Cambiar estatus del par", "Change pair status")}</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {tt("Cambiar estatus del par", "Change pair status")}
+                </p>
 
                 <div className="flex items-center justify-center gap-2 text-xs font-semibold">
               <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
@@ -1303,7 +1515,9 @@ function InventoryFastRowMobile({
                 onClick={() => handleStatusClick("available")}
                 disabled={saving}
                 className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-                    localStatus === "available" ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700"
+                    localStatus === "available"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-emerald-50 text-emerald-700"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {tt("Disponible", "Available")}
@@ -1313,7 +1527,9 @@ function InventoryFastRowMobile({
                 onClick={() => handleStatusClick("reserved")}
                 disabled={saving}
                 className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-                    localStatus === "reserved" ? "bg-amber-400 text-slate-900" : "bg-amber-50 text-amber-700"
+                    localStatus === "reserved"
+                        ? "bg-amber-400 text-slate-900"
+                        : "bg-amber-50 text-amber-700"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {tt("Apartado", "Reserved")}
@@ -1323,7 +1539,9 @@ function InventoryFastRowMobile({
                 onClick={() => handleStatusClick("paid_complete")}
                 disabled={saving}
                 className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold ${
-                    localStatus === "paid_complete" ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-700"
+                    localStatus === "paid_complete"
+                        ? "bg-sky-500 text-white"
+                        : "bg-sky-50 text-sky-700"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {tt("Pagado", "Paid")}
